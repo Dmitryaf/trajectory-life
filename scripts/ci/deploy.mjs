@@ -2,7 +2,14 @@ import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { githubClient } from './github.mjs';
-import { assertDeployment, assertReleaseRun, deploymentUrl, promoteVerified, releaseTargets } from './release-policy.mjs';
+import {
+  assertDeployment,
+  assertReleaseRun,
+  candidateDeploymentArgs,
+  deploymentUrl,
+  promoteVerified,
+  releaseTargets,
+} from './release-policy.mjs';
 import { assetSignature, smokePublic } from './smoke.mjs';
 import { git, summary, writeJson } from './runtime.mjs';
 
@@ -62,20 +69,7 @@ await assetSignature(deploymentUrl(previous.url));
 
 vercel(['pull', '--yes', `--environment=${target.environment}`, `--git-branch=${branch}`]);
 vercel(['build', ...(branch === 'main' ? ['--prod'] : [])]);
-const output = vercel(
-  [
-    'deploy',
-    '--prebuilt',
-    '--skip-domain',
-    '--yes',
-    ...(branch === 'main' ? ['--prod'] : []),
-    '--meta',
-    `sourceSha=${sha}`,
-    '--meta',
-    `ciRun=${source.id}`,
-  ],
-  true,
-);
+const output = vercel(candidateDeploymentArgs(branch, sha, source.id), true);
 // The pinned CLI supports structured output in non-interactive agent mode as
 // well as the documented URL-only stdout. Never guess a URL from log text.
 const candidateUrl = output.startsWith('{') ? JSON.parse(output).url : output;
