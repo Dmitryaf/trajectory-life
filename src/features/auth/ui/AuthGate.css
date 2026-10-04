@@ -151,28 +151,33 @@
   color: var(--auth-gate-error);
 }
 .auth-mode {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 4px;
-  margin-bottom: 16px;
-  padding: 4px;
-  border-radius: 14px;
-  background: var(--auth-gate-disabled-surface);
-}
-.auth-mode button {
-  min-height: 38px;
-  border: 0;
-  border-radius: 10px;
-  background: transparent;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  margin-bottom: 20px;
   color: var(--muted);
-  cursor: pointer;
-  font-size: 12px;
-  font-weight: 800;
+  font-size: 14px;
+  line-height: 1.6;
 }
-.auth-mode button.is-active {
-  background: var(--surface);
-  color: var(--navy);
-  box-shadow: 0 4px 12px var(--auth-gate-input-shadow);
+.auth-mode button,
+.auth-mode a {
+  padding: 6px 0;
+  border: 0;
+  background: transparent;
+  color: var(--auth-gate-link);
+  cursor: pointer;
+  font: inherit;
+  font-weight: 750;
+  text-decoration: none;
+}
+.auth-mode button:hover,
+.auth-mode a:hover {
+  color: var(--accent-dark);
+}
+.auth-mode button:disabled {
+  cursor: wait;
+  opacity: 0.6;
 }
 .auth-reset {
   display: block;

@@ -76,6 +76,23 @@ test('registers without an invitation and keeps confirmation and retry paths usa
   }
 });
 
+test('finds registration after entering through the landing sign-in link', async ({ page }, testInfo) => {
+  await page.route(`${backend}/**`, (route) => route.fulfill({ json: {} }));
+  for (const width of [390, 1280]) {
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto(`${origin}/`);
+    await page.getByRole('link', { name: 'Войти', exact: true }).first().click();
+    await expect(page.getByText('Нет аккаунта?', { exact: true })).toBeVisible();
+    await expectPageFitsViewport(page, `sign-in at ${width}px`);
+    await page.screenshot({ path: testInfo.outputPath(`sign-in-${width}.png`), fullPage: true });
+    await page.locator('.auth-mode').getByRole('button', { name: 'Создать аккаунт', exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'Создайте аккаунт', exact: true })).toBeVisible();
+    await expect(page.getByRole('textbox', { name: 'Email', exact: true })).toBeFocused();
+    await page.locator('.auth-mode').getByRole('button', { name: 'Войти', exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'Войдите в «Траекторию»' })).toBeVisible();
+  }
+});
+
 test('shows server rate limiting and allows returning to sign-in', async ({ page }) => {
   await page.route(`${backend}/**`, (route) =>
     route.fulfill({ status: 429, json: { code: 'over_email_send_rate_limit', msg: 'Too many requests' } }),

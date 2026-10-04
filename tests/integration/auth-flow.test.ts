@@ -56,6 +56,40 @@ describe('authentication', () => {
     wrapper.unmount();
   });
 
+  it('makes registration discoverable from sign-in and focuses the email field', async () => {
+    const pinia = createPinia();
+    setActivePinia(pinia);
+    const auth = useAuthStore();
+    auth.signupEnabled = true;
+    const wrapper = mount(AuthGate, { attachTo: document.body, global: { plugins: [pinia, authRouter()] } });
+
+    expect(wrapper.get('.auth-mode').text()).toContain('Нет аккаунта?');
+    await wrapper.get('.auth-form input[type="email"]').setValue('new@example.test');
+    await wrapper.get('#auth-password').setValue('old-password');
+    await wrapper.get('.auth-mode button').trigger('click');
+    expect(wrapper.get('.auth-card__brand h2').text()).toBe('Создайте аккаунт');
+    expect(wrapper.get('.auth-mode').text()).toContain('Уже есть аккаунт?');
+    expect(wrapper.get('input[type="email"]').element).toBe(document.activeElement);
+    expect(wrapper.get('input[type="email"]').element).toHaveProperty('value', 'new@example.test');
+    expect(wrapper.get('#auth-password').element).toHaveProperty('value', '');
+    wrapper.unmount();
+  });
+
+  it('explains closed registration without exposing a signup form', () => {
+    const pinia = createPinia();
+    setActivePinia(pinia);
+    const auth = useAuthStore();
+    auth.signupEnabled = false;
+    const wrapper = mount(AuthGate, { props: { initialMode: 'sign-up' }, global: { plugins: [pinia, authRouter()] } });
+
+    expect(wrapper.get('.auth-mode').text()).toContain('Регистрация сейчас закрыта.');
+    expect(wrapper.get('.auth-mode a').attributes('href')).toBe('/#product');
+    expect(wrapper.find('.auth-mode button').exists()).toBe(false);
+    expect(wrapper.find('#auth-password-confirmation').exists()).toBe(false);
+    expect(wrapper.get('.auth-card__brand h2').text()).toBe('Войдите в «Траекторию»');
+    wrapper.unmount();
+  });
+
   it('uses the registration mode requested by the public access route when registration is enabled', () => {
     const pinia = createPinia();
     setActivePinia(pinia);
