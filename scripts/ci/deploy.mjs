@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
+import { parseEnv } from 'node:util';
+import { assertClientBuildEnvironment } from './build-environment.mjs';
 import { githubClient } from './github.mjs';
 import {
   assertDeployment,
@@ -68,6 +70,7 @@ assertDeployment(previous, projectId);
 await assetSignature(deploymentUrl(previous.url));
 
 vercel(['pull', '--yes', `--environment=${target.environment}`, `--git-branch=${branch}`]);
+assertClientBuildEnvironment(parseEnv(readFileSync(`.vercel/.env.${target.environment}.local`, 'utf8')), target.projectRef);
 vercel(['build', ...(branch === 'main' ? ['--prod'] : [])]);
 const output = vercel(candidateDeploymentArgs(branch, sha, source.id), true);
 // The pinned CLI supports structured output in non-interactive agent mode as
