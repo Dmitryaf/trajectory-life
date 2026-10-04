@@ -1,0 +1,20 @@
+name: Event delivery
+
+on:
+  push:
+    branches: [codex/linux-visual-baselines]
+  pull_request:
+    branches: [develop, main]
+
+permissions: {}
+
+jobs:
+  event-delivery:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 1
+    steps:
+      - name: Report event delivery
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          COMMIT_SHA: ${{ github.sha }}
+        run: printf '%s %s\n' "$EVENT_NAME" "$COMMIT_SHA"
