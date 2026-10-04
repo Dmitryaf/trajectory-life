@@ -2,8 +2,10 @@ project_id = "trajectory-app"
 
 [auth]
 enabled = true
-site_url = "https://trajectory-app-git-develop-trajectory3.vercel.app"
+site_url = "https://trajectory-life-staging-trajectory3.vercel.app"
 additional_redirect_urls = [
+  "https://trajectory-life-staging-trajectory3.vercel.app/access",
+  "https://trajectory-life-staging-trajectory3.vercel.app/password-reset",
   "https://trajectory-app-git-develop-trajectory3.vercel.app/access",
   "https://trajectory-app-git-develop-trajectory3.vercel.app/password-reset",
 ]
