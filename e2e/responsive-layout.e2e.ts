@@ -764,6 +764,37 @@ test('removes paginated list motion when reduced motion is requested', async ({ 
   await expect.poll(() => list.evaluate((element) => element.style.height)).toBe('');
 });
 
+for (const width of [320, 361, 390, 480, 719, 720, 721]) {
+  test(`keeps the daily heading text separate from its date control at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 844 });
+    await page.goto('/today');
+    await page.locator('.page--today').waitFor();
+    await page.evaluate(() => document.fonts.ready);
+
+    async function expectHeadingFits() {
+      const heading = await readLayoutBox(page.locator('.page--today > .page-heading'), 'daily heading');
+      const date = await readLayoutBox(page.getByRole('button', { name: 'Выбрать дату записи' }), 'date control');
+      const text = await page.locator('.page--today > .page-heading h1').evaluate((element) => {
+        const range = document.createRange();
+        range.selectNodeContents(element);
+        const box = range.getBoundingClientRect();
+        return { x: box.x, y: box.y, width: box.width, height: box.height };
+      });
+      expectBoxInside(text, heading, 'daily heading text');
+      const separated = text.x + text.width + 4 <= date.x || text.y + text.height + 4 <= date.y;
+      expect(separated, 'the date control must not cover heading text').toBe(true);
+    }
+
+    await expectHeadingFits();
+    await page.getByLabel('Дата записи', { exact: true }).evaluate((input) => {
+      (input as HTMLInputElement).value = '2026-08-30';
+      input.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    await expect(page.locator('.page--today > .page-heading h1')).toContainText('августа');
+    await expectHeadingFits();
+  });
+}
+
 test('keeps the returning daily form compact and visibly grouped', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 720 });
   await page.goto('/today');
