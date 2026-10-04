@@ -1,0 +1,51 @@
+.settings-card {
+  --settings-accent: var(--mint);
+  position: relative;
+  min-width: 0;
+  margin-bottom: 16px;
+  padding: 24px;
+  overflow: hidden;
+  border: 1px solid var(--settings-card-border);
+  border-radius: 24px;
+  background: var(--settings-card-surface);
+  box-shadow: 0 10px 28px var(--settings-card-shadow);
+}
+@media (max-width: 720px) {
+  .settings-card {
+    padding: 18px;
+    border-radius: 18px;
+  }
+}
+.settings-card::before {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 5px;
+  background: var(--settings-accent);
+}
+.settings-card--tone-areas {
+  --settings-accent: var(--amber);
+}
+.settings-card--tone-career {
+  --settings-accent: var(--blue);
+}
+.settings-card--tone-success {
+  --settings-accent: var(--status-success);
+}
+.settings-card--tone-brand {
+  --settings-accent: var(--brand-strong);
+}
+.settings-card--tone-purple {
+  --settings-accent: var(--purple);
+}
+.settings-card--tone-orange {
+  --settings-accent: var(--orange);
+}
+.settings-card > :deep(.form-card__heading) {
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--archive-pagination-divider);
+}
+.settings-card > :deep(.primary-button),
+.settings-card > :deep(.form-row + .primary-button) {
+  margin-top: 18px;
+}

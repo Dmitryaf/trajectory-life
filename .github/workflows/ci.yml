@@ -1,0 +1,155 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [develop, main]
+  push:
+    branches: [develop, main]
+  workflow_dispatch:
+    inputs:
+      force_browser_checks:
+        description: Run the complete browser matrix even when matching evidence exists
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  HUSKY: 0
+
+jobs:
+  prepare:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      reuse: ${{ steps.proof.outputs.reuse }}
+      proof_run: ${{ steps.proof.outputs.proof_run }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+      - id: proof
+        name: Verify source and previous browser evidence
+        env:
+          GH_TOKEN: ${{ github.token }}
+          FORCE_BROWSER_CHECKS: ${{ inputs.force_browser_checks || false }}
+        run: node scripts/ci/prepare.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ci-context
+          path: qa/ci/context.json
+          retention-days: 7
+          overwrite: true
+
+  quality:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm run audit:dependencies
+      - run: npm run check
+
+  browsers:
+    needs: prepare
+    if: needs.prepare.outputs.reuse != 'true'
+    name: browser-${{ matrix.project }}-${{ matrix.shard }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        project: [chromium, mobile-webkit, webkit]
+        shard: [1, 2]
+    env:
+      BROWSER_JOB: browser-${{ matrix.project }}-${{ matrix.shard }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - name: Install selected browser
+        env:
+          ENGINE: ${{ matrix.project == 'chromium' && 'chromium' || 'webkit' }}
+        run: npx playwright install --with-deps "$ENGINE"
+      - name: Run browser shard
+        env:
+          PROJECT: ${{ matrix.project }}
+          SHARD: ${{ matrix.shard }}
+        run: npm run test:e2e:ci -- --project="$PROJECT" --shard="$SHARD/2"
+      - name: Keep timing and browser evidence on every run
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: metrics-${{ matrix.project }}-${{ matrix.shard }}
+          path: qa/ci/browser-*.json
+          if-no-files-found: error
+          retention-days: 14
+          overwrite: true
+      - name: Keep browser report and traces
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-report-${{ matrix.project }}-${{ matrix.shard }}
+          path: |
+            blob-report/
+            test-results/
+          if-no-files-found: ignore
+          retention-days: 7
+          overwrite: true
+
+  test-and-build:
+    if: always()
+    needs: [prepare, quality, browsers]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+      - uses: actions/download-artifact@v4
+        with:
+          name: ci-context
+          path: qa/ci
+      - if: needs.prepare.outputs.reuse != 'true'
+        uses: actions/download-artifact@v4
+        with:
+          pattern: metrics-*
+          path: qa/ci/reports
+          merge-multiple: true
+      - name: Require every check or verified identical browser evidence
+        env:
+          CI_RESULTS: ${{ toJSON(needs) }}
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/ci/gate.mjs
+      - if: needs.prepare.outputs.reuse != 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-proof
+          path: qa/ci/proof.json
+          if-no-files-found: error
+          retention-days: 7
+          overwrite: true

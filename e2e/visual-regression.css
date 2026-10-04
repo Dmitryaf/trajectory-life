@@ -1,0 +1,23 @@
+*,
+*::before,
+*::after {
+  animation: none !important;
+  caret-color: transparent !important;
+  transition: none !important;
+}
+
+[data-sonner-toaster] {
+  display: none !important;
+}
+
+.entry-date-picker input,
+.visual-dynamic-text {
+  color: transparent !important;
+}
+
+.visual-calendar-dependent {
+  min-height: 145px !important;
+  max-height: 145px !important;
+  overflow: hidden !important;
+  visibility: hidden !important;
+}

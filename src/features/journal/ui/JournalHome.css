@@ -1,0 +1,207 @@
+.page--journal > .page-heading {
+  margin: 8px 2px 20px;
+}
+
+.page--journal > .page-heading h1 {
+  font-size: clamp(36px, 4.5vw, 44px);
+  line-height: 1;
+}
+
+.page--journal > .page-heading p {
+  max-width: 560px;
+  font-size: 14px;
+}
+
+.more-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.journal-settings-card {
+  position: relative;
+  min-height: 88px;
+  display: grid;
+  grid-template-columns: 40px 1fr auto;
+  align-items: center;
+  gap: 12px;
+  margin-top: 14px;
+  padding: 15px 18px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--surface-soft);
+  color: inherit;
+  text-decoration: none;
+  transition:
+    transform 0.18s ease,
+    border-color 0.18s ease,
+    box-shadow 0.18s ease;
+}
+
+.journal-settings-card:hover {
+  transform: translateY(-1px);
+  border-color: var(--more-view-primary-border);
+  box-shadow: var(--shadow-soft);
+}
+
+.journal-settings-card > span {
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  border-radius: 13px;
+  background: var(--chip-selected-surface);
+  color: var(--accent-dark);
+  font-size: 17px;
+}
+
+.journal-settings-card small {
+  display: block;
+  margin-bottom: 3px;
+  color: var(--archive-date-action);
+  font-size: 10px;
+  font-weight: 850;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.journal-settings-card h2 {
+  margin-bottom: 2px;
+  font-size: 17px;
+}
+
+.journal-settings-card p {
+  margin: 0;
+  font-size: 12px;
+}
+
+.journal-settings-card > i {
+  color: var(--more-view-secondary);
+  font-style: normal;
+  font-size: 22px;
+}
+
+.more-card {
+  position: relative;
+  min-height: 168px;
+  display: grid;
+  grid-template-columns: 44px 1fr auto;
+  align-items: start;
+  gap: 12px;
+  overflow: hidden;
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  background: var(--surface);
+  color: inherit;
+  text-decoration: none;
+  box-shadow: var(--shadow-soft);
+  transition:
+    transform 0.18s ease,
+    box-shadow 0.18s ease;
+}
+
+.more-card::after {
+  content: '';
+  position: absolute;
+  width: 120px;
+  height: 120px;
+  right: -52px;
+  bottom: -74px;
+  border-radius: 50%;
+  background: var(--journal-glow);
+  opacity: 0.5;
+}
+
+.more-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow);
+}
+
+.more-card--mint {
+  --journal-glow: var(--mint);
+}
+
+.more-card--amber {
+  --journal-glow: var(--more-view-journal-glow);
+}
+
+.more-card > span {
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  border-radius: 14px;
+  background: var(--chip-selected-surface);
+  color: var(--more-view-journal-text);
+  font-size: 18px;
+  font-weight: 850;
+}
+
+.more-card--amber > span {
+  color: var(--more-view-event-text);
+  background: var(--archive-event-surface-end);
+}
+
+.more-card small {
+  display: block;
+  margin: 1px 0 8px;
+  color: var(--accent-dark);
+  font-size: 10px;
+  font-weight: 850;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.more-card h2 {
+  margin: 0 0 4px;
+  font-size: 17px;
+}
+
+.more-card p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.more-card > i {
+  position: relative;
+  z-index: 1;
+  color: var(--more-view-muted);
+  font-style: normal;
+  font-size: 22px;
+}
+
+@media (max-width: 760px) {
+  .page--journal > .page-heading {
+    margin-bottom: 18px;
+  }
+
+  .more-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .more-card {
+    min-height: 144px;
+    padding: 18px;
+    border-radius: 20px;
+  }
+}
+
+@media (max-width: 720px) {
+  .page--journal > .page-heading h1 {
+    font-size: 34px;
+  }
+
+  .journal-settings-card {
+    min-height: 84px;
+    padding: 14px 16px;
+  }
+}
+
+@media (max-width: 520px) {
+  .journal-settings-card p {
+    display: none;
+  }
+}

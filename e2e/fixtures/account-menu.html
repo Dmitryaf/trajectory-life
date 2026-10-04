@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Account menu browser fixture</title>
+  </head>
+  <body>
+    <main style="padding: 20px">
+      <button id="before" type="button">Перед аккаунтом</button>
+      <div id="account" style="display: flex; justify-content: flex-end; margin-block: 20px"></div>
+      <button id="after" type="button">После аккаунта</button>
+      <output id="sign-outs">0</output>
+    </main>
+    <script type="module">
+      import { createApp, h } from 'vue';
+      import { createRouter, createMemoryHistory } from 'vue-router';
+      import AccountMenu from '../../src/features/auth/ui/AccountMenu.vue';
+      import '../../src/style.css';
+
+      const router = createRouter({ history: createMemoryHistory(), routes: [{ path: '/:pathMatch(.*)*', component: {} }] });
+      let signOuts = 0;
+      createApp({
+        render: () =>
+          h(AccountMenu, {
+            email: 'long-synthetic-account-name@example.com',
+            onSignOut: () => {
+              document.querySelector('#sign-outs').textContent = String(++signOuts);
+            },
+          }),
+      })
+        .use(router)
+        .mount('#account');
+    </script>
+  </body>
+</html>

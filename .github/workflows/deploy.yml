@@ -1,0 +1,56 @@
+name: Verified deployment
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [develop, main]
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: deploy-${{ github.event.workflow_run.head_branch }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_repository.full_name == github.repository
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      HUSKY: 0
+      VERCEL_TELEMETRY_DISABLED: 1
+      VERCEL_ORG_ID: team_sZTFAJUNjw3uCHNZarBQgdVb
+      VERCEL_PROJECT_ID: prj_O0neiglfpJG0JKq6jBYLJOE6buR4
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - name: Require the publishing credential before installing tools
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: test -n "$VERCEL_TOKEN" || { echo 'Set the VERCEL_TOKEN repository secret. Existing deployments remain active.'; exit 1; }
+      - run: npm ci
+      - run: npm install --global vercel@60.1.3
+      - run: npx playwright install --with-deps chromium
+      - name: Build isolated candidate, verify, then promote
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: node scripts/ci/deploy.mjs
+      - if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: deployment-evidence
+          path: qa/ci/deployment.json
+          if-no-files-found: ignore
+          retention-days: 14

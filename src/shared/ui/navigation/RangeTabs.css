@@ -1,0 +1,42 @@
+.range-tabs {
+  display: flex;
+  min-width: 0;
+  gap: 8px;
+  margin: -8px 0 18px;
+}
+
+.range-tabs :deep(button),
+.range-tabs :deep(a) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--line);
+  border-radius: 13px;
+  background: var(--surface);
+  padding: 10px 14px;
+  color: var(--range-tab-text);
+  cursor: pointer;
+  font-weight: 750;
+  text-decoration: none;
+}
+
+.range-tabs :deep(button.active),
+.range-tabs :deep(a.active) {
+  color: var(--range-tab-active-text);
+  border-color: var(--range-tab-active-border);
+  background: var(--range-tab-active-surface);
+}
+
+@media (max-width: 720px) {
+  .range-tabs {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .range-tabs :deep(button),
+  .range-tabs :deep(a) {
+    min-width: 0;
+    padding: 10px 6px;
+    font-size: 12px;
+  }
+}

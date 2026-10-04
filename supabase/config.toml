@@ -1,0 +1,38 @@
+project_id = "trajectory-app"
+
+[auth]
+enabled = true
+site_url = "https://trajectory-app-git-develop-trajectory3.vercel.app"
+additional_redirect_urls = [
+  "https://trajectory-app-git-develop-trajectory3.vercel.app/access",
+  "https://trajectory-app-git-develop-trajectory3.vercel.app/password-reset",
+]
+enable_signup = false
+enable_anonymous_sign_ins = false
+
+[auth.hook.before_user_created]
+enabled = true
+uri = "pg-functions://postgres/public/hook_require_beta_invite"
+
+[functions.delete-account]
+verify_jwt = true
+
+[auth.email]
+enable_signup = true
+enable_confirmations = true
+max_frequency = "1m"
+otp_length = 8
+
+[auth.sms]
+enable_signup = false
+enable_confirmations = false
+
+[auth.mfa.totp]
+enroll_enabled = true
+verify_enabled = true
+
+[storage.vector]
+enabled = false
+
+[functions.product-events]
+verify_jwt = true

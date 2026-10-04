@@ -1,0 +1,25 @@
+.section-heading {
+  display: flex;
+  min-width: 0;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 16px;
+  margin: 0 0 17px;
+}
+
+.section-heading > :deep(*) {
+  min-width: 0;
+}
+
+.section-heading :deep(h2),
+.section-heading :deep(.eyebrow) {
+  margin-bottom: 0;
+}
+
+.section-heading :deep(.eyebrow) {
+  margin-bottom: 4px;
+}
+
+.section-heading :deep(small) {
+  overflow-wrap: anywhere;
+}

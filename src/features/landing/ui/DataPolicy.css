@@ -1,0 +1,68 @@
+.data-policy-page {
+  min-height: 100vh;
+  background: var(--page);
+  color: var(--text);
+}
+.data-policy-header,
+.data-policy-content {
+  width: min(880px, calc(100% - 48px));
+  margin-inline: auto;
+}
+.data-policy-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding-block: 24px;
+  border-bottom: 1px solid var(--line);
+}
+.data-policy-header a {
+  color: var(--brand-strong);
+  text-decoration: none;
+}
+.data-policy-header a:hover {
+  color: var(--navy);
+}
+.data-policy-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 20px;
+}
+.data-policy-content {
+  padding-block: 40px 56px;
+}
+.data-policy-content h1 {
+  margin: 0 0 24px;
+  color: var(--navy);
+  font-size: clamp(30px, 4vw, 40px);
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+}
+.data-policy-body {
+  max-width: 780px;
+  line-height: 1.7;
+}
+.data-policy-body h2 {
+  margin: 28px 0 12px;
+  color: var(--navy);
+  font-size: 21px;
+  line-height: 1.35;
+}
+.data-policy-body p {
+  margin: 0;
+}
+@media (max-width: 720px) {
+  .data-policy-header,
+  .data-policy-content {
+    width: calc(100% - 36px);
+  }
+  .data-policy-header {
+    flex-wrap: wrap;
+    gap: 16px;
+    padding-block: 18px;
+  }
+  .data-policy-content {
+    padding-block: 28px 40px;
+  }
+}

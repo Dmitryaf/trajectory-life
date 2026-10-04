@@ -1,0 +1,223 @@
+.auth-shell {
+  display: grid;
+  min-height: calc(var(--viewport-height) - 210px);
+  place-items: center;
+  padding: 22px 0 48px;
+}
+.auth-card {
+  position: relative;
+  width: min(440px, calc(100vw - 28px));
+  max-width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  padding: 36px;
+  border: 1px solid var(--dialog-border);
+  border-radius: 30px;
+  background: var(--utility-action-surface);
+  box-shadow: 0 30px 80px var(--auth-gate-dialog-shadow);
+}
+.auth-card::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 8px;
+  background: linear-gradient(90deg, var(--accent) 0 58%, var(--brand-mark-highlight) 58%);
+}
+.auth-card::after {
+  content: '';
+  position: absolute;
+  width: 160px;
+  height: 160px;
+  right: -100px;
+  top: -100px;
+  border: 1px solid var(--auth-gate-decoration-border);
+  border-radius: 50%;
+  box-shadow: 0 0 0 28px var(--auth-gate-decoration-ring);
+  pointer-events: none;
+}
+.auth-card__brand {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  margin-bottom: 28px;
+}
+.auth-card__brand > div {
+  min-width: 0;
+}
+.auth-card__brand :deep(.brand-mark) {
+  width: 52px;
+  height: 52px;
+  border-radius: 17px;
+}
+.auth-card__brand .eyebrow {
+  margin-bottom: 4px;
+}
+.auth-card__brand h2 {
+  margin: 0;
+  color: var(--navy);
+  font-size: 25px;
+  line-height: 1.1;
+}
+.auth-form {
+  display: grid;
+  min-width: 0;
+  gap: 12px;
+}
+.auth-form__intro {
+  margin: 0 0 4px;
+  padding: 12px 14px;
+  border-radius: 13px;
+  background: var(--auth-gate-form-surface);
+  color: var(--auth-gate-field-text);
+  font-size: 13px;
+  line-height: 1.5;
+}
+.auth-field-hint {
+  display: block;
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+.auth-form .primary-button {
+  min-height: 50px;
+  margin-top: 4px;
+}
+.auth-button-spinner {
+  width: 16px;
+  height: 16px;
+  display: inline-block;
+  margin-right: 7px;
+  border: 2px solid var(--auth-gate-button-border);
+  border-top-color: var(--line-inverse);
+  border-radius: 50%;
+  vertical-align: -3px;
+  animation: auth-spin 0.8s linear infinite;
+}
+@keyframes auth-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.auth-confirmation {
+  display: grid;
+  gap: 12px;
+}
+.auth-confirmation__mark {
+  width: 48px;
+  height: 48px;
+  display: grid;
+  place-items: center;
+  border-radius: 15px;
+  background: var(--auth-gate-chip-surface);
+  color: var(--accent-dark);
+  font-size: 24px;
+  font-weight: 900;
+}
+.auth-confirmation h3 {
+  margin: 2px 0 0;
+  color: var(--navy);
+  font-size: 24px;
+}
+.auth-confirmation p {
+  margin: 0;
+  color: var(--auth-gate-text);
+  line-height: 1.55;
+}
+.auth-confirmation ol {
+  display: grid;
+  gap: 7px;
+  margin: 2px 0;
+  padding-left: 22px;
+  color: var(--navy);
+  font-size: 14px;
+  line-height: 1.45;
+}
+.auth-confirmation .auth-confirmation__note {
+  font-size: 13px;
+}
+.auth-confirmation__actions {
+  display: grid;
+  gap: 9px;
+  margin-top: 4px;
+}
+.auth-confirmation__actions .auth-reset {
+  margin-top: 2px;
+}
+.settings-status--error {
+  color: var(--auth-gate-error);
+}
+.auth-mode {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px;
+  margin-bottom: 16px;
+  padding: 4px;
+  border-radius: 14px;
+  background: var(--auth-gate-disabled-surface);
+}
+.auth-mode button {
+  min-height: 38px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 800;
+}
+.auth-mode button.is-active {
+  background: var(--surface);
+  color: var(--navy);
+  box-shadow: 0 4px 12px var(--auth-gate-input-shadow);
+}
+.auth-reset {
+  display: block;
+  margin: 14px auto 0;
+  border: 0;
+  background: transparent;
+  color: var(--auth-gate-link);
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 750;
+}
+.auth-reset:hover {
+  color: var(--accent-dark);
+}
+.auth-card p,
+.auth-footnote {
+  overflow-wrap: anywhere;
+}
+.auth-footnote {
+  margin: 14px 0 0;
+  color: var(--data-note-text);
+  font-size: 12px;
+  line-height: 1.5;
+}
+@media (max-width: 720px) {
+  .auth-shell {
+    display: block;
+    width: 100%;
+    min-width: 0;
+    min-height: calc(var(--viewport-height) - 170px);
+    padding-top: 8px;
+  }
+  .auth-card {
+    width: 100%;
+    padding: 20px;
+    border-radius: 20px;
+  }
+  .auth-card__brand {
+    align-items: flex-start;
+    gap: 12px;
+  }
+}
+.settings-status {
+  margin: 12px 0 0;
+  color: var(--accent-dark);
+  font-size: 13px;
+  font-weight: 750;
+}
