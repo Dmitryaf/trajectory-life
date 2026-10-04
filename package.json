@@ -8,7 +8,7 @@
     "node": ">=22 <23"
   },
   "scripts": {
-    "audit:dependencies": "npm audit --audit-level=high",
+    "audit:dependencies": "node scripts/ci/audit-dependencies.mjs",
     "check": "npm run check:architecture && npm run test:delivery && npm run lint && npm run lint:styles && npm run format:check && npm test && npm run build && npm run check:dist && npm run storybook:build",
     "test:delivery": "node --test scripts/ci/*-check.mjs",
     "check:architecture": "node scripts/check-architecture.mjs",
