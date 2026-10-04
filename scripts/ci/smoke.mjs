@@ -19,11 +19,11 @@ export async function assetSignature(origin) {
   for (const path of assets) {
     const resource = await get(new URL(path, origin));
     assert.match(resource.headers.get('content-type'), path.endsWith('.js') ? /javascript/ : /text\/css/);
+    const content = await resource.text();
+    assert.ok(!content.includes('[SENSITIVE]'), 'Published assets contain redacted build configuration');
     signature.push({
       path,
-      hash: createHash('sha256')
-        .update(await resource.text())
-        .digest('hex'),
+      hash: createHash('sha256').update(content).digest('hex'),
     });
   }
   return signature;
@@ -62,11 +62,15 @@ export async function smokePublic(origin) {
       await page.locator('h1').waitFor();
       await page.goto(`${origin}/today`);
       await page.locator('input[type="password"]').waitFor();
+      await page.locator('.auth-form[aria-busy="false"]').waitFor();
+      assert.equal(await page.getByRole('alert').count(), 0, 'Sign-in must initialize without a visible error');
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), true);
     }
     for (const path of ['/settings', '/week', '/month', '/events', '/results', '/trends', '/more']) {
       await page.goto(`${origin}${path}`);
       await page.locator('input[type="password"]').waitFor();
+      await page.locator('.auth-form[aria-busy="false"]').waitFor();
+      assert.equal(await page.getByRole('alert').count(), 0, 'Sign-in must initialize without a visible error');
     }
     assert.deepEqual(errors, []);
   } finally {
