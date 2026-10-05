@@ -17,10 +17,10 @@ const { copyCustomPrompt, copyPrompt, downloadCustomData, downloadData, end, isC
   <SettingsCard id="analysis-settings" class="settings-card--analysis" tone="purple">
     <FormCardHeading icon="goal" tone="green">
       <div>
-        <h2>Данные для внешнего анализа</h2>
+        <h2>Данные для разбора в нейросети</h2>
         <p>
-          Подготовленный текст содержит читаемую сводку, а отдельный JSON — полную копию данных выбранного периода. Приложение само ничего
-          не отправляет.
+          Скопируйте текст с записями или скачайте данные за выбранные даты в файле JSON. Передать их в нейросеть можно самостоятельно.
+          Приложение ничего не отправляет.
         </p>
       </div>
     </FormCardHeading>
@@ -77,9 +77,7 @@ const { copyCustomPrompt, copyPrompt, downloadCustomData, downloadData, end, isC
         заменяет резервную копию.
       </DataNote>
     </FormDisclosure>
-    <DataNote>
-      В пакет входят личные заметки выбранного периода. Перед передачей внешнему сервису можно просмотреть скачанный JSON.
-    </DataNote>
+    <DataNote> В текст и файл входят личные заметки за выбранные даты. Просмотрите их перед передачей в нейросеть. </DataNote>
   </SettingsCard>
 </template>
 

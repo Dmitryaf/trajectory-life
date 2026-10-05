@@ -82,7 +82,7 @@ export function buildObservations(entries: DailyEntry[], factorOptions: Option<C
     const details = factorComparisonText(leadingFactor);
     observations.push({
       id: 'context-factor',
-      title: 'Повторяющийся фактор',
+      title: 'Повторяющееся условие',
       text: `Отметка «${leadingFactor.label}» встречалась ${leadingFactor.count} ${plural(leadingFactor.count, 'раз', 'раза', 'раз')}.${details ? ` ${details}` : ' Для сравнения пока мало обычных дней.'}`,
     });
   }
@@ -122,7 +122,7 @@ export function factorComparisonText(factor: FactorSummary): string {
   if (factor.sleepSamples >= 4 && factor.sleepSamplesWithout >= 4 && factor.averageSleep !== null && factor.averageSleepWithout !== null) {
     const difference = Math.round(factor.averageSleep - factor.averageSleepWithout);
     parts.push(
-      `Сон: ${formatMinutes(Math.round(factor.averageSleep))} против ${formatMinutes(Math.round(factor.averageSleepWithout))} без фактора (${signedMinutes(difference)})`,
+      `Сон: ${formatMinutes(Math.round(factor.averageSleep))} против ${formatMinutes(Math.round(factor.averageSleepWithout))} в дни без этой отметки (${signedMinutes(difference)})`,
     );
   }
   if (
@@ -136,7 +136,7 @@ export function factorComparisonText(factor: FactorSummary): string {
       `энергия: ${formatNumber(factor.averageEnergy)} против ${formatNumber(factor.averageEnergyWithout)} (${signedNumber(difference)})`,
     );
   }
-  return parts.length ? `${parts.join('; ')}. Это связь, а не доказанная причина.` : '';
+  return parts.length ? `${parts.join('; ')}. Разница не доказывает, что причина именно в этом условии.` : '';
 }
 
 function average(values: Array<number | null>): number | null {

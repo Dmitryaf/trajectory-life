@@ -135,17 +135,19 @@ function eventKey(event: LifeEventRecord) {
   <ArchivePage
     tone="events"
     heading-eyebrow="Что произошло и что вы заметили"
-    heading-title="События и наблюдения"
+    heading-title="События и мысли"
     heading-description="Важная ситуация, мысль или деталь дня."
     archive-eyebrow="Хронология"
-    archive-title="События и важные мысли"
+    archive-title="События и мысли"
     :editing-id="editingId"
     :empty-archive="recentEvents.length === 0"
     :count="filteredEvents.length"
     :has-items="visibleEvents.length > 0"
     empty-icon="event"
     :empty-title="recentEvents.length ? 'Ничего не найдено' : 'Записей пока нет'"
-    :empty-description="recentEvents.length ? 'Измените фильтры или диапазон дат.' : 'Добавьте первое важное событие или понимание.'"
+    :empty-description="
+      recentEvents.length ? 'Измените фильтры или диапазон дат.' : 'Запишите событие или мысль, которую хочется сохранить.'
+    "
   >
     <template #composer>
       <FormCardHeading icon="event" tone="amber">

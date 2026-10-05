@@ -32,10 +32,10 @@ export function buildReviewCues(
 
   cues.push({
     id: 'coverage',
-    title: enoughEntries ? 'Данных достаточно для обзора' : 'Данных пока мало',
+    title: enoughEntries ? 'Есть записи для сравнения' : 'Данных пока мало',
     text: enoughEntries
-      ? `${summary.ordinaryCoveredEntriesCount} заполненных дней, из них ${summary.ordinaryCoreEntriesCount} с основными полями, уже дают рабочую картину периода.`
-      : `Для рабочего обзора лучше иметь хотя бы ${minTarget} без отметки «особый день». Сейчас: ${summary.ordinaryCoveredEntriesCount} и ${summary.ordinaryCoreEntriesCount}.`,
+      ? `${summary.ordinaryCoveredEntriesCount} заполненных дней, из них ${summary.ordinaryCoreEntriesCount} с основными полями, можно посмотреть в обзоре.`
+      : `Для сравнения записей ориентир — ${minTarget} без отметки «особый день». Сейчас: ${summary.ordinaryCoveredEntriesCount} и ${summary.ordinaryCoreEntriesCount}.`,
     tone: enoughEntries ? 'good' : 'warning',
   });
 
@@ -47,7 +47,7 @@ export function buildReviewCues(
     cues.push({
       id: 'factor',
       title: 'Повторяющееся условие',
-      text: `Отметка «${leadingFactor.label}» встречалась ${leadingFactor.count} ${plural(leadingFactor.count, 'раз', 'раза', 'раз')}.${comparison ? ` ${comparison}` : ' Сравнительных данных пока мало.'}`,
+      text: `Отметка «${leadingFactor.label}» встречалась ${leadingFactor.count} ${plural(leadingFactor.count, 'раз', 'раза', 'раз')}.${comparison ? ` ${comparison}` : ' Для сравнения пока мало записей.'}`,
       tone: 'warning',
     });
   }
@@ -86,7 +86,7 @@ function appendSleepCues(cues: ReviewCue[], entries: DailyEntry[], summary: Peri
     cues.push({
       id: 'sleep-regularity',
       title: 'Время сна заметно менялось',
-      text: `Разброс времени отхода ко сну или подъёма около ${Math.round(timingVariation)} мин. Это отдельный контекст помимо длительности сна.`,
+      text: `Разброс времени отхода ко сну или подъёма около ${Math.round(timingVariation)} мин.`,
       tone: 'neutral',
     });
   }
@@ -112,7 +112,7 @@ function appendDirectionCues(cues: ReviewCue[], summary: PeriodSummary): void {
     cues.push({
       id: 'direction-drift',
       title: 'Другие дела занимали день',
-      text: `${summary.driftDays} ${plural(summary.driftDays, 'день', 'дня', 'дней')} были заняты другими делами. В разборе лучше искать повторяющееся условие, а не обвинять себя.`,
+      text: `${summary.driftDays} ${plural(summary.driftDays, 'день', 'дня', 'дней')} были заняты другими делами. Можно вернуться к заметкам и вспомнить, чем вы занимались.`,
       tone: 'warning',
     });
   }
@@ -122,7 +122,7 @@ function appendPeriodOutcomeCues(cues: ReviewCue[], summary: PeriodSummary, resu
   if (results.length) {
     cues.push({
       id: 'results',
-      title: 'Есть завершённые вещи',
+      title: 'Сохранённые итоги',
       text: `${results.length} ${plural(results.length, 'итог', 'итога', 'итогов')} за период. Это итоги, которые вы сохранили отдельно от записи за день.`,
       tone: 'good',
     });
@@ -134,7 +134,7 @@ function appendPeriodOutcomeCues(cues: ReviewCue[], summary: PeriodSummary, resu
       title: blocksGoal ? 'Питание мешало цели' : 'Питание поддерживало цель',
       text: blocksGoal
         ? `${summary.nutritionBlockDays} ${plural(summary.nutritionBlockDays, 'день', 'дня', 'дней')} питание отмечено как мешающее цели. Лучше искать один повторяющийся сценарий, а не менять всё сразу.`
-        : `${summary.nutritionSupportDays} ${plural(summary.nutritionSupportDays, 'день', 'дня', 'дней')} питание поддерживало цель. Это стоит сохранить как рабочее условие.`,
+        : `${summary.nutritionSupportDays} ${plural(summary.nutritionSupportDays, 'день', 'дня', 'дней')} питание поддерживало цель. Можно посмотреть в заметках, что вы ели в эти дни.`,
       tone: blocksGoal ? 'warning' : 'good',
     });
   }
@@ -149,8 +149,8 @@ function appendPeriodOutcomeCues(cues: ReviewCue[], summary: PeriodSummary, resu
   if (summary.specialDays || lifeEvents.length) {
     cues.push({
       id: 'context',
-      title: 'Есть поправка на контекст',
-      text: `${summary.specialDays} особых ${plural(summary.specialDays, 'день', 'дня', 'дней')} и ${lifeEvents.length} ${plural(lifeEvents.length, 'важное событие', 'важных события', 'важных событий')}. Такой период лучше не сравнивать с обычным ритмом напрямую.`,
+      title: 'Особые дни и события',
+      text: `${summary.specialDays} особых ${plural(summary.specialDays, 'день', 'дня', 'дней')} и ${lifeEvents.length} ${plural(lifeEvents.length, 'важное событие', 'важных события', 'важных событий')}. При сравнении с другими неделями или месяцами учитывайте эти обстоятельства.`,
       tone: 'neutral',
     });
   }
@@ -186,7 +186,7 @@ export function buildRangeReviewCues(
     cues.push({
       id: 'factor',
       title: 'Повторяющееся условие',
-      text: `Отметка «${factor.label}» встречалась ${factor.count} ${plural(factor.count, 'раз', 'раза', 'раз')}.${comparison ? ` ${comparison}` : ' Сравнительных данных пока мало.'}`,
+      text: `Отметка «${factor.label}» встречалась ${factor.count} ${plural(factor.count, 'раз', 'раза', 'раз')}.${comparison ? ` ${comparison}` : ' Для сравнения пока мало записей.'}`,
       tone: 'neutral',
     });
   }
@@ -205,7 +205,7 @@ export function buildRangeReviewCues(
     } else if (externalRate >= 35) {
       cues.push({
         id: 'direction-external',
-        title: 'Конкретные действия сохранялись',
+        title: 'Вы отмечали шаги к цели',
         text: `Конкретные действия появлялись в ${externalRate}% дней с отметкой по текущей цели. Сверьте это с итогами периода.`,
         tone: 'good',
       });
@@ -223,8 +223,8 @@ export function buildRangeReviewCues(
   if (results.length) {
     cues.push({
       id: 'results',
-      title: 'Есть завершённые итоги',
-      text: `${results.length} ${plural(results.length, 'итог', 'итога', 'итогов')} за период. Сопоставьте их с реальными шагами, а не только с занятостью.`,
+      title: 'Сохранённые итоги',
+      text: `${results.length} ${plural(results.length, 'итог', 'итога', 'итогов')} за период. Эти записи сохранены в Журнале.`,
       tone: 'good',
     });
   }
@@ -233,7 +233,7 @@ export function buildRangeReviewCues(
     cues.push({
       id: 'context',
       title: 'Особые дни и события',
-      text: `${summary.specialDays} особых ${plural(summary.specialDays, 'день', 'дня', 'дней')} и ${lifeEvents.length} ${plural(lifeEvents.length, 'важное событие', 'важных события', 'важных событий')}. Дни с отметкой «особый день» исключены из базовых средних состояния; события показаны отдельно.`,
+      text: `${summary.specialDays} особых ${plural(summary.specialDays, 'день', 'дня', 'дней')} и ${lifeEvents.length} ${plural(lifeEvents.length, 'важное событие', 'важных события', 'важных событий')}. Дни с отметкой «особый день» не учитываются в средних значениях сна, энергии и веса; события показаны отдельно.`,
       tone: 'neutral',
     });
   }

@@ -462,12 +462,12 @@ describe('period review navigation', () => {
     expect(wrapper.findAll('.review-cue-grid--primary .review-cue')).toHaveLength(3);
     expect(wrapper.find('.review-cue-grid--additional').exists()).toBe(false);
     expect((reviewContext.element as HTMLDetailsElement).open).toBe(false);
-    expect(reviewContext.get('summary').text()).toBe('Добавить итоги и контекст');
+    expect(reviewContext.get('summary').text()).toBe('Добавить дела, события и самочувствие');
     expect(
       (review.get('textarea[placeholder="Можно продолжить как есть или пока ничего не решать"]').element as HTMLTextAreaElement).value,
     ).toBe('');
     expect((details.element as HTMLDetailsElement).open).toBe(false);
-    expect(details.get('summary').text()).toBe('Показать дни и дополнительный контекст');
+    expect(details.get('summary').text()).toBe('Показать записи по дням');
     expect(details.find('.metrics-grid').exists()).toBe(false);
     expect(details.find('.week-story-list').exists()).toBe(true);
     expect(details.find('.heatmap').exists()).toBe(true);
@@ -607,8 +607,8 @@ describe('period review navigation', () => {
     }));
     const wrapper = mount(MonthView, { global: { plugins: [pinia], stubs: { EChartPanel: true, RouterLink: routerLinkStub } } });
 
-    expect(wrapper.text()).toContain('Показать выбранный показатель и подробный разбор');
-    expect(wrapper.text()).toContain('Показать действия и дополнительный контекст');
+    expect(wrapper.text()).toContain('Показать графики и сравнения');
+    expect(wrapper.text()).toContain('Показать действия, заметки и особые дни');
     expect(wrapper.text()).not.toContain('Открыть все итоги');
     expect(wrapper.text()).not.toContain('Открыть все события');
     const recordGroups = wrapper.get('.period-records--featured').findAll('article.period-record-card');
@@ -641,7 +641,7 @@ describe('period review navigation', () => {
     });
 
     expect(wrapper.find('details.period-records').exists()).toBe(false);
-    expect(wrapper.text()).not.toContain('Показать действия и дополнительный контекст');
+    expect(wrapper.text()).not.toContain('Показать действия, заметки и особые дни');
   });
 
   it('shows journal records without pretending that daily analytics exist', () => {
@@ -724,7 +724,7 @@ describe('period review navigation', () => {
     });
 
     const overview = wrapper.get('#first-use-overview');
-    expect(overview.text()).toContain('Восстановлено по вашим ответам');
+    expect(overview.text()).toContain('По вашим воспоминаниям');
     expect(overview.text()).toContain('Закончил черновик');
     expect(overview.text()).toContain('Состоялся важный разговор');
     expect(overview.text()).toContain('К середине недели было мало сил');
@@ -734,7 +734,7 @@ describe('period review navigation', () => {
     const reviewForm = wrapper.get('#week-review');
     const reviewContext = reviewForm.get('details.review-context-details');
     expect((reviewContext.element as HTMLDetailsElement).open).toBe(true);
-    expect(reviewContext.get('summary').text()).toBe('Итоги и контекст');
+    expect(reviewContext.get('summary').text()).toBe('Дела, события и самочувствие');
     expect(reviewForm.findAll('input')).toHaveLength(6);
     expect(reviewForm.text()).toContain('До трёх событий, решений или мыслей');
     expect((reviewForm.findAll('textarea')[0]!.element as HTMLTextAreaElement).value).toBe('К середине недели было мало сил');

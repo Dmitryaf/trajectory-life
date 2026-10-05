@@ -5,7 +5,7 @@ import { careerStatesForEntry, type PeriodSummary } from './periodSummary';
 
 export function weekSummaryText(summary: PeriodSummary, activeAreas: LifeAreaId[], areaOptions: Option[] = lifeAreaOptions): string {
   if (!summary.coveredEntriesCount) {
-    return 'Пока нет заполненных записей за эту неделю. Здесь появится краткая сводка фактов.';
+    return 'Пока нет заполненных записей за эту неделю. Здесь появятся записи о сне, самочувствии и занятиях.';
   }
 
   const labels = new Map(areaOptions.map((item) => [item.id, item.label]));
@@ -34,7 +34,7 @@ export function weekSummaryText(summary: PeriodSummary, activeAreas: LifeAreaId[
   }
   let text = `За неделю: ${parts.join(', ')}.`;
   if (present.length) {
-    text += ` Присутствовали: ${present.join(', ')}.`;
+    text += ` Вы отмечали: ${present.join(', ')}.`;
   }
   if (absent.length) {
     text += ` Не отмечались: ${absent.join(', ')}.`;

@@ -54,7 +54,7 @@ describe('decision follow-up', () => {
 
     expect(wrapper.get('.decision-follow-up__step--outcome').text()).toContain('Данных хватило только за два дня.');
     expect(wrapper.text()).toContain('Отдельных итогов, событий или важных условий за неделю не сохранено.');
-    expect(wrapper.text()).toContain('Они сами по себе не доказывают причину.');
+    expect(wrapper.text()).toContain('По ним нельзя точно сказать, что изменения произошли именно из-за него.');
     expect(wrapper.text()).toContain('Следующее решение пока не сохранено.');
   });
 });

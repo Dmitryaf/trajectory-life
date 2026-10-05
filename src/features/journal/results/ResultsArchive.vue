@@ -176,7 +176,7 @@ function resultKey(result: ResultRecord) {
         v-model="note"
         :rows="4"
         :max-length="2000"
-        placeholder="Что произошло, почему это важно или какой контекст стоит сохранить"
+        placeholder="Что произошло, почему это важно и какие подробности хочется запомнить"
       />
       <ActionButton v-if="editingId !== null" variant="secondary" class="composer-cancel" type="button" @click="resetForm">
         Отменить редактирование

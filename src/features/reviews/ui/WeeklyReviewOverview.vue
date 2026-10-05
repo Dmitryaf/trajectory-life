@@ -38,7 +38,7 @@ const highlights = computed(() => props.review.highlights.filter((item) => item.
       <p>{{ review.nextLever }}</p>
     </div>
     <div v-if="review.ifThenPlan" class="weekly-review-overview__group">
-      <strong>План «если — то»</strong>
+      <strong>План на похожую ситуацию</strong>
       <p>{{ review.ifThenPlan }}</p>
     </div>
   </div>

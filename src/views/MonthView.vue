@@ -360,7 +360,7 @@ function shiftMonth(offset: number) {
   <PageShell class="page--review page--month">
     <ReviewHeading
       title="Месяц"
-      summary="Сравните недели, важные события и результаты. Решите, что продолжить или изменить."
+      summary="Сравните недели, вспомните важные события и сделанные дела. При желании запишите планы."
       :action="hasPeriodData ? (reviewAvailable ? 'К обзору' : 'Обзор позже') : undefined"
       href="#month-review"
       period="month"
@@ -389,7 +389,7 @@ function shiftMonth(offset: number) {
         <SectionHeading>
           <div>
             <EyebrowText>Недели месяца</EyebrowText>
-            <h2>Как менялись записи</h2>
+            <h2>Сравнение недель</h2>
           </div>
           <Badge>{{ summary.coveredEntriesCount }} дн.</Badge>
         </SectionHeading>
@@ -415,7 +415,7 @@ function shiftMonth(offset: number) {
       <section v-if="hasJournal" class="period-records period-records--featured">
         <PeriodRecordCard
           v-if="results.length"
-          eyebrow="Завершённые факты"
+          eyebrow="Сделанные дела"
           title="Итоги месяца"
           :items="resultRecordItems"
           :breakdown="resultAreaSummary"
@@ -424,7 +424,7 @@ function shiftMonth(offset: number) {
         />
         <PeriodRecordCard
           v-if="lifeEvents.length"
-          eyebrow="Важный контекст"
+          eyebrow="Из журнала"
           title="События месяца"
           :items="eventRecordItems"
           :breakdown="eventTypeSummary"
@@ -448,19 +448,19 @@ function shiftMonth(offset: number) {
           @toggle="updateReviewContextOpen"
         >
           <FormFieldLabel>Что чаще всего повторялось?</FormFieldLabel
-          ><AutoGrowTextarea v-model="review.mainPattern" :rows="2" placeholder="Повторяющееся действие, состояние или условие" />
-          <FormFieldLabel>Что поддерживало?</FormFieldLabel
+          ><AutoGrowTextarea v-model="review.mainPattern" :rows="2" placeholder="Например: часто гулял по вечерам и легче засыпал" />
+          <FormFieldLabel>Что помогало?</FormFieldLabel
           ><AutoGrowTextarea v-model="review.support" :rows="2" placeholder="Условия, решения или люди, которые помогали" />
           <FormFieldLabel>Что мешало сильнее всего?</FormFieldLabel
-          ><AutoGrowTextarea v-model="review.obstacle" :rows="2" placeholder="Один главный повторяющийся фактор" />
-          <FormFieldLabel>Что изменило месяц?</FormFieldLabel
+          ><AutoGrowTextarea v-model="review.obstacle" :rows="2" placeholder="Например: частые переработки" />
+          <FormFieldLabel>После какого события вы заметили изменения?</FormFieldLabel
           ><AutoGrowTextarea
             v-model="review.courseChange"
             :rows="2"
-            placeholder="Событие, решение или итог, после которого данные стали выглядеть иначе"
+            placeholder="Например: смена работы, поездка или завершение большого дела"
           />
         </PeriodDetails>
-        <FormFieldLabel>Главное направление следующего месяца</FormFieldLabel
+        <FormFieldLabel>Чему хотите уделить внимание в следующем месяце?</FormFieldLabel
         ><AutoGrowTextarea v-model="review.nextFocus" :rows="2" placeholder="Что стоит продолжить, изменить или проверить" />
         <PeriodReviewActions :actions="actions" label="Сохранить обзор месяца" />
       </SurfaceCard>
@@ -478,11 +478,11 @@ function shiftMonth(offset: number) {
         @download="downloadJson"
       />
 
-      <PeriodDetails v-if="hasDailyData" class="month-analysis-details" title="Показать выбранный показатель и подробный разбор">
+      <PeriodDetails v-if="hasDailyData" class="month-analysis-details" title="Показать графики и сравнения">
         <SurfaceCard v-if="additionalObservations.length" kind="dashboard">
           <SectionHeading>
             <div>
-              <EyebrowText>Сопоставление записей</EyebrowText>
+              <EyebrowText>Сравнение дней</EyebrowText>
               <h2>Что ещё видно по данным</h2>
             </div>
           </SectionHeading>
@@ -547,7 +547,7 @@ function shiftMonth(offset: number) {
       <PeriodDetails
         v-if="actionNotes.length || contextEntries.length"
         class="period-records"
-        title="Показать действия и дополнительный контекст"
+        title="Показать действия, заметки и особые дни"
       >
         <div class="period-records__content">
           <details v-if="actionNotes.length" class="period-record-card period-record-card--disclosure">
@@ -580,7 +580,7 @@ function shiftMonth(offset: number) {
           <details v-if="contextEntries.length" class="period-record-card period-record-card--disclosure">
             <summary>
               <span class="period-record-card__heading">
-                <span><EyebrowText>Условия и исключения</EyebrowText><strong>Контекст месяца</strong></span>
+                <span><EyebrowText>По дням</EyebrowText><strong>Заметки и особые дни</strong></span>
                 <Badge>{{ contextEntries.length }}</Badge>
               </span>
               <span class="period-record-card__breakdown">
@@ -599,7 +599,7 @@ function shiftMonth(offset: number) {
                   </p>
                 </article>
               </div>
-              <ArchivePagination v-model:page="contextPage" :page-count="contextPageCount" context-label="записей контекста" />
+              <ArchivePagination v-model:page="contextPage" :page-count="contextPageCount" context-label="заметок и особых дней" />
             </div>
           </details>
         </div>

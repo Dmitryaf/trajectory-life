@@ -23,7 +23,7 @@ const sections = computed<Array<{ to: string; icon: UiIconName; tone: string; co
     icon: 'event',
     tone: 'amber',
     count: store.lifeEvents.length,
-    title: 'События и наблюдения',
+    title: 'События и мысли',
     text: 'Ситуация, важная мысль или деталь, к которой хочется вернуться.',
   },
 ]);
@@ -35,7 +35,7 @@ const sections = computed<Array<{ to: string; icon: UiIconName; tone: string; co
       <div>
         <EyebrowText>Важное отдельно</EyebrowText>
         <h1>Журнал</h1>
-        <p>Выберите, что хотите сохранить отдельно: завершённый итог или событие и наблюдение.</p>
+        <p>Запишите сделанное дело, важное событие или мысль, которую хочется сохранить.</p>
       </div>
     </PageHeading>
     <div class="more-grid">

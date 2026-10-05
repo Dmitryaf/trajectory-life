@@ -188,7 +188,7 @@ describe('first-use week recovery', () => {
     ];
     const wrapper = mount(FirstUseRecovery, { global: { plugins: [pinia] } });
 
-    expect(wrapper.text()).toContain('Вот чем была наполнена ваша неделя');
+    expect(wrapper.text()).toContain('Ваш обзор недели');
     expect(wrapper.text()).toContain('Закончил черновик');
     expect(wrapper.text()).toContain('Поговорил с другом');
     expect(recordedEvents).toContain('first_use_overview_viewed');

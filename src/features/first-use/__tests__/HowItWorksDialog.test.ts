@@ -41,8 +41,8 @@ describe('HowItWorksDialog', () => {
     expect(document.body.textContent).toContain('Зачем нужна «Траектория»');
     expect(document.querySelectorAll('.help-steps > li')).toHaveLength(3);
     expect(document.body.textContent).toContain('Записать важное');
-    expect(document.body.textContent).toContain('Увидеть период целиком');
-    expect(document.body.textContent).toContain('Сохранить следующее решение');
+    expect(document.body.textContent).toContain('Вернуться к записям');
+    expect(document.body.textContent).toContain('Записать мысли и планы');
     expect(document.body.textContent).toContain('Разобрать записи во внешней нейросети');
     expect(document.body.textContent).toContain('приложение ничего не отправляет');
     const analysisLink = document.querySelector('a[href="/week#ai-analysis"]');
