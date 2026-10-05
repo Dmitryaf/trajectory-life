@@ -2,10 +2,24 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { readFileSync } from 'node:fs';
 import { requireStaging, STAGING_ORIGIN } from '../staging/session.mjs';
-import { assertReleaseRun, candidateDeploymentArgs, deploymentUrl, promoteVerified, releaseTargets } from './release-policy.mjs';
+import {
+  assertReleaseRun,
+  candidateDeploymentArgs,
+  deploymentUrl,
+  environmentPullArgs,
+  promoteVerified,
+  releaseTargets,
+} from './release-policy.mjs';
 
 const sha = 'a'.repeat(40);
 const repository = 'owner/project';
+test('production environment pull omits branch overrides required only by preview', () => {
+  assert.deepEqual(environmentPullArgs('main'), ['pull', '--yes', '--environment=production']);
+  assert.deepEqual(environmentPullArgs('develop'), ['pull', '--yes', '--environment=preview', '--git-branch=develop']);
+  assert.throws(() => environmentPullArgs('feature/example'));
+  assert.throws(() => environmentPullArgs('constructor'));
+});
+
 const run = {
   event: 'push',
   path: '.github/workflows/ci.yml',
