@@ -103,7 +103,7 @@ const {
       <div>
         <EyebrowText>Настройка приложения</EyebrowText>
         <h1>Настройки</h1>
-        <p>Выбери, что отмечать каждый день, и управляй экспериментом и копиями данных.</p>
+        <p>Выберите разделы дневника, настройте эксперимент или скачайте копию записей.</p>
       </div>
     </PageHeading>
 
@@ -130,21 +130,19 @@ const {
       <SettingsCard id="daily-blocks" class="settings-card--daily-blocks">
         <FormCardHeading icon="blocks" tone="blue">
           <div>
-            <h2>Блоки ежедневной записи</h2>
+            <h2>Разделы ежедневной записи</h2>
             <p>Оставьте только то, что хотите видеть каждый день. Прежние записи не пропадут.</p>
           </div>
         </FormCardHeading>
         <ChipGroup v-model="settings.activeDailyBlocks as DailyBlockId[]" :options="dailyBlockOptions" multiple />
-        <DataNote v-if="!settings.activeDailyBlocks.length">
-          Останутся общие блоки: действия по текущей цели, области жизни и заметка дня.
-        </DataNote>
+        <DataNote v-if="!settings.activeDailyBlocks.length"> Останутся заметка дня, шаги к цели и области жизни. </DataNote>
         <ActionButton
           variant="primary"
           type="button"
           :busy="isSaving('daily-blocks')"
           busy-label="Сохраняю…"
-          @click="save('Блоки ежедневной записи сохранены', 'daily-blocks')"
-          >Сохранить блоки</ActionButton
+          @click="save('Разделы ежедневной записи сохранены', 'daily-blocks')"
+          >Сохранить разделы</ActionButton
         >
       </SettingsCard>
 
@@ -152,7 +150,7 @@ const {
         <FormCardHeading icon="activity" tone="green">
           <div>
             <h2>Физическая активность</h2>
-            <p>Оставь общие варианты или добавь занятия, которые важны именно тебе.</p>
+            <p>Оставьте предложенные варианты или добавьте свои занятия.</p>
           </div>
         </FormCardHeading>
         <div class="custom-list context-factor-list">
@@ -268,7 +266,7 @@ const {
         <FormCardHeading icon="context" tone="orange">
           <div>
             <h2>Условия дня</h2>
-            <p>Добавьте условия, которые повторяются и которые вы хотите сравнивать между днями.</p>
+            <p>Выберите, что хотите отмечать: например, шум, поздний кофе или помощь близких. Можно добавить свои варианты.</p>
           </div>
         </FormCardHeading>
         <div class="custom-list context-factor-list">

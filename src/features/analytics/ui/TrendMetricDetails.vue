@@ -25,10 +25,10 @@ defineEmits<{ 'update:modelValue': [value: string] }>();
     <SurfaceCard v-if="options.length" kind="dashboard" class="trend-metric-card">
       <SectionHeading>
         <div>
-          <EyebrowText>Динамика периода</EyebrowText>
+          <EyebrowText>Изменения по месяцам</EyebrowText>
           <h2>{{ selectedLabel }}</h2>
         </div>
-        <small>{{ selectedSamples }} наблюдений · минимум два месяца</small>
+        <small>Записей: {{ selectedSamples }} · минимум два месяца</small>
       </SectionHeading>
       <MetricSwitcher
         :model-value="modelValue"
@@ -39,13 +39,13 @@ defineEmits<{ 'update:modelValue': [value: string] }>();
       />
       <EChartPanel :option="chartOption" :height="300" :aria-label="`Динамика: ${selectedLabel}`" :description="description" />
       <DataNote class="trend-chart-description">
-        Показаны месячные средние и важные события. Совпадение изменений во времени не доказывает причину; текущий месяц может быть
-        неполным.
+        Показаны средние значения за каждый месяц и важные события. Изменения на графике не обязательно связаны с этими событиями. Текущий
+        месяц ещё может быть неполным.
       </DataNote>
     </SurfaceCard>
     <ReviewNotice v-else class="trends-chart-guide">
-      <strong>Для графика пока мало сопоставимых данных</strong>
-      <p>Нужны наблюдения хотя бы в двух месяцах: 6 для сна или энергии либо 3 измерения веса.</p>
+      <strong>Для графика пока мало записей</strong>
+      <p>Нужны записи хотя бы за два месяца: всего 6 со сном, 6 с энергией или 3 измерения веса.</p>
     </ReviewNotice>
   </PeriodDetails>
 </template>

@@ -418,12 +418,12 @@ function openEntryDatePicker() {
         <FormCardHeading icon="context" tone="orange">
           <div>
             <h2>Что могло повлиять на день</h2>
-            <p v-if="isFirstEntry">Отметьте условия, которые стоит сравнить с другими днями.</p>
+            <p v-if="isFirstEntry">Например: шум, поздний кофе или помощь близких.</p>
           </div>
           <RouterLink class="card-settings-link" to="/settings#context-options">Настроить</RouterLink>
         </FormCardHeading>
         <div class="factor-block">
-          <FormFieldLabel>Что сопровождало день?</FormFieldLabel>
+          <FormFieldLabel>Что из этого было сегодня?</FormFieldLabel>
           <ChipGroup :model-value="form.contextFactors" :options="contextFactorItems" multiple @update:model-value="setContextFactors" />
           <button
             class="none-option"
@@ -480,7 +480,7 @@ function openEntryDatePicker() {
                     ? 'Для этой записи цель не была сохранена.'
                     : hasSavedEntry
                       ? 'Для этой даты цель не была сохранена. Текущие настройки не изменяют историю.'
-                      : 'Цель необязательна. Выберите её, если хотите связать дневные действия с периодом.'
+                      : 'Цель необязательна. Выберите её, если хотите записывать шаги к ней.'
               }}
             </p>
           </div>
@@ -561,8 +561,8 @@ function openEntryDatePicker() {
           <SurfaceCard v-if="blockIsActive('career')" id="career" kind="form">
             <FormCardHeading icon="goal" tone="blue">
               <div>
-                <h2>Рабочий контекст</h2>
-                <p>Что было частью рабочего дня. Эта отметка сама по себе не считается шагом по текущей цели.</p>
+                <h2>Что было на работе</h2>
+                <p>Отметьте занятия за день. Шаги к цели записываются отдельно.</p>
               </div>
               <RouterLink class="card-settings-link" to="/settings#work-settings">Настроить</RouterLink>
             </FormCardHeading>
@@ -639,7 +639,7 @@ function openEntryDatePicker() {
             <FormCardHeading icon="event" tone="amber">
               <div>
                 <h2>Области жизни</h2>
-                <p v-if="isFirstEntry">Что было заметной частью этого дня. Это не оценка успешности.</p>
+                <p v-if="isFirstEntry">Каким сферам жизни вы сегодня уделяли внимание?</p>
               </div>
               <RouterLink class="card-settings-link" to="/settings#life-areas">Настроить</RouterLink>
             </FormCardHeading>

@@ -122,7 +122,7 @@ function remove() {
           v-model="draftOutcomeCriterion"
           type="text"
           maxlength="220"
-          placeholder="Наблюдаемый результат — необязательно"
+          placeholder="Например: пройти собеседование — необязательно"
         />
 
         <FormFieldLabel for="current-goal-review-date">Когда вернуться к цели</FormFieldLabel>
@@ -136,7 +136,7 @@ function remove() {
           :max-length="220"
           placeholder="Например: выполненное задание, тренировка, разговор или принятое решение"
         />
-        <p class="goal-dialog__hint">Цель помогает связать отдельные шаги с периодом, но не обязательна для сохранения дня.</p>
+        <p class="goal-dialog__hint">Можно вести дневник без цели. Если выберете её, сможете отмечать шаги к ней в записи дня.</p>
 
         <div class="dialog-actions goal-dialog__actions">
           <ActionButton v-if="title" variant="secondary" type="button" :disabled="saving" @click="remove">Убрать цель</ActionButton>

@@ -31,12 +31,12 @@ function select(event: LifeEventRecord) {
 </script>
 
 <template>
-  <PeriodDetails class="trends-event-details" title="Показать сравнение рядом с важным событием">
+  <PeriodDetails class="trends-event-details" title="Сравнить показатели до и после события">
     <SurfaceCard kind="dashboard" class="event-comparison-card">
       <SectionHeading>
         <div>
           <EyebrowText>До и после</EyebrowText>
-          <h2>Что менялось рядом с событием</h2>
+          <h2>Показатели до и после события</h2>
         </div>
         <details ref="picker" class="event-picker">
           <summary aria-label="Выбрать событие для сравнения">
@@ -98,11 +98,10 @@ function select(event: LifeEventRecord) {
             >
           </div>
         </div>
-        <ReviewNotice v-else tag="p">Для сравнения показателей нужно минимум по три наблюдения до и после события.</ReviewNotice>
-        <DataNote>
-          День события исключён. Показываются только показатели с достаточным числом наблюдений; совпадение во времени не означает причинный
-          эффект.
-        </DataNote>
+        <ReviewNotice v-else tag="p"
+          >Для сравнения нужны хотя бы три записи с одним и тем же показателем до события и три после.</ReviewNotice
+        >
+        <DataNote> День события не учитывается. Изменения после события могли произойти и по другим причинам. </DataNote>
       </template>
       <p v-else class="empty-copy">После события пока не прошло ни одного полного дня для сравнения.</p>
     </SurfaceCard>

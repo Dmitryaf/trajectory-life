@@ -75,14 +75,14 @@ defineEmits<{
     </FormHint>
     <template v-if="canConclude || experiment.conclusion.trim()">
       <FormFieldLabel for="experiment-conclusion">
-        {{ canConclude ? 'Что вы заметили?' : 'Промежуточное наблюдение' }}
+        {{ canConclude ? 'Что вы заметили?' : 'Что заметили к этому моменту' }}
       </FormFieldLabel>
       <AutoGrowTextarea
         id="experiment-conclusion"
         v-model="experiment.conclusion"
         :rows="6"
         :max-length="experimentTextLimits.conclusion"
-        placeholder="Опиши наблюдения своими словами. Совпадение показателей не обязательно означает влияние эксперимента."
+        placeholder="Опишите, что изменилось. Изменения могли произойти и по другим причинам."
       />
       <FormFieldLabel optional>
         {{ canConclude ? 'Что хотите делать дальше?' : 'Ранее выбранное решение' }}

@@ -30,7 +30,7 @@ test('keeps action buttons and their neighbours still during slow saves, success
   for (const width of [320, 390, 768, 1280]) {
     await page.setViewportSize({ width, height: 900 });
     for (const [name, id] of [
-      ['Сохранить блоки', 'daily-blocks'],
+      ['Сохранить разделы', 'daily-blocks'],
       ['Сохранить области', 'life-areas'],
     ]) {
       const button = page.getByRole('button', { name, exact: true });

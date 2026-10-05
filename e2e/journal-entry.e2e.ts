@@ -30,7 +30,9 @@ test('adds both journal entry types through their direct section links', async (
   await openComposer(page);
   const resultTitle = page.getByPlaceholder('Что вы сделали или какой результат получили');
   await resultTitle.fill('Завершил проверку прямого добавления');
-  await page.getByPlaceholder('Что произошло, почему это важно или какой контекст стоит сохранить').fill('Проверен прямой путь из Журнала');
+  await page
+    .getByPlaceholder('Что произошло, почему это важно и какие подробности хочется запомнить')
+    .fill('Проверен прямой путь из Журнала');
   await page.getByRole('button', { name: 'Добавить итог' }).click();
   await expect(page.getByText('Итог добавлен', { exact: true })).toBeVisible();
   await expect(page.locator('.result-item').filter({ hasText: 'Завершил проверку прямого добавления' })).toBeVisible();
@@ -136,7 +138,7 @@ test('shows note disclosure only for measured overflow at mobile and desktop wid
   await page.goto('/results');
   await openComposer(page);
   const title = page.getByPlaceholder('Что вы сделали или какой результат получили');
-  const note = page.getByPlaceholder('Что произошло, почему это важно или какой контекст стоит сохранить');
+  const note = page.getByPlaceholder('Что произошло, почему это важно и какие подробности хочется запомнить');
 
   await title.fill('Короткая заметка для проверки раскрытия');
   await note.fill('Короткий контекст.');

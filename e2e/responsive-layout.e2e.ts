@@ -899,8 +899,8 @@ test('explains the app from the permanent help button', async ({ page }) => {
 
   await expect(dialog.locator('.help-steps > li')).toHaveCount(3);
   await expect(dialog).toContainText('Записать важное');
-  await expect(dialog).toContainText('Увидеть период целиком');
-  await expect(dialog).toContainText('Сохранить следующее решение');
+  await expect(dialog).toContainText('Вернуться к записям');
+  await expect(dialog).toContainText('Записать мысли и планы');
   await expect(page.locator('body')).toHaveCSS('position', 'fixed');
   const dialogActions = dialog.locator(':scope > .help-dialog__actions > a');
   const analysisLink = dialog.getByRole('link', { name: 'Подготовить текст для нейросети' });
@@ -1037,7 +1037,7 @@ test('keeps monthly results before the review and secondary context behind a dis
   await expect(records.getByRole('navigation', { name: 'Страницы итогов месяца' })).toContainText('2 из');
   const secondaryRecords = page.locator('details.period-records');
   await expectPeriodDetailsChrome(secondaryRecords);
-  await secondaryRecords.getByText('Показать действия и дополнительный контекст', { exact: true }).click();
+  await secondaryRecords.getByText('Показать действия, заметки и особые дни', { exact: true }).click();
   await secondaryRecords.getByText('Конкретные действия и подготовка', { exact: true }).click();
   await expect(secondaryRecords.getByRole('navigation', { name: 'Страницы действий месяца' })).toBeVisible();
 });

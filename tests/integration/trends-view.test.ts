@@ -106,7 +106,7 @@ describe('trends scenarios', () => {
 
     expect(wrapper.findAll('.review-cue-grid--primary .review-cue').length).toBeGreaterThan(0);
     expect(wrapper.get('.trends-metric-details').attributes('open')).toBeUndefined();
-    expect(wrapper.get('.trends-chart-guide').text()).toContain('Для графика пока мало сопоставимых данных');
+    expect(wrapper.get('.trends-chart-guide').text()).toContain('Для графика пока мало записей');
     expect(wrapper.findAll('e-chart-panel-stub')).toHaveLength(0);
   });
 

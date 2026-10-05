@@ -500,7 +500,7 @@ describe('analytics', () => {
     const summary = summarize([entry('2026-07-13', { careerState: 'external', activities: ['boxing'], lifeAreas: ['family'] })]);
     const text = weekSummaryText(summary, ['family', 'reading']);
     expect(text).toContain('работа отмечена в 1 из 1 заполненных дней этого блока');
-    expect(text).toContain('Присутствовали: семья');
+    expect(text).toContain('Вы отмечали: семья');
     expect(text).toContain('Не отмечались: чтение');
     expect(text).not.toContain('%');
   });
