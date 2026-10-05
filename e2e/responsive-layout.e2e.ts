@@ -380,12 +380,10 @@ test('keeps mobile form controls inside their cards', async ({ page }) => {
     expect(overflow, `form controls should stay inside cards at ${width}px`).toEqual([]);
 
     const quickCaptureBox = await page.locator('.quick-capture').boundingBox();
-    const goalCardBox = await page.locator('#goal-actions').boundingBox();
+    const dailyNoteBox = await page.locator('.form-card--daily-summary').boundingBox();
     expect(quickCaptureBox).not.toBeNull();
-    expect(goalCardBox).not.toBeNull();
-    expect(quickCaptureBox!.y, `quick actions should follow the daily form at ${width}px`).toBeGreaterThanOrEqual(
-      goalCardBox!.y + goalCardBox!.height + 12,
-    );
+    expect(dailyNoteBox).not.toBeNull();
+    expectVerticalSeparation(quickCaptureBox!, dailyNoteBox!, 12, `quick actions before the daily note at ${width}px`);
   }
 });
 
@@ -818,7 +816,8 @@ test('keeps the returning daily form compact and visibly grouped', async ({ page
   expect(goalBox).not.toBeNull();
   expect(quickCaptureBox).not.toBeNull();
   expect(additionalBlocksBox).not.toBeNull();
-  expect(quickCaptureBox!.y).toBeGreaterThanOrEqual(goalBox!.y + goalBox!.height + 12);
+  const summaryBox = await readLayoutBox(page.locator('.form-card--daily-summary'), 'daily note');
+  expectVerticalSeparation(quickCaptureBox!, summaryBox, 12, 'quick capture before daily note');
   expect(goalBox!.y).toBeLessThan(additionalBlocksBox!.y);
   await expect(additionalBlocks).not.toHaveAttribute('open', '');
   await additionalBlocks.locator('summary').click();

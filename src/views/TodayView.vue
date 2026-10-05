@@ -31,6 +31,8 @@ import EyebrowText from '../shared/ui/typography/EyebrowText.vue';
 import ChipGroup from '../shared/ui/forms/ChipGroup.vue';
 import DurationInput from '../shared/ui/forms/DurationInput.vue';
 import ScalePicker from '../shared/ui/forms/ScalePicker.vue';
+import ExperimentCompletionPicker from '@/features/experiments/ui/ExperimentCompletionPicker.vue';
+import EmptyChoiceButton from '@/features/daily-entry/ui/EmptyChoiceButton.vue';
 import { experimentTextLimits } from '../features/experiments/model';
 import { useDailyEntryForm } from '../features/daily-entry/useDailyEntryForm';
 import { useAppStore } from '../stores/app';
@@ -339,6 +341,16 @@ function openEntryDatePicker() {
       </div>
     </section>
 
+    <section v-if="!firstUseTakesPriority && activeContextCue === 'recovery'" class="recovery-nudge" aria-label="Вчера без записи">
+      <div>
+        <strong>Вчера без записи</strong>
+        <p>Можно заполнить коротко сейчас или спокойно продолжить с сегодняшнего дня.</p>
+      </div>
+      <ActionButton variant="secondary" class="context-action" type="button" @click="fillYesterday">Добавить запись</ActionButton>
+    </section>
+
+    <JournalQuickCapture v-if="!firstUseTakesPriority && !isFirstEntry" />
+
     <section v-if="!firstUseTakesPriority && draftConflict" class="entry-change-notice draft-conflict-notice" role="alert">
       <div>
         <strong>Черновик и сохранённая запись отличаются</strong>
@@ -404,12 +416,8 @@ function openEntryDatePicker() {
           </div>
         </div>
         <FormRow>
-          <div class="form-control">
-            <FormFieldLabel>Качество сна</FormFieldLabel><ScalePicker v-model="form.sleepQuality" low-label="плохо" high-label="хорошо" />
-          </div>
-          <div class="form-control">
-            <FormFieldLabel>Энергия за день</FormFieldLabel><ScalePicker v-model="form.energy" low-label="нет сил" high-label="много сил" />
-          </div>
+          <ScalePicker v-model="form.sleepQuality" class="form-control" label="Качество сна" low-label="плохо" high-label="хорошо" />
+          <ScalePicker v-model="form.energy" class="form-control" label="Энергия за день" low-label="нет сил" high-label="много сил" />
         </FormRow>
         <p v-if="validationMessage" class="field-error" role="alert">{{ validationMessage }}</p>
       </SurfaceCard>
@@ -425,14 +433,9 @@ function openEntryDatePicker() {
         <div class="factor-block">
           <FormFieldLabel>Что из этого было сегодня?</FormFieldLabel>
           <ChipGroup :model-value="form.contextFactors" :options="contextFactorItems" multiple @update:model-value="setContextFactors" />
-          <button
-            class="none-option"
-            :class="{ selected: form.contextFactorsRecorded && !form.contextFactors.length }"
-            type="button"
-            @click="setContextFactors([])"
-          >
+          <EmptyChoiceButton :selected="form.contextFactorsRecorded && !form.contextFactors.length" @click="setContextFactors([])">
             Ничего из списка
-          </button>
+          </EmptyChoiceButton>
         </div>
         <FormFieldLabel for="context-note">Короткое пояснение</FormFieldLabel>
         <textarea
@@ -502,14 +505,12 @@ function openEntryDatePicker() {
             allow-clear
             @update:model-value="setActionDirection"
           />
-          <button
-            class="none-option"
-            :class="{ selected: form.recordedFields.includes('actionDirection') && form.actionDirection === null }"
-            type="button"
+          <EmptyChoiceButton
+            :selected="form.recordedFields.includes('actionDirection') && form.actionDirection === null"
             @click="setNoActionDirection"
           >
             Шага по цели не было
-          </button>
+          </EmptyChoiceButton>
           <DataNote v-if="form.actionDirection === 'recovery'">
             Это значение сохранено из старой записи. Для новых дней восстановление отмечается в активности или условиях дня.
           </DataNote>
@@ -572,14 +573,12 @@ function openEntryDatePicker() {
               multiple
               @update:model-value="setCareerStates"
             />
-            <button
-              class="none-option"
-              :class="{ selected: form.recordedFields.includes('careerStates') && !form.careerStates.length }"
-              type="button"
+            <EmptyChoiceButton
+              :selected="form.recordedFields.includes('careerStates') && !form.careerStates.length"
               @click="setCareerStates([])"
             >
               Ничего из списка
-            </button>
+            </EmptyChoiceButton>
             <DataNote>Конкретное действие по выбранной цели записывается только в блоке выше.</DataNote>
           </SurfaceCard>
 
@@ -597,14 +596,9 @@ function openEntryDatePicker() {
               multiple
               @update:model-value="setActivities"
             />
-            <button
-              class="none-option"
-              :class="{ selected: form.activitiesRecorded && !form.activities.length }"
-              type="button"
-              @click="setActivities([])"
-            >
+            <EmptyChoiceButton :selected="form.activitiesRecorded && !form.activities.length" @click="setActivities([])">
               Без активности
-            </button>
+            </EmptyChoiceButton>
           </SurfaceCard>
 
           <SurfaceCard v-if="blockIsActive('nutrition')" id="nutrition" kind="form" class="form-card--nutrition">
@@ -649,14 +643,9 @@ function openEntryDatePicker() {
               multiple
               @update:model-value="setLifeAreas"
             />
-            <button
-              class="none-option"
-              :class="{ selected: form.lifeAreasRecorded && !form.lifeAreas.length }"
-              type="button"
-              @click="setLifeAreas([])"
-            >
+            <EmptyChoiceButton :selected="form.lifeAreasRecorded && !form.lifeAreas.length" @click="setLifeAreas([])">
               Ничего не отмечаю
-            </button>
+            </EmptyChoiceButton>
           </SurfaceCard>
 
           <SurfaceCard v-if="experimentAppliesToSelectedDate" id="experiment" kind="form" class="form-card--experiment">
@@ -671,18 +660,7 @@ function openEntryDatePicker() {
             <p v-if="store.settings.experiment.hypothesis" class="form-context">
               Что хотите узнать: {{ store.settings.experiment.hypothesis }}
             </p>
-            <FormFieldLabel>Сегодня получилось это сделать?</FormFieldLabel>
-            <div class="binary-choice">
-              <button type="button" :class="{ selected: form.experimentCompleted === true }" @click="form.experimentCompleted = true">
-                Да
-              </button>
-              <button type="button" :class="{ selected: form.experimentCompleted === false }" @click="form.experimentCompleted = false">
-                Нет
-              </button>
-              <button type="button" :class="{ selected: form.experimentCompleted === null }" @click="form.experimentCompleted = null">
-                Нет отметки
-              </button>
-            </div>
+            <ExperimentCompletionPicker v-model="form.experimentCompleted" />
             <FormFieldLabel for="experiment-note" optional>Что помогло или помешало?</FormFieldLabel>
             <AutoGrowTextarea
               id="experiment-note"
@@ -710,14 +688,6 @@ function openEntryDatePicker() {
       }}</ActionButton>
     </ReviewNudge>
 
-    <section v-else-if="!firstUseTakesPriority && activeContextCue === 'recovery'" class="recovery-nudge" aria-label="Вчера без записи">
-      <div>
-        <strong>Вчера без записи</strong>
-        <p>Можно заполнить коротко сейчас или спокойно продолжить с сегодняшнего дня.</p>
-      </div>
-      <ActionButton variant="secondary" class="context-action" type="button" @click="fillYesterday">Добавить запись</ActionButton>
-    </section>
-
     <section v-else-if="!firstUseTakesPriority && activeContextCue === 'plan'" class="today-pulse" aria-label="Текущий план недели">
       <div>
         <EyebrowText>План недели</EyebrowText>
@@ -736,9 +706,9 @@ function openEntryDatePicker() {
         <EyebrowText>Пульс недели</EyebrowText>
         <p>
           {{ currentWeekSummary.coveredEntriesCount }}
-          {{ currentWeekSummary.coveredEntriesCount === 1 ? 'заполненный день' : 'заполненных дней' }} · сон
-          {{ formatMinutes(currentWeekSummary.averageSleep === null ? null : Math.round(currentWeekSummary.averageSleep)) }} ·
-          {{ currentWeekSummary.externalActionDays }} дн. с шагом к цели
+          {{ currentWeekSummary.coveredEntriesCount === 1 ? 'заполненный день' : 'заполненных дней' }} · средний сон
+          {{ formatMinutes(currentWeekSummary.averageSleep === null ? null : Math.round(currentWeekSummary.averageSleep)) }}
+          (измерений: {{ currentWeekSummary.sleepSamples }}) · {{ currentWeekSummary.externalActionDays }} дн. с шагом к цели
         </p>
       </div>
       <p v-if="currentWeekObservation">{{ currentWeekObservation.text }}</p>
@@ -751,7 +721,6 @@ function openEntryDatePicker() {
       @availability-change="pwaNudgeAvailable = $event"
     />
 
-    <JournalQuickCapture v-if="!firstUseTakesPriority && !isFirstEntry" />
     <DailyLayoutSettings v-if="!firstUseTakesPriority && !isFirstEntry" />
 
     <Teleport to="body">
