@@ -48,6 +48,9 @@ function toggle(id: T) {
   gap: 9px;
 }
 .chip {
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
   padding: 10px 14px;
   border: 1px solid var(--line);
   border-radius: 999px;

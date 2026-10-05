@@ -10,12 +10,13 @@ defineEmits<{ 'update:modelValue': [value: RangeMonths] }>();
 </script>
 
 <template>
-  <RangeTabs class="history-range-tabs" aria-label="Период истории">
+  <RangeTabs class="history-range-tabs" role="group" aria-label="Период истории">
     <button
       v-for="option in options"
       :key="option.value"
       type="button"
       :class="{ active: modelValue === option.value }"
+      :aria-pressed="modelValue === option.value"
       @click="$emit('update:modelValue', option.value)"
     >
       {{ option.label }}
