@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 
-export const STAGING_ORIGIN = 'https://trajectory-app-git-develop-trajectory3.vercel.app';
+export const STAGING_ORIGIN = 'https://trajectory-life-staging-trajectory3.vercel.app';
 
 export function requireStaging(origin, confirmed) {
   assert.equal(origin, STAGING_ORIGIN, 'Only the explicitly allowlisted staging origin is permitted');

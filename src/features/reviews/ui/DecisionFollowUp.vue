@@ -39,14 +39,16 @@ defineProps<{ followUp: DecisionFollowUp }>();
           </li>
         </ul>
         <p v-else class="decision-follow-up__missing">Отдельных итогов, событий или важных условий за неделю не сохранено.</p>
-        <DataNote>Это записи, которые шли после решения. Они сами по себе не доказывают причину.</DataNote>
+        <DataNote
+          >Это записи за неделю после вашего решения. По ним нельзя точно сказать, что изменения произошли именно из-за него.</DataNote
+        >
       </div>
     </div>
 
     <div class="decision-follow-up__step decision-follow-up__step--outcome">
       <span>3</span>
       <div>
-        <small>Проверка пользователя</small>
+        <small>Что получилось по вашим словам</small>
         <p>{{ followUp.userOutcome }}</p>
       </div>
     </div>

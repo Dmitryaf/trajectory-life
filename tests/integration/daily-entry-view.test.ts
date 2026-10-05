@@ -75,7 +75,7 @@ describe('daily entry scenario', () => {
     expect(wrapper.text()).toContain('Зачем это заполнять?');
     expect(wrapper.text()).not.toContain('Вчера без записи');
     expect(wrapper.find('.quick-capture').exists()).toBe(false);
-    expect(wrapper.text()).toContain('Цель необязательна. Выберите её, если хотите связать дневные действия с периодом.');
+    expect(wrapper.text()).toContain('Цель необязательна. Выберите её, если хотите записывать шаги к ней.');
     expect(wrapper.find('.current-goal-summary').exists()).toBe(false);
     expect(wrapper.get('#goal-actions').classes()).toContain('form-card--direction-empty');
     expect(wrapper.get('#goal-actions .context-action').text()).toBe('Выбрать цель');
@@ -146,8 +146,8 @@ describe('daily entry scenario', () => {
     expect(goalCard.classes()).not.toContain('form-card--direction-empty');
     expect(wrapper.text().match(/Подготовить доклад/g)).toHaveLength(1);
     expect(goalCard.get('.goal-context-details').attributes('open')).toBeUndefined();
-    expect(workCard.get('h2').text()).toBe('Рабочий контекст');
-    expect(workCard.text()).toContain('не считается шагом по текущей цели');
+    expect(workCard.get('h2').text()).toBe('Что было на работе');
+    expect(workCard.text()).toContain('Шаги к цели записываются отдельно');
     expect(workCard.find('textarea').exists()).toBe(false);
     expect(wrapper.find('#life-areas').exists()).toBe(false);
 
@@ -502,7 +502,7 @@ describe('daily entry scenario', () => {
 
     const headings = wrapper.findAll('.form-card h2').map((heading) => heading.text());
     expect(headings).not.toContain('Сон и состояние');
-    expect(headings).not.toContain('Рабочий контекст');
+    expect(headings).not.toContain('Что было на работе');
     expect(headings).not.toContain('Физическая активность');
     expect(headings).not.toContain('Питание');
     expect(headings).toContain('Заметка дня');

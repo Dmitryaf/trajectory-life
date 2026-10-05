@@ -1,7 +1,29 @@
 export const releaseTargets = {
-  develop: { environment: 'preview', alias: 'trajectory-app-git-develop-trajectory3.vercel.app' },
-  main: { environment: 'production', alias: 'trajectory-app-lilac.vercel.app' },
+  develop: { environment: 'preview', projectRef: 'toieenyfwogplcmobfla', alias: 'trajectory-life-staging-trajectory3.vercel.app' },
+  main: { environment: 'production', projectRef: 'pvcitldyssqhcdmkqahj', alias: 'trajectory-app-lilac.vercel.app' },
 };
+
+export function candidateDeploymentArgs(branch, sha, runId) {
+  if (!Object.hasOwn(releaseTargets, branch) || !/^[a-f0-9]{40}$/.test(sha) || !/^\d+$/.test(String(runId))) {
+    throw new Error('Unsupported deployment source');
+  }
+  return [
+    'deploy',
+    '--prebuilt',
+    '--yes',
+    ...(branch === 'main' ? ['--prod', '--skip-domain'] : ['--target=preview']),
+    '--meta',
+    'githubDeployment=1',
+    '--meta',
+    `githubCommitRef=${branch}`,
+    '--meta',
+    `githubCommitSha=${sha}`,
+    '--meta',
+    `sourceSha=${sha}`,
+    '--meta',
+    `ciRun=${runId}`,
+  ];
+}
 
 export function assertReleaseRun(run, repository, sha, branch, currentSha) {
   if (!releaseTargets[branch] || !/^[a-f0-9]{40}$/.test(sha)) {

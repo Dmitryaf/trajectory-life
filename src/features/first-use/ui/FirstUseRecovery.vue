@@ -352,7 +352,7 @@ async function completeRecovery() {
   <section v-else-if="availablePromptVisible" class="first-use-card first-use-card--available" aria-label="Первый обзор недели">
     <div>
       <strong>Вспомнить недавнюю неделю?</strong>
-      <p>Выберите период. Несколько коротких вопросов помогут увидеть его целиком.</p>
+      <p>Выберите неделю и ответьте на несколько вопросов о событиях, делах и самочувствии.</p>
       <div class="first-use-periods first-use-periods--compact" role="radiogroup" aria-label="Период первого обзора">
         <button
           v-for="option in periodOptions"
@@ -408,7 +408,7 @@ async function completeRecovery() {
     <div v-else-if="currentStep === 'state_context'" class="first-use-recovery__step">
       <h2 id="first-use-step-title">Как вы себя чувствовали?</h2>
       <p>Можно коротко написать про силы, настроение и обстоятельства недели.</p>
-      <FormFieldLabel for="first-use-state">Состояние и важные условия</FormFieldLabel>
+      <FormFieldLabel for="first-use-state">Самочувствие и обстоятельства недели</FormFieldLabel>
       <textarea
         id="first-use-state"
         v-model="stateContext"
@@ -446,7 +446,7 @@ async function completeRecovery() {
         <p class="first-use-recovery__field-note">
           В следующем обзоре этот ответ появится как ваше прошлое решение — так будет проще посмотреть, что получилось.
         </p>
-        <FormFieldLabel for="first-use-plan">Необязательный план «если — то»</FormFieldLabel>
+        <FormFieldLabel for="first-use-plan">Что сделаете, если ситуация повторится? — необязательно</FormFieldLabel>
         <textarea
           id="first-use-plan"
           v-model="ifThenPlan"
@@ -458,8 +458,8 @@ async function completeRecovery() {
     </div>
 
     <div v-else class="first-use-recovery__step first-use-overview">
-      <h2 id="first-use-step-title">Вот чем была наполнена ваша неделя</h2>
-      <p>Ответы уже сохранены. Это не оценка недели, а её факты и важный контекст.</p>
+      <h2 id="first-use-step-title">Ваш обзор недели</h2>
+      <p>Ваш обзор сохранён. Позже его можно дополнить.</p>
       <p v-if="periodIsIncomplete" class="first-use-overview__coverage">
         Обзор собран по {{ formatDate(targetPeriodEnd, { day: 'numeric', month: 'long' }) }}. Неделя ещё идёт — позже её можно дополнить.
       </p>
@@ -467,7 +467,7 @@ async function completeRecovery() {
       <WeeklyReviewJournalLinks :review="review" />
 
       <p v-if="meaningfulAnswerCount < 2" class="first-use-overview__empty">
-        Чтобы получилась полезная картина, добавьте ещё хотя бы два факта или важных условия недели.
+        При желании добавьте, что ещё произошло за неделю или как вы себя чувствовали.
       </p>
     </div>
 

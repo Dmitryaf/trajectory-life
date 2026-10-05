@@ -342,7 +342,7 @@ describe('settings scenarios', () => {
     await saveButton.trigger('click');
     await flushPromises();
     expect(saveSettings).toHaveBeenCalledTimes(2);
-    expect(notifySaved).toHaveBeenCalledWith('Блоки ежедневной записи сохранены');
+    expect(notifySaved).toHaveBeenCalledWith('Разделы ежедневной записи сохранены');
   });
 
   it('blocks repeated data clearing and allows retrying after an error', async () => {

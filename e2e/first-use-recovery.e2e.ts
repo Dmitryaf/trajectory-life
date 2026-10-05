@@ -28,13 +28,13 @@ test('saves and resumes the first week recovery on a small screen', async ({ pag
   await page.getByLabel('По одному пункту в строке').fill('Состоялся важный разговор');
   await page.getByRole('button', { name: 'Продолжить', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Как вы себя чувствовали?' })).toBeVisible();
-  await page.getByLabel('Состояние и важные условия').fill('К середине недели было мало сил');
+  await page.getByLabel('Самочувствие и обстоятельства недели').fill('К середине недели было мало сил');
   await page.getByRole('button', { name: 'Продолжить', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Что помогало, а что мешало?' })).toBeVisible();
   await page.getByRole('button', { name: 'Пропустить' }).click();
   await page.getByRole('button', { name: 'Пока без решения' }).click();
   await page.getByRole('button', { name: 'Продолжить', exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'Вот чем была наполнена ваша неделя' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Ваш обзор недели' })).toBeVisible();
   const firstOverview = page.locator('.first-use-overview .weekly-review-overview');
   await expect(firstOverview.getByText('Закончил черновик')).toBeVisible();
   await expect(firstOverview.getByText('Состоялся важный разговор')).toBeVisible();
@@ -63,7 +63,7 @@ test('saves and resumes the first week recovery on a small screen', async ({ pag
   await page.getByRole('button', { name: 'Готово' }).click();
   await expect(page).toHaveURL(/\/week\?week=\d{4}-\d{2}-\d{2}#first-use-overview$/);
   const restoredOverview = page.locator('#first-use-overview');
-  await expect(restoredOverview.getByText('Восстановлено по вашим ответам')).toBeVisible();
+  await expect(restoredOverview.getByText('По вашим воспоминаниям')).toBeVisible();
   await expect(restoredOverview.getByText('К середине недели было мало сил')).toBeVisible();
   await restoredOverview.getByText('Добавить точные даты в Журнал').click();
   await expect(restoredOverview.getByText('Уже есть в Журнале')).toHaveCount(2);

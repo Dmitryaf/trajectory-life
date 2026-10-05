@@ -223,8 +223,6 @@
   --auth-gate-field-text: #52645e;
   --auth-gate-button-border: rgba(255, 255, 255, 0.45);
   --auth-gate-error: #a33b32;
-  --auth-gate-disabled-surface: #f1f4f1;
-  --auth-gate-input-shadow: rgba(16, 45, 44, 0.08);
   --auth-gate-link: #526d65;
   --account-menu-border: #d5e2dc;
   --account-menu-surface: rgba(255, 255, 255, 0.86);

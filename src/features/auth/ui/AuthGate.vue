@@ -55,7 +55,10 @@ const submitIssue = computed(() => {
   return '';
 });
 
-function selectMode(nextMode: 'sign-in' | 'sign-up') {
+async function selectMode(nextMode: 'sign-in' | 'sign-up') {
+  if (auth.loading || (nextMode === 'sign-up' && !auth.signupEnabled)) {
+    return;
+  }
   mode.value = nextMode;
   password.value = '';
   passwordConfirmation.value = '';
@@ -64,6 +67,8 @@ function selectMode(nextMode: 'sign-in' | 'sign-up') {
   confirmationEmail.value = '';
   auth.error = '';
   auth.notice = '';
+  await nextTick();
+  emailInput.value?.focus();
 }
 
 async function submit() {
@@ -146,14 +151,22 @@ async function requestPasswordReset() {
       <div class="auth-card__brand">
         <BrandMark />
         <div>
-          <EyebrowText tag="p">{{ mode === 'sign-up' ? 'Новый аккаунт' : 'С возвращением' }}</EyebrowText>
+          <EyebrowText tag="p">{{ mode === 'sign-up' ? 'Новый аккаунт' : 'Ваш дневник' }}</EyebrowText>
           <h2>{{ mode === 'sign-up' ? 'Создайте аккаунт' : 'Войдите в «Траекторию»' }}</h2>
         </div>
       </div>
 
-      <div v-if="auth.signupEnabled && !confirmationEmail" class="auth-mode" aria-label="Выбор действия">
-        <button type="button" :class="{ 'is-active': mode === 'sign-in' }" @click="selectMode('sign-in')">Войти</button>
-        <button type="button" :class="{ 'is-active': mode === 'sign-up' }" @click="selectMode('sign-up')">Создать аккаунт</button>
+      <div v-if="!confirmationEmail" class="auth-mode">
+        <template v-if="auth.signupEnabled">
+          <span>{{ mode === 'sign-in' ? 'Нет аккаунта?' : 'Уже есть аккаунт?' }}</span>
+          <button type="button" :disabled="auth.loading" @click="selectMode(mode === 'sign-in' ? 'sign-up' : 'sign-in')">
+            {{ mode === 'sign-in' ? 'Создать аккаунт' : 'Войти' }}
+          </button>
+        </template>
+        <template v-else>
+          <span>Регистрация сейчас закрыта. Войти можно с существующим аккаунтом.</span>
+          <RouterLink to="/#product">Посмотреть примеры приложения</RouterLink>
+        </template>
       </div>
 
       <section v-if="confirmationEmail" class="auth-confirmation" aria-labelledby="auth-confirmation-title" aria-live="polite">

@@ -219,7 +219,7 @@ watch(
   <PageShell class="page--review page--week">
     <ReviewHeading
       title="Неделя"
-      summary="Посмотрите, чем была наполнена неделя, и решите, хотите ли что-то менять."
+      summary="Вспомните события недели, посмотрите записи о сне, самочувствии и занятиях."
       :action="hasPeriodData ? (reviewAvailable ? 'К обзору' : 'Обзор позже') : undefined"
       href="#week-review"
       period="week"
@@ -269,9 +269,9 @@ watch(
       <article v-if="showRecoveredOverview && savedReview" id="first-use-overview" class="restored-week-overview">
         <div class="restored-week-overview__heading">
           <div>
-            <EyebrowText tag="p">Восстановлено по вашим ответам</EyebrowText>
-            <h2>Вот чем была наполнена ваша неделя</h2>
-            <p>Здесь собраны ваши факты, важные события и условия недели. Это не оценка и не автоматический вывод.</p>
+            <EyebrowText tag="p">По вашим воспоминаниям</EyebrowText>
+            <h2>Ваш обзор недели</h2>
+            <p>Здесь ваши ответы о событиях, делах и самочувствии за неделю.</p>
             <p v-if="recoveredPeriodIsIncomplete" class="restored-week-overview__coverage">
               Ответы собраны по {{ formatDate(savedReview.coveredThrough, { day: 'numeric', month: 'long' }) }}. Остальные дни этой недели
               не считаются пропущенными.
@@ -297,7 +297,7 @@ watch(
       >
         <PeriodRecordCard
           v-if="results.length"
-          eyebrow="Завершённые факты"
+          eyebrow="Сделанные дела"
           title="Итоги недели"
           :items="resultRecordItems"
           :breakdown="resultAreaSummary"
@@ -307,7 +307,7 @@ watch(
 
         <PeriodRecordCard
           v-if="lifeEvents.length"
-          eyebrow="Важный контекст"
+          eyebrow="Из журнала"
           title="События недели"
           :items="eventRecordItems"
           :breakdown="eventTypeSummary"
@@ -331,7 +331,7 @@ watch(
       <PeriodDetails
         v-if="hasDailyData || hasJournalData || experimentCards.length"
         class="week-data-details"
-        :title="hasDailyData ? 'Показать дни и дополнительный контекст' : 'Записи недели'"
+        :title="hasDailyData ? 'Показать записи по дням' : 'Записи недели'"
         :open="!hasDailyData"
       >
         <WeeklyRhythmCard v-if="hasDailyData" :days="rhythmDays" />
@@ -361,7 +361,6 @@ watch(
         <SurfaceCard v-if="hasDailyData && specialDays.length" kind="dashboard">
           <SectionHeading>
             <div>
-              <EyebrowText>Поправка на контекст</EyebrowText>
               <h2>Особые дни</h2>
             </div>
             <Badge>{{ specialDays.length }}</Badge>
@@ -399,7 +398,7 @@ watch(
         <SurfaceCard v-if="hasDailyData" kind="dashboard">
           <SectionHeading>
             <div>
-              <EyebrowText>Присутствие областей</EyebrowText>
+              <EyebrowText>Каким сферам жизни вы уделяли внимание</EyebrowText>
               <h2>Карта недели</h2>
             </div>
           </SectionHeading>
@@ -450,7 +449,7 @@ watch(
         </template>
         <PeriodDetails
           class="review-context-details"
-          :title="reviewHasContext ? 'Итоги и контекст' : 'Добавить итоги и контекст'"
+          :title="reviewHasContext ? 'Дела, события и самочувствие' : 'Добавить дела, события и самочувствие'"
           :open="reviewContextOpen"
           @toggle="updateReviewContextOpen"
         >
@@ -460,7 +459,7 @@ watch(
             :key="index"
             v-model="review.results[index]"
             type="text"
-            :placeholder="`${index + 1}. Итог или важный факт`"
+            :placeholder="`${index + 1}. Сделанное дело или результат`"
           />
           <FormFieldLabel>До трёх событий, решений или мыслей</FormFieldLabel>
           <input

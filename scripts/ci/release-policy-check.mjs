@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { assertReleaseRun, deploymentUrl, promoteVerified } from './release-policy.mjs';
+import { readFileSync } from 'node:fs';
+import { requireStaging, STAGING_ORIGIN } from '../staging/session.mjs';
+import { assertReleaseRun, candidateDeploymentArgs, deploymentUrl, promoteVerified, releaseTargets } from './release-policy.mjs';
 
 const sha = 'a'.repeat(40);
 const repository = 'owner/project';
@@ -137,4 +139,48 @@ test('wrong project or source never reaches smoke or promotion', async () => {
     await assert.rejects(promoteVerified(state.input, state.actions));
     assert.deepEqual(state.events, []);
   }
+});
+
+// Vercel CLI supports --skip-domain only for production. Preview branch domains
+// are automatic, so the verified staging alias must be separate from that domain.
+test('preview keeps branch-scoped settings without production-only CLI flags', () => {
+  const args = candidateDeploymentArgs('develop', sha, 123);
+  assert.ok(args.includes('--target=preview'));
+  assert.equal(args.includes('--skip-domain'), false);
+  assert.equal(args.includes('--prod'), false);
+  assert.ok(args.includes('githubDeployment=1'));
+  assert.ok(args.includes('githubCommitRef=develop'));
+  assert.ok(args.includes(`githubCommitSha=${sha}`));
+  assert.ok(args.includes(`sourceSha=${sha}`));
+  assert.ok(args.includes('ciRun=123'));
+  assert.equal(releaseTargets.develop.alias, 'trajectory-life-staging-trajectory3.vercel.app');
+  assert.equal(releaseTargets.develop.alias.includes('-git-develop-'), false);
+});
+
+test('production is staged without automatic domain promotion', () => {
+  const args = candidateDeploymentArgs('main', sha, 123);
+  assert.ok(args.includes('--prod'));
+  assert.ok(args.includes('--skip-domain'));
+  assert.equal(args.includes('--target=preview'), false);
+  assert.ok(args.includes('githubCommitRef=main'));
+});
+
+test('deployment arguments reject unsupported sources', () => {
+  assert.throws(() => candidateDeploymentArgs('feature/example', sha, 123));
+  assert.throws(() => candidateDeploymentArgs('constructor', sha, 123));
+  assert.throws(() => candidateDeploymentArgs('develop', 'bad-sha', 123));
+  assert.throws(() => candidateDeploymentArgs('develop', sha, 'bad-run'));
+});
+
+test('staging verification and Auth redirects follow the verified alias', () => {
+  assert.equal(STAGING_ORIGIN, `https://${releaseTargets.develop.alias}`);
+  assert.equal(requireStaging(STAGING_ORIGIN, true), STAGING_ORIGIN);
+  assert.throws(() => requireStaging(STAGING_ORIGIN, false));
+  assert.throws(() => requireStaging(`https://${releaseTargets.main.alias}`, true));
+  assert.throws(() => requireStaging('https://trajectory-app-git-develop-trajectory3.vercel.app', true));
+  const config = readFileSync(new URL('../../supabase/config.toml', import.meta.url), 'utf8');
+  assert.ok(config.includes(`site_url = "${STAGING_ORIGIN}"`));
+  assert.ok(config.includes(`"${STAGING_ORIGIN}/access"`));
+  assert.ok(config.includes(`"${STAGING_ORIGIN}/password-reset"`));
+  assert.ok(config.includes('"https://trajectory-app-git-develop-trajectory3.vercel.app/password-reset"'));
 });

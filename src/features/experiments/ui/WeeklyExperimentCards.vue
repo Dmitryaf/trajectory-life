@@ -69,7 +69,7 @@ function experimentNoteStatus(experiment: WeeklyExperimentCard): string {
   <SurfaceCard kind="dashboard">
     <SectionHeading>
       <div>
-        <EyebrowText>Личные проверки</EyebrowText>
+        <EyebrowText>Что вы пробуете</EyebrowText>
         <h2>Эксперименты в эту неделю</h2>
       </div>
       <CountBadge>{{ experiments.length }}</CountBadge>
@@ -107,7 +107,7 @@ function experimentNoteStatus(experiment: WeeklyExperimentCard): string {
             </p>
             <p v-if="experiment.hypothesis">Что хотите узнать: {{ experiment.hypothesis }}</p>
             <p v-if="experiment.conclusion">
-              <strong>{{ experiment.active ? 'Промежуточное наблюдение:' : 'Что заметили:' }}</strong
+              <strong>{{ experiment.active ? 'Что заметили к этому моменту:' : 'Что заметили:' }}</strong
               ><br />{{ experiment.conclusion }}
             </p>
             <p v-if="experiment.decision">Дальше: {{ experimentDecisionLabel(experiment.decision).toLocaleLowerCase('ru-RU') }}</p>
