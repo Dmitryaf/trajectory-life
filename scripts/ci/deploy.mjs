@@ -9,6 +9,7 @@ import {
   assertReleaseRun,
   candidateDeploymentArgs,
   deploymentUrl,
+  environmentPullArgs,
   promoteVerified,
   releaseTargets,
 } from './release-policy.mjs';
@@ -69,7 +70,7 @@ const previous = await inspect(target.alias);
 assertDeployment(previous, projectId);
 await assetSignature(deploymentUrl(previous.url));
 
-vercel(['pull', '--yes', `--environment=${target.environment}`, `--git-branch=${branch}`]);
+vercel(environmentPullArgs(branch));
 assertClientBuildEnvironment(parseEnv(readFileSync(`.vercel/.env.${target.environment}.local`, 'utf8')), target.projectRef);
 vercel(['build', ...(branch === 'main' ? ['--prod'] : [])]);
 const output = vercel(candidateDeploymentArgs(branch, sha, source.id), true);

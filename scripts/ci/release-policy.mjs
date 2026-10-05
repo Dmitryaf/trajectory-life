@@ -3,6 +3,14 @@ export const releaseTargets = {
   main: { environment: 'production', projectRef: 'pvcitldyssqhcdmkqahj', alias: 'trajectory-app-lilac.vercel.app' },
 };
 
+export function environmentPullArgs(branch) {
+  if (!Object.hasOwn(releaseTargets, branch)) {
+    throw new Error('Unsupported release source');
+  }
+  const { environment } = releaseTargets[branch];
+  return ['pull', '--yes', `--environment=${environment}`, ...(environment === 'preview' ? [`--git-branch=${branch}`] : [])];
+}
+
 export function candidateDeploymentArgs(branch, sha, runId) {
   if (!Object.hasOwn(releaseTargets, branch) || !/^[a-f0-9]{40}$/.test(sha) || !/^\d+$/.test(String(runId))) {
     throw new Error('Unsupported deployment source');
