@@ -793,6 +793,43 @@ for (const width of [320, 361, 390, 480, 719, 720, 721]) {
   });
 }
 
+test('separates daily layout settings from collapsed and expanded additional sections', async ({ page }, testInfo) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.goto('/today');
+  await page.getByLabel('Дата записи', { exact: true }).evaluate((input, value) => {
+    (input as HTMLInputElement).value = value;
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+  }, emptyPeriodDate());
+  const additional = page.locator('.daily-additional-blocks');
+  const settings = page.locator('.daily-layout-settings');
+  await expect(additional).toBeVisible();
+  await expect(settings).toBeVisible();
+  await expect(page.locator('form + .daily-layout-settings')).toBeVisible();
+
+  for (const width of [320, 390, 768, 980, 1440]) {
+    await page.setViewportSize({ width, height: 900 });
+    for (const expanded of [false, true]) {
+      const isExpanded = (await additional.getAttribute('open')) !== null;
+      if (isExpanded !== expanded) {
+        await additional.locator('summary').click();
+      }
+      expectVerticalSeparation(
+        await readLayoutBox(additional, 'additional sections'),
+        await readLayoutBox(settings, 'daily layout settings'),
+        12,
+        `daily settings gap at ${width}px, expanded=${expanded}`,
+      );
+      await expectPageFitsViewport(page, `daily settings at ${width}px`);
+      if (!expanded && (width === 390 || width === 980)) {
+        await settings.scrollIntoViewIfNeeded();
+        await page.screenshot({ path: testInfo.outputPath(`daily-settings-${width}.png`) });
+      }
+    }
+  }
+  await settings.getByRole('link', { name: 'Настроить главную' }).click();
+  await expect(page).toHaveURL(/\/settings#daily-blocks$/);
+});
+
 test('keeps the returning daily form compact and visibly grouped', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 720 });
   await page.goto('/today');
