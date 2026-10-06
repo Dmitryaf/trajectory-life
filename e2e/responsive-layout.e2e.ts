@@ -1020,6 +1020,11 @@ for (const width of [320, 390, 768, 980, 1440]) {
     await expect(feedback).toHaveAttribute('title', 'Обратная связь');
     await expect(feedback.locator('strong')).toBeHidden();
     await expect(feedback.locator('use')).toHaveAttribute('href', '/icons/ui-icons.svg#feedback');
+    const actions = page.locator('.header-actions');
+    const actionsBox = await readLayoutBox(actions, 'header actions');
+    for (const action of await actions.locator(':scope > *').all()) {
+      expectBoxInside(await readLayoutBox(action, 'header action'), actionsBox, `header action at ${width}px`, 1);
+    }
     await expectPageFitsViewport(page, `compact header at ${width}px`);
     await page.locator('.app-header').screenshot({ path: testInfo.outputPath(`feedback-header-${width}.png`) });
 

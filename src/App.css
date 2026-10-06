@@ -470,6 +470,10 @@
 }
 
 @media (max-width: 390px) {
+  .app-header {
+    gap: 8px;
+  }
+
   .brand small {
     display: none;
   }
