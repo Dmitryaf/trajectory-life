@@ -48,6 +48,7 @@ defineExpose({ element });
 .utility-trigger--feedback {
   width: 38px;
   min-height: 38px;
+  flex-shrink: 0;
   justify-content: center;
   padding: 0;
 }
