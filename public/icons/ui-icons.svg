@@ -23,6 +23,7 @@
   <symbol id="edit" viewBox="0 0 24 24"><path d="m5 16-.75 3.75L8 19 18 9l-3-3L5 16Zm8.5-8.5 3 3"/></symbol>
   <symbol id="delete" viewBox="0 0 24 24"><path d="M5 7h14M9 7V4.5h6V7m2 0-.75 12H7.75L7 7m3 4v5m4-5v5"/></symbol>
   <symbol id="help" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M9.75 9.25A2.4 2.4 0 0 1 12.1 7c1.45 0 2.65.9 2.65 2.3 0 2-2.75 2.15-2.75 4.2M12 17h.01"/></symbol>
+  <symbol id="feedback" viewBox="0 0 24 24"><path d="M6 4.5h12A2.5 2.5 0 0 1 20.5 7v8A2.5 2.5 0 0 1 18 17.5H8L3.5 21V7A2.5 2.5 0 0 1 6 4.5ZM7.5 9h9m-9 4h6"/></symbol>
   <symbol id="sleep" viewBox="0 0 24 24"><path d="M18.5 15.5A7 7 0 0 1 8.5 5a7.5 7.5 0 1 0 10 10.5Z"/></symbol>
   <symbol id="context" viewBox="0 0 24 24"><path d="M5 7h5m4 0h5M5 12h9m4 0h1M5 17h2m4 0h8"/><circle cx="12" cy="7" r="2"/><circle cx="16" cy="12" r="2"/><circle cx="9" cy="17" r="2"/></symbol>
   <symbol id="goal" viewBox="0 0 24 24"><circle cx="11" cy="13" r="6.5"/><circle cx="11" cy="13" r="2.5"/><path d="m13 11 6-6m-3 0h3v3"/></symbol>

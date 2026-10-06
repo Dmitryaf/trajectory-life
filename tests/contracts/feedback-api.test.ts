@@ -44,10 +44,12 @@ describe('feedback API', () => {
     expect(fetchMock.mock.calls[0][0]).toBe('https://project.supabase.co/auth/v1/user');
     const delivery = fetchMock.mock.calls[1];
     expect(delivery[0]).toBe('https://api.resend.com/emails');
-    const payload = JSON.parse((delivery[1] as RequestInit).body as string) as { to: string[]; text: string };
+    const payload = JSON.parse((delivery[1] as RequestInit).body as string) as { to: string[]; text: string; subject: string };
     expect(payload.to).toEqual(['private-inbox@example.test']);
     expect(payload.text).toContain('friend@example.test');
     expect(payload.text).toContain('На экране недели не хватает пояснения.');
+    expect(payload.subject).toBe('Обратная связь — Траектория');
+    expect(payload.text).not.toMatch(/закрыт.{0,20}бет/i);
   });
 
   it('rejects cross-origin requests before calling external services', async () => {

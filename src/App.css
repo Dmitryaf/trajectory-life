@@ -46,15 +46,10 @@
 }
 
 .header-feedback-slot {
-  width: 124px;
+  width: 38px;
   min-height: 38px;
   display: flex;
   flex: 0 0 auto;
-}
-
-:deep(.header-feedback-slot .beta-feedback-link) {
-  width: 100%;
-  justify-content: center;
 }
 
 .header-settings-link {
@@ -475,6 +470,10 @@
 }
 
 @media (max-width: 390px) {
+  .app-header {
+    gap: 8px;
+  }
+
   .brand small {
     display: none;
   }
@@ -527,11 +526,5 @@
 
   .app-main {
     padding-bottom: calc(54px + var(--safe-bottom));
-  }
-}
-
-@media (min-width: 980px) and (max-width: 1150px) {
-  .header-feedback-slot {
-    width: 38px;
   }
 }

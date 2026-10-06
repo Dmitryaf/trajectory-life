@@ -8,6 +8,7 @@ import AiAnalysisNudge from '../features/analysis/ui/AiAnalysisNudge.vue';
 import CurrentGoalDialog from '../features/daily-entry/ui/CurrentGoalDialog.vue';
 import { resolveTodayContextCue } from '../features/daily-entry/contextCue';
 import DailyLayoutSettings from '../features/daily-entry/ui/DailyLayoutSettings.vue';
+import WeightField from '../features/daily-entry/ui/WeightField.vue';
 import { useDailyBlocksDisclosure } from '../features/daily-entry/useDailyBlocksDisclosure';
 import { useCurrentGoalDialog } from '../features/daily-entry/useCurrentGoalDialog';
 import { useTodayContext } from '../features/daily-entry/useTodayContext';
@@ -613,13 +614,7 @@ function openEntryDatePicker() {
             </FormCardHeading>
             <ChipGroup :model-value="form.nutritionState" :options="nutritionOptions" allow-clear @update:model-value="setNutritionState" />
             <div class="sleep-field-grid">
-              <div>
-                <FormFieldLabel for="weight-kg">Вес</FormFieldLabel>
-                <div class="number-field">
-                  <input id="weight-kg" v-model="weightKg" type="text" inputmode="decimal" autocomplete="off" placeholder="82.4" />
-                  <span>кг</span>
-                </div>
-              </div>
+              <WeightField v-model="weightKg" />
             </div>
             <textarea
               v-model="form.nutritionNote"

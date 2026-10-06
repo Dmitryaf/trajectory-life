@@ -372,32 +372,6 @@
   font-weight: 700;
 }
 
-.number-field {
-  width: 185px;
-  display: flex;
-  align-items: center;
-  overflow: hidden;
-  border: 1px solid var(--line);
-  border-radius: 14px;
-  background: var(--surface);
-}
-
-.number-field input {
-  padding: 10px 4px 10px 14px;
-  border: 0;
-  border-radius: 0;
-  box-shadow: none;
-  font-size: 22px;
-  font-weight: 750;
-}
-
-.number-field span {
-  padding-right: 14px;
-  color: var(--muted);
-  font-size: 13px;
-  white-space: nowrap;
-}
-
 .floating-save-button {
   position: fixed;
   right: calc(24px + var(--safe-right));
@@ -542,8 +516,7 @@
     transform: translateY(6px);
   }
 
-  .sleep-field-grid > div,
-  .number-field {
+  .sleep-field-grid > div {
     width: 100%;
     flex-basis: 100%;
   }
