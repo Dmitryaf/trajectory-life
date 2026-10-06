@@ -1006,6 +1006,38 @@ test('switches settings scenarios with the keyboard on a mobile screen', async (
   expect(widths.content).toBeLessThanOrEqual(widths.viewport);
 });
 
+for (const width of [320, 390, 768, 980, 1440]) {
+  test(`keeps the feedback action compact and keyboard-accessible at ${width}px`, async ({ page }, testInfo) => {
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto('/today');
+    const feedback = page.getByRole('button', { name: 'Обратная связь' });
+    const help = page.getByRole('button', { name: 'Как работает приложение' });
+    const [feedbackBox, helpBox] = await Promise.all([readLayoutBox(feedback, 'feedback action'), readLayoutBox(help, 'help action')]);
+    expect(feedbackBox.width).toBeCloseTo(helpBox.width, 0);
+    expect(feedbackBox.height).toBeCloseTo(helpBox.height, 0);
+    expect(feedbackBox.width).toBeCloseTo(feedbackBox.height, 0);
+    expectHorizontalSeparation(helpBox, feedbackBox, 8, 'header utility actions');
+    await expect(feedback).toHaveAttribute('title', 'Обратная связь');
+    await expect(feedback.locator('strong')).toBeHidden();
+    await expect(feedback.locator('use')).toHaveAttribute('href', '/icons/ui-icons.svg#feedback');
+    await expectPageFitsViewport(page, `compact header at ${width}px`);
+    await page.locator('.app-header').screenshot({ path: testInfo.outputPath(`feedback-header-${width}.png`) });
+
+    await help.focus();
+    await page.keyboard.press('Tab');
+    await expect(feedback).toBeFocused();
+    await page.keyboard.press('Enter');
+    const dialog = page.getByRole('dialog', { name: 'Написать разработчику' });
+    await expect(dialog).toBeVisible();
+    await expect(dialog).not.toContainText(/закрыт.{0,20}бет/i);
+    await expect(dialog.getByLabel('Предложение, проблема или ошибка')).toBeFocused();
+    await dialog.screenshot({ path: testInfo.outputPath(`feedback-dialog-${width}.png`) });
+    await page.keyboard.press('Escape');
+    await expect(dialog).not.toBeVisible();
+    await expect(feedback).toBeFocused();
+  });
+}
+
 test('sends feedback from the built-in form without asking for recipient details', async ({ page }) => {
   let submittedMessage = '';
   await page.route('/api/feedback', async (route) => {

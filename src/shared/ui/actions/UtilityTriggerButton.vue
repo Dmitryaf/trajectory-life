@@ -44,13 +44,15 @@ defineExpose({ element });
 .utility-trigger strong {
   font-weight: 850;
 }
-.utility-trigger--help {
+.utility-trigger--help,
+.utility-trigger--feedback {
   width: 38px;
   min-height: 38px;
   justify-content: center;
   padding: 0;
 }
-.utility-trigger--help strong {
+.utility-trigger--help strong,
+.utility-trigger--feedback strong {
   display: none;
 }
 .utility-trigger--inline {
@@ -65,40 +67,11 @@ defineExpose({ element });
   box-shadow: 0 15px 34px var(--utility-action-hover-shadow);
   transform: translateY(-2px);
 }
-@media (min-width: 980px) {
-  .utility-trigger:not(.utility-trigger--inline) {
-    min-height: 38px;
-    padding: 8px 12px;
-  }
-}
-@media (min-width: 980px) and (max-width: 1150px) {
-  .utility-trigger--feedback {
-    width: 38px;
-    justify-content: center;
-    padding: 0;
-  }
-  .utility-trigger--feedback strong {
-    display: none;
-  }
-}
 @media (max-width: 720px) {
-  .utility-trigger--feedback {
-    min-height: 36px;
-    padding: 7px 10px;
-  }
-  .utility-trigger--feedback strong {
-    display: none;
-  }
-  .utility-trigger--help {
-    width: 36px;
-    min-height: 36px;
-  }
-}
-@media (max-width: 390px) {
+  .utility-trigger--help,
   .utility-trigger--feedback {
     width: 36px;
-    justify-content: center;
-    padding: 0;
+    min-height: 36px;
   }
 }
 </style>
