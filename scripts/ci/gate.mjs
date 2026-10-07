@@ -1,6 +1,6 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { assertGate, validateReports } from './policy.mjs';
+import { assertGate, validateFreshReports } from './policy.mjs';
 import { githubClient, loadProof } from './github.mjs';
 import { summary, writeJson } from './runtime.mjs';
 
@@ -14,7 +14,7 @@ if (context.reuse.runId) {
 } else {
   const files = readdirSync('qa/ci/reports').filter((name) => name.startsWith('browser-') && name.endsWith('.json'));
   const reports = files.map((name) => JSON.parse(readFileSync(join('qa/ci/reports', name), 'utf8')));
-  validateReports(reports, context.identity);
+  validateFreshReports(reports, context.identity);
   writeJson('qa/ci/proof.json', {
     schema: 1,
     runId: Number(process.env.GITHUB_RUN_ID),

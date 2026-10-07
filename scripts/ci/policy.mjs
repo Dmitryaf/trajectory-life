@@ -22,6 +22,14 @@ export function isTrustedRun(run, repository, now = Date.now()) {
 }
 
 export function validateReports(reports, identity) {
+  validateReportSet(reports, identity, false);
+}
+
+export function validateFreshReports(reports, identity) {
+  validateReportSet(reports, identity, true);
+}
+
+function validateReportSet(reports, identity, fresh) {
   if (reports.length !== browserJobs.length) {
     throw new Error('Missing browser reports');
   }
@@ -31,7 +39,14 @@ export function validateReports(reports, identity) {
       throw new Error(`Missing or duplicate report: ${name}`);
     }
     const report = matches[0];
-    if (identityKey(report.identity) !== identityKey(identity)) {
+    // A fresh matrix actually tests each allocated runner during image rollouts.
+    // Reusing earlier evidence still requires an exact image version match.
+    const imageVersion = report.identity?.imageVersion;
+    if (typeof imageVersion !== 'string' || !imageVersion.trim()) {
+      throw new Error(`Missing runner image version: ${name}`);
+    }
+    const expectedIdentity = fresh ? { ...identity, imageVersion } : identity;
+    if (identityKey(report.identity) !== identityKey(expectedIdentity)) {
       throw new Error(`Different source or runner: ${name}`);
     }
     if (

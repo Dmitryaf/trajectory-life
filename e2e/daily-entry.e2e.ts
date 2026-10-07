@@ -47,6 +47,61 @@ function startOfWeek(dateKey: string): string {
   return addDays(dateKey, 1 - weekday);
 }
 
+for (const width of [390, 1440]) {
+  test(`keeps field focus in the product palette without clipping at ${width}px`, async ({ page }, testInfo) => {
+    await page.setViewportSize({ width, height: 900 });
+    await openDailyEntry(page);
+
+    const note = page.getByLabel('Короткое пояснение');
+    await note.click();
+    await expect(note).toBeFocused();
+    await expect(note).toHaveCSS('outline-color', 'rgb(25, 121, 92)');
+    await expect(note).toHaveCSS('outline-width', '2px');
+    await note.press('Shift+Tab');
+    await page.keyboard.press('Tab');
+    await expect(note).toBeFocused();
+    await expect(note).toHaveCSS('outline-style', 'solid');
+    await page.screenshot({ path: testInfo.outputPath('note-focus.png') });
+
+    const duration = page.locator('.duration-field').first();
+    const hours = duration.getByRole('spinbutton', { name: 'Часы' });
+    const minutes = duration.getByRole('spinbutton', { name: 'Минуты' });
+    await hours.click();
+    await expect(hours).toBeFocused();
+    await expect(hours).toHaveCSS('outline-style', 'none');
+    await expect(duration).toHaveCSS('outline-color', 'rgb(25, 121, 92)');
+    await expect(duration).toHaveCSS('outline-width', '2px');
+    await hours.press('Tab');
+    await expect(minutes).toBeFocused();
+    await expect(minutes).toHaveCSS('outline-style', 'none');
+    await expect(duration).toHaveCSS('outline-style', 'solid');
+    await minutes.press('Tab');
+    await expect(duration).toHaveCSS('outline-style', 'none');
+    await expect(duration).toHaveCSS('box-shadow', 'none');
+
+    await openAdditionalBlocks(page);
+    const weight = page.getByLabel('Вес', { exact: true });
+    const control = page.locator('.number-field');
+    await weight.fill('89.4');
+    await expect(weight).toBeFocused();
+    await expect(weight).toHaveCSS('outline-style', 'none');
+    await expect(control).toHaveCSS('border-color', 'rgb(101, 185, 154)');
+    await expect(control).toHaveCSS('outline-color', 'rgb(25, 121, 92)');
+    await expect(control).toHaveCSS('outline-width', '2px');
+    await weight.press('Shift+Tab');
+    await page.keyboard.press('Tab');
+    await expect(weight).toBeFocused();
+    await expect(control).toHaveCSS('outline-style', 'solid');
+    await expect(control).not.toHaveCSS('box-shadow', 'none');
+    await page.screenshot({ path: testInfo.outputPath('weight-focus.png') });
+
+    await weight.press('Tab');
+    await expect(weight).not.toBeFocused();
+    await expect(control).toHaveCSS('outline-style', 'none');
+    await expect(control).toHaveCSS('box-shadow', 'none');
+  });
+}
+
 async function emulateSafeViewport(
   page: Page,
   insets: { top: number; right: number; bottom: number; left: number },

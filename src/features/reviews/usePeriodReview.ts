@@ -1,6 +1,7 @@
-import { computed, onBeforeUnmount, reactive, ref, watch, type Ref } from 'vue';
+import { computed, getCurrentInstance, onBeforeUnmount, onMounted, reactive, ref, watch, type Ref } from 'vue';
+import { onBeforeRouteLeave, onBeforeRouteUpdate } from 'vue-router';
 import { buildPeriodPackage, copyAiPrompt, downloadAiPackage } from '../export/browser';
-import { addDays, startOfMonth, startOfWeek, todayKey } from '@/services/dates';
+import { addDays, addMonths, startOfMonth, startOfWeek, todayKey } from '@/services/dates';
 import { notifyInfo, notifySaved, notifyUnknownError } from '@/services/notifications';
 import { plainCopy } from '@/services/plain';
 import { useAppStore } from '@/stores/app';
@@ -109,7 +110,37 @@ export function usePeriodReview<T extends PeriodReview>(options: PeriodReviewOpt
     },
     { deep: true, flush: 'sync' },
   );
-  onBeforeUnmount(() => setSyncEditorDirty(editorId, false));
+  function confirmDiscardChanges() {
+    return !dirty.value || window.confirm('Обзор ещё не сохранён. Отбросить изменения и продолжить?');
+  }
+
+  function changePeriod(anchor: string) {
+    const nextStart = options.period === 'week' ? startOfWeek(anchor) : startOfMonth(anchor);
+    if (nextStart === options.start.value || confirmDiscardChanges()) {
+      options.anchor.value = anchor;
+    }
+  }
+
+  function shiftPeriod(offset: number) {
+    changePeriod(options.period === 'week' ? addDays(options.anchor.value, offset * 7) : addMonths(options.start.value, offset));
+  }
+
+  function handleBeforeUnload(event: BeforeUnloadEvent) {
+    if (dirty.value) {
+      event.preventDefault();
+      event.returnValue = '';
+    }
+  }
+
+  if (getCurrentInstance()?.appContext.config.globalProperties.$router) {
+    onBeforeRouteLeave(confirmDiscardChanges);
+    onBeforeRouteUpdate((to, from) => to.query.week === from.query.week || confirmDiscardChanges());
+  }
+  onMounted(() => window.addEventListener('beforeunload', handleBeforeUnload));
+  onBeforeUnmount(() => {
+    setSyncEditorDirty(editorId, false);
+    window.removeEventListener('beforeunload', handleBeforeUnload);
+  });
 
   function updateReviewContextOpen(event: Event) {
     reviewContextOpen.value = (event.currentTarget as HTMLDetailsElement).open;
@@ -189,6 +220,11 @@ export function usePeriodReview<T extends PeriodReview>(options: PeriodReviewOpt
   }
 
   return {
+    navigation: {
+      previous: () => shiftPeriod(-1),
+      next: () => shiftPeriod(1),
+      current: () => changePeriod(todayKey()),
+    },
     actions: reactive({ saving: reviewSaving, conflict: reviewConflict, save: saveReview, reload: loadReview, replace: replaceReview }),
     copyPrompt,
     downloadJson,

@@ -24,8 +24,8 @@ describe('feedback dialog', () => {
     feedback.send.mockResolvedValueOnce(undefined);
     const wrapper = mount(FeedbackDialog, { props: { accessToken: 'session-token' }, attachTo: document.body });
 
-    await wrapper.get('.beta-feedback-link').trigger('click');
-    const textarea = document.body.querySelector<HTMLTextAreaElement>('#beta-feedback-message');
+    await wrapper.get('.feedback-trigger').trigger('click');
+    const textarea = document.body.querySelector<HTMLTextAreaElement>('#feedback-message');
     expect(textarea).not.toBeNull();
     textarea!.value = 'Добавьте подсказку на экране недели';
     textarea!.dispatchEvent(new Event('input', { bubbles: true }));
@@ -43,7 +43,7 @@ describe('feedback dialog', () => {
   it('uses the shared close icon and ignores a gesture that starts inside the dialog', async () => {
     const wrapper = mount(FeedbackDialog, { props: { accessToken: 'session-token' }, attachTo: document.body });
 
-    await wrapper.get('.beta-feedback-link').trigger('click');
+    await wrapper.get('.feedback-trigger').trigger('click');
     const backdrop = document.body.querySelector<HTMLElement>('.feedback-backdrop')!;
     const dialog = document.body.querySelector<HTMLElement>('.feedback-dialog')!;
     const closeButton = document.body.querySelector<HTMLButtonElement>('[aria-label="Закрыть форму"]')!;

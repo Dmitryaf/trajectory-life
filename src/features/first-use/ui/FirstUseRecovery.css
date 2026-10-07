@@ -120,10 +120,9 @@
   font-weight: 750;
 }
 .first-use-card--available {
-  display: flex;
-  gap: 18px;
-  align-items: center;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
   padding: 18px 20px;
 }
 .first-use-card--available strong {

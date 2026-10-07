@@ -85,10 +85,10 @@ describe('trends scenarios', () => {
     expect(wrapper.findAll('.trend-chart-description')).toHaveLength(1);
     expect(wrapper.findAll('e-chart-panel-stub')).toHaveLength(1);
     const chartOption = wrapper.getComponent({ name: 'EChartPanel' }).props('option') as {
-      series: Array<{ tooltip: { valueFormatter: (value: unknown) => string } }>;
+      series: Array<{ tooltip: { valueFormatter: (value: unknown, dataIndex: number) => string } }>;
     };
-    expect(chartOption.series[0]!.tooltip.valueFormatter(undefined)).toBe('—');
-    expect(chartOption.series[0]!.tooltip.valueFormatter(7.5)).toBe('7,5 ч');
+    expect(chartOption.series[0]!.tooltip.valueFormatter(undefined, 0)).toBe('— (измерений: 8)');
+    expect(chartOption.series[0]!.tooltip.valueFormatter(7.5, 0)).toBe('7,5 ч (измерений: 8)');
 
     for (const label of ['3 месяца', '6 месяцев', '12 месяцев'] as const) {
       const button = wrapper.findAll('.range-tabs button').find((item) => item.text() === label);
