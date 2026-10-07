@@ -89,7 +89,8 @@ describe('daily entry scenario', () => {
       global: { plugins: [pinia], stubs: { RouterLink: routerLinkStub } },
     });
 
-    expect(wrapper.text()).toContain('Хотите добавить или убрать разделы?');
+    expect(wrapper.get('.page-heading .daily-layout-settings').attributes('href')).toBe('/settings#daily-blocks');
+    expect(wrapper.findAll('.daily-layout-settings')).toHaveLength(1);
     expect(wrapper.text()).toContain('Настроить главную');
     expect(wrapper.text()).not.toContain('С чего начать');
     expect(wrapper.text()).toContain('Состояние и условия');
@@ -115,6 +116,9 @@ describe('daily entry scenario', () => {
     });
 
     const nudge = wrapper.get('.ai-analysis-nudge');
+    const children = Array.from(wrapper.get('.page--today').element.children);
+    expect(children.indexOf(nudge.element)).toBeGreaterThan(children.indexOf(wrapper.get('.checkin-grid').element));
+    expect(wrapper.find('[aria-label="Пульс недели"]').exists()).toBe(false);
     expect(nudge.text()).toContain('Приложение только соберёт текст и ничего не отправит само');
     expect(nudge.text()).toContain('Подготовить текст');
     expect(nudge.text()).toContain('Открыть выбранный сервис');
@@ -125,6 +129,10 @@ describe('daily entry scenario', () => {
 
     expect(store.settings.aiAnalysisNudgeDismissed).toBe(true);
     expect(wrapper.find('.ai-analysis-nudge').exists()).toBe(false);
+    const updatedChildren = Array.from(wrapper.get('.page--today').element.children);
+    expect(updatedChildren.indexOf(wrapper.get('[aria-label="Пульс недели"]').element)).toBeLessThan(
+      updatedChildren.indexOf(wrapper.get('.checkin-grid').element),
+    );
   });
 
   it('keeps one goal action before optional work context', async () => {
@@ -222,6 +230,23 @@ describe('daily entry scenario', () => {
     expect(wrapper.get('[aria-label="Текущий план недели"]').text()).toContain('Если застряну, выйду на короткую прогулку');
     expect(wrapper.find('.today-pulse[aria-label="Пульс недели"]').exists()).toBe(false);
     expect(wrapper.find('.recovery-nudge').exists()).toBe(false);
+    const children = Array.from(wrapper.get('.page--today').element.children);
+    expect(children.indexOf(wrapper.get('[aria-label="Текущий план недели"]').element)).toBeLessThan(
+      children.indexOf(wrapper.get('.checkin-grid').element),
+    );
+  });
+
+  it('shows the weekly pulse before the form while keeping the note editable', async () => {
+    const { pinia, store } = createStore();
+    store.settings.aiAnalysisNudgeDismissed = true;
+    store.dailyEntries = [{ ...emptyDailyEntry(addDays(todayKey(), -1)), importantFact: 'Вчерашняя запись' }];
+    const wrapper = mount(TodayView, { global: { plugins: [pinia], stubs: { RouterLink: routerLinkStub } } });
+    const pulse = wrapper.get('[aria-label="Пульс недели"]');
+    const children = Array.from(wrapper.get('.page--today').element.children);
+    expect(children.indexOf(pulse.element)).toBeLessThan(children.indexOf(wrapper.get('.checkin-grid').element));
+    await wrapper.get('[aria-label="Заметка дня"]').setValue('Новый черновик');
+    expect(wrapper.get('.checkin-grid').classes()).toContain('checkin-grid--dirty');
+    expect(store.dailyEntries).toHaveLength(1);
   });
 
   it('validates sleep duration and saves the completed day with current criteria', async () => {

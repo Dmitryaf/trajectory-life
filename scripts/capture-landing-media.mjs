@@ -62,6 +62,12 @@ try {
       await page.setViewportSize(viewport);
       await page.goto(`${baseUrl}${capture.route}`);
       await page.locator(capture.selector).waitFor();
+      // Dismiss the optional hint through the demo UI to show the weekly context.
+      const dismiss = page.locator('.ai-analysis-nudge').getByRole('button', { name: 'Больше не показывать подсказку', exact: true });
+      if (capture.route === '/today' && (await dismiss.isVisible())) {
+        await dismiss.click();
+        await page.locator('.ai-analysis-nudge').waitFor({ state: 'hidden' });
+      }
       if (capture.expand) {
         await page.locator(capture.expand).click();
       }

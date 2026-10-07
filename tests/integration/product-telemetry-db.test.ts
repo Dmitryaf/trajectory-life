@@ -51,6 +51,61 @@ describe('telemetry migration on PostgreSQL (PGlite)', () => {
     await db.close();
   });
 
+  it('keeps long-standing consent in usage while excluding incomplete W0 from cohorts and respecting exclusions/withdrawal', async () => {
+    const ca = await grant(a);
+    const cb = await grant(b);
+    await db.query("update public.product_telemetry_consent set observation_started_at = now() - interval '100 days' where user_id = $1", [
+      a,
+    ]);
+    await db.query("update public.product_telemetry_consent set observation_started_at = now() - interval '10 days' where user_id = $1", [
+      b,
+    ]);
+    const action = (name: string) => ({ ...event(), event_name: name, occurred_at: new Date(Date.now() - 1000).toISOString() });
+    await process(a, 'ingest', ca.revision as string, [action('journal_opened'), action('journal_opened'), action('experiment_started')]);
+    await process(b, 'ingest', cb.revision as string, [action('app_opened')]);
+    const report = readFileSync('supabase/queries/product-observability.sql', 'utf8');
+    await db.exec(report);
+    expect((await db.query('select id from telemetry_observed_accounts order by id')).rows).toEqual([{ id: a }, { id: b }]);
+    expect((await db.query('select id from telemetry_cohort_accounts order by id')).rows).toEqual([{ id: b }]);
+    const excluded = report.replace('array[]::uuid[] as excluded_user_ids', "array['" + b + "']::uuid[] as excluded_user_ids");
+    const results = await db.exec(excluded);
+    expect(results.at(-1)?.rows).toEqual([
+      {
+        event_name: 'experiment_started',
+        observed_actions: 1,
+        observed_accounts: 1,
+        observed_active_accounts: 1,
+        reach_per_observed_active: '1.00000000000000000000',
+      },
+      {
+        event_name: 'journal_opened',
+        observed_actions: 2,
+        observed_accounts: 1,
+        observed_active_accounts: 1,
+        reach_per_observed_active: '1.00000000000000000000',
+      },
+    ]);
+    expect((await db.query('select count(*)::integer as count from telemetry_first_use_funnel')).rows).toEqual([{ count: 0 }]);
+    await process(a, 'withdraw');
+    const withdrawn = await db.exec(excluded);
+    expect(withdrawn.at(-1)?.rows).toEqual([
+      {
+        event_name: 'experiment_started',
+        observed_actions: 0,
+        observed_accounts: 0,
+        observed_active_accounts: 0,
+        reach_per_observed_active: null,
+      },
+      {
+        event_name: 'journal_opened',
+        observed_actions: 0,
+        observed_accounts: 0,
+        observed_active_accounts: 0,
+        reach_per_observed_active: null,
+      },
+    ]);
+  });
+
   it('denies anonymous/authenticated CRUD and execution, with RLS even after an accidental select grant', async () => {
     for (const role of ['anon', 'authenticated']) {
       await db.exec(`set role ${role}`);
@@ -169,7 +224,7 @@ describe('telemetry migration on PostgreSQL (PGlite)', () => {
     expect(retention.find((row) => row.week === 4)).toMatchObject({ mature_accounts: 1, returning_accounts: 1 });
     expect(retention.find((row) => row.week === 8)).toMatchObject({ mature_accounts: 1, returning_accounts: 1 });
     expect(retention.find((row) => row.week === 0)).toMatchObject({ mature_accounts: 2 });
-    expect(results.at(-1)?.rows).toContainEqual(
+    expect(results.flatMap((result) => result.rows).filter((row) => 'candidate_present' in row)).toContainEqual(
       expect.objectContaining({
         name: 'reconstructed_overview',
         candidate_present: true,

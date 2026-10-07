@@ -26,9 +26,11 @@
 }
 
 .entry-date-picker {
+  grid-template-columns: minmax(0, auto) auto;
+  align-items: center;
   display: grid;
   justify-items: end;
-  gap: 4px;
+  gap: 4px 10px;
   color: var(--today-date-text);
   font-size: 12px;
   font-weight: 800;
@@ -592,5 +594,20 @@
   }
   .entry-date-picker {
     justify-items: start;
+  }
+}
+
+.entry-date-picker > span,
+.entry-date-picker > small {
+  grid-column: 1;
+}
+@media (max-width: 380px) {
+  .entry-date-picker {
+    column-gap: 6px;
+  }
+}
+@media (max-width: 359px) {
+  .entry-date-picker {
+    grid-template-columns: 1fr;
   }
 }
