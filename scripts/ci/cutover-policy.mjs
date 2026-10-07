@@ -62,7 +62,10 @@ export function productionRows(rows) {
     if (row) {
       assert.deepEqual(row.target, ['production'], 'Shared production/preview backend parameter requires separate operator preparation');
       assert.ok(
-        !row.gitBranch && !row.configurationId && !row.system && !row.customEnvironmentIds?.length,
+        (row.gitBranch === undefined || row.gitBranch === '') &&
+          (row.configurationId === undefined || row.configurationId === null || row.configurationId === '') &&
+          (row.system === undefined || row.system === false) &&
+          (row.customEnvironmentIds === undefined || (Array.isArray(row.customEnvironmentIds) && row.customEnvironmentIds.length === 0)),
         'Managed or branch-scoped backend parameter is unsupported',
       );
       assert.ok(['plain', 'encrypted'].includes(row.type), 'Unreadable backend parameter cannot be compensated');
@@ -76,6 +79,41 @@ export function productionRows(rows) {
     }
     return { key, row };
   });
+}
+
+// Requested list decryption is not evidence that encrypted values are readable.
+// Resolve only the four validated Production rows; preserve raw plaintext bytes.
+export async function readableProductionRows(rows, readById) {
+  const selected = productionRows(rows);
+  const replacements = new Map();
+  for (const { row } of selected) {
+    if (!row || row.type === 'plain' || row.decrypted === true) {
+      continue;
+    }
+    const actual = await readById(row.id);
+    assert.equal(actual?.decrypted, true, 'Backend parameter was not actually decrypted');
+    productionRows([actual]);
+    assert.ok(sameProductionMetadata(row, actual), 'Backend parameter metadata changed during decryption');
+    replacements.set(row, { ...row, value: actual.value, decrypted: true });
+  }
+  return rows.map((row) => replacements.get(row) || row);
+}
+
+// LIST and GET have different optional DTO defaults. This bridge is not raw CAS.
+export function sameProductionMetadata(listed, actual) {
+  return (
+    ['id', 'key', 'type', 'visibility', 'updatedAt', 'gitBranch'].every((key) => listed[key] === actual[key]) &&
+    JSON.stringify(listed.target) === JSON.stringify(actual.target) &&
+    [undefined, false].includes(listed.system) &&
+    [undefined, false].includes(actual.system) &&
+    (listed.configurationId ?? undefined) === (actual.configurationId ?? undefined) &&
+    JSON.stringify(listed.customEnvironmentIds === undefined ? [] : listed.customEnvironmentIds) ===
+      JSON.stringify(actual.customEnvironmentIds === undefined ? [] : actual.customEnvironmentIds)
+  );
+}
+
+export function cutoverFailureName(error) {
+  return ['AssertionError', 'TypeError', 'TimeoutError', 'AbortError', 'Error'].includes(error?.name) ? error.name : 'Error';
 }
 
 export function sameRow(left, right) {
@@ -109,8 +147,13 @@ export function sanitizedRows(rows) {
           customEnvironmentIds: row.customEnvironmentIds || [],
         };
         if (key.endsWith('_URL')) {
-          if ([hostedUrl, targetUrl].includes(row.value)) {
-            result.url = row.value;
+          const canonicalUrl = typeof row.value === 'string' ? row.value.trim() : null;
+          if ([hostedUrl, targetUrl].includes(canonicalUrl)) {
+            result.url = canonicalUrl;
+            result.rawUrlSha256 = digest(row.value);
+            if (canonicalUrl !== row.value) {
+              result.urlWhitespaceTrimmed = true;
+            }
           } else {
             result.unexpectedUrl = true;
           }

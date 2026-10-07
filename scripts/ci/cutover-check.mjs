@@ -8,10 +8,12 @@ import {
   assertCandidate,
   assertClosedGate,
   cutoverEnvironment,
+  cutoverFailureName,
   digest,
   hostedUrl,
   productionRows,
   promoteCutover,
+  readableProductionRows,
   sameRow,
   sanitizedRows,
   targetUrl,
@@ -59,6 +61,196 @@ test('production update rejects duplicate, shared and unreadable scopes while pr
   assert.throws(() => productionRows([row('SUPABASE_URL', hostedUrl), row('SUPABASE_URL', hostedUrl, 'duplicate')]));
   assert.equal(productionRows([]).length, 4);
 });
+test('readability resolves only encrypted allowlisted Production rows and preserves raw plaintext bytes', async () => {
+  const cipher = { ...row('VITE_SUPABASE_URL', 'synthetic-ciphertext'), type: 'encrypted', decrypted: false };
+  const readable = { ...row('SUPABASE_ANON_KEY', hostedKey), type: 'encrypted', decrypted: true };
+  const preview = { ...cipher, id: 'preview', target: ['preview'] };
+  const unrelated = { ...row('RESEND_API_KEY', 'unrelated-ciphertext'), type: 'encrypted' };
+  const rows = [cipher, readable, preview, unrelated, row('SUPABASE_URL', hostedUrl)];
+  const before = structuredClone(rows);
+  const requests = [];
+  const rawValue = ' \r\n' + hostedUrl + '\t';
+  const result = await readableProductionRows(rows, async (id) => {
+    requests.push(id);
+    return { ...cipher, value: rawValue, decrypted: true };
+  });
+  assert.deepEqual(requests, [cipher.id]);
+  assert.deepEqual(rows, before);
+  assert.equal(result[0].value, rawValue);
+  assert.equal(sanitizedRows(result)[0].rows[0].url, hostedUrl);
+  assert.ok(sameRow(result[0], { ...cipher, value: rawValue, decrypted: true }));
+  assert.ok(!sameRow(result[0], { ...result[0], value: hostedUrl }));
+  for (let n = 1; n < rows.length; n++) {
+    assert.equal(result[n], rows[n]);
+  }
+});
+
+test('readability bridges documented LIST/GET defaults while retaining LIST authority fields', async () => {
+  const listed = {
+    id: 'env-url',
+    key: 'VITE_SUPABASE_URL',
+    type: 'encrypted',
+    value: 'ciphertext',
+    target: ['production'],
+    updatedAt: 17,
+    system: false,
+    configurationId: null,
+    customEnvironmentIds: [],
+    visibility: 'config',
+    createdAt: 10,
+  };
+  const actual = {
+    id: 'env-url',
+    key: 'VITE_SUPABASE_URL',
+    type: 'encrypted',
+    value: ' \r\n' + hostedUrl,
+    target: ['production'],
+    updatedAt: 17,
+    decrypted: true,
+    visibility: 'config',
+  };
+  const result = await readableProductionRows([listed], async () => actual);
+  assert.deepEqual(result, [{ ...listed, value: actual.value, decrypted: true }]);
+  assert.equal(listed.value, 'ciphertext');
+  assert.ok(!sameRow(listed, actual));
+  for (const patch of [
+    { id: 'other' },
+    { key: 'SUPABASE_URL' },
+    { type: 'plain' },
+    { updatedAt: 18 },
+    { target: ['preview'] },
+    { target: ['production', 'preview'] },
+    { system: null },
+    { system: 0 },
+    { system: true },
+    { gitBranch: null },
+    { gitBranch: 'main' },
+    { configurationId: 'integration' },
+    { configurationId: false },
+    { customEnvironmentIds: null },
+    { customEnvironmentIds: ['custom'] },
+    { visibility: undefined },
+    { visibility: 'secret' },
+  ]) {
+    await assert.rejects(readableProductionRows([listed], async () => ({ ...actual, ...patch })));
+  }
+  const legacyList = {
+    id: 'legacy',
+    key: 'SUPABASE_URL',
+    type: 'encrypted',
+    value: 'ciphertext',
+    target: ['production'],
+    updatedAt: 2,
+  };
+  const nullableDetail = {
+    id: 'legacy',
+    key: 'SUPABASE_URL',
+    type: 'encrypted',
+    value: hostedUrl,
+    target: ['production'],
+    updatedAt: 2,
+    decrypted: true,
+    configurationId: null,
+    customEnvironmentIds: [],
+    system: false,
+  };
+  assert.deepEqual(await readableProductionRows([legacyList], async () => nullableDetail), [
+    { ...legacyList, value: hostedUrl, decrypted: true },
+  ]);
+  await assert.rejects(readableProductionRows([legacyList], async () => ({ ...nullableDetail, visibility: 'config' })));
+  for (const patch of [{ system: null }, { system: 0 }, { gitBranch: null }, { customEnvironmentIds: null }, { configurationId: false }]) {
+    let calls = 0;
+    await assert.rejects(
+      readableProductionRows([{ ...legacyList, ...patch }], async () => {
+        calls++;
+      }),
+    );
+    assert.equal(calls, 0);
+  }
+});
+
+test('readability requires observed true decryption and exact ID/key/scope metadata', async () => {
+  const cipher = { ...row('VITE_SUPABASE_ANON_KEY', 'ciphertext'), type: 'encrypted' };
+  for (const patch of [
+    { decrypted: false },
+    { decrypted: undefined },
+    { decrypted: 'true' },
+    { id: 'foreign' },
+    { key: 'RESEND_API_KEY' },
+    { key: 'SUPABASE_ANON_KEY' },
+    { updatedAt: 2 },
+    { type: 'plain' },
+    { visibility: 'secret' },
+    { target: ['preview'] },
+    { target: ['production', 'preview'] },
+    { gitBranch: 'main' },
+    { configurationId: 'integration' },
+    { system: true },
+    { customEnvironmentIds: ['custom'] },
+    { value: undefined },
+    { value: '[SENSITIVE]' },
+  ]) {
+    await assert.rejects(
+      readableProductionRows([cipher], async () => ({
+        ...cipher,
+        value: hostedKey,
+        decrypted: true,
+        ...patch,
+      })),
+    );
+  }
+  const result = await readableProductionRows([cipher], async () => ({
+    ...cipher,
+    value: hostedKey,
+    decrypted: true,
+  }));
+  assert.equal(sanitizedRows(result)[1].rows[0].sha256, digest(hostedKey));
+  assert.ok(!JSON.stringify(sanitizedRows(result)).includes(hostedKey));
+});
+
+test('readability validates every selected scope before decrypting and stops on unreadable API response', async () => {
+  const cipher = { ...row('VITE_SUPABASE_URL', 'ciphertext'), type: 'encrypted' };
+  for (const extra of [
+    { ...row('SUPABASE_URL', hostedUrl), target: ['production', 'preview'] },
+    { ...row('SUPABASE_URL', hostedUrl), configurationId: 'integration' },
+    { ...cipher, id: 'duplicate' },
+  ]) {
+    let calls = 0;
+    await assert.rejects(
+      readableProductionRows([cipher, extra], async () => {
+        calls++;
+      }),
+    );
+    assert.equal(calls, 0);
+  }
+  await assert.rejects(readableProductionRows([cipher], async () => null));
+  await assert.rejects(
+    readableProductionRows([cipher], async () => {
+      throw new Error('synthetic HTTP failure');
+    }),
+  );
+});
+
+test('cutover failure classification emits only fixed names and separates smoke stages without raw errors', () => {
+  for (const name of ['AssertionError', 'TypeError', 'TimeoutError', 'AbortError', 'Error']) {
+    assert.equal(cutoverFailureName({ name, message: 'secret-value', stack: 'secret-stack' }), name);
+  }
+  for (const error of [undefined, null, { name: 'secret-name' }, { message: 'secret-value' }]) {
+    assert.equal(cutoverFailureName(error), 'Error');
+  }
+  const source = readFileSync(new URL('./cutover.mjs', import.meta.url), 'utf8');
+  assert.ok(source.includes('v1/projects/${projectId}/env/${encodeURIComponent(id)}'));
+  assert.ok(source.includes('return readableProductionRows(rows,'));
+  assert.ok(!source.includes('?decrypt=true'));
+  const smoke = source.slice(source.indexOf('async function candidateSmoke'), source.indexOf('async function putRow'));
+  const stages = ['candidate-public-smoke', 'candidate-js-asset-read', 'candidate-js-backend-check'];
+  assert.ok(stages.every((stage, n) => smoke.indexOf(stage) >= 0 && (!n || smoke.indexOf(stage) > smoke.indexOf(stages[n - 1]))));
+  const terminal = source.slice(source.lastIndexOf('} catch (error)'));
+  assert.ok(terminal.includes('record.failureStage = record.progressStage'));
+  assert.ok(terminal.includes('record.failureName = cutoverFailureName(error)'));
+  assert.ok(!/error\.(message|stack|cause|args)|JSON\.stringify\(error/.test(terminal));
+});
+
 test('inspection receipt contains public URLs and key digests, never key values or unrelated secrets', () => {
   const rows = [row('VITE_SUPABASE_URL', hostedUrl), row('VITE_SUPABASE_ANON_KEY', hostedKey), row('RESEND_API_KEY', 'hidden')];
   const output = JSON.stringify(sanitizedRows(rows));
@@ -66,6 +258,107 @@ test('inspection receipt contains public URLs and key digests, never key values 
   assert.ok(output.includes(digest(hostedKey)));
   assert.ok(!output.includes(hostedKey) && !output.includes('hidden') && !output.includes('RESEND'));
 });
+test('inspection URL metadata recognizes only trimmed allowlisted endpoints and leaves raw rows unchanged', () => {
+  for (const url of [hostedUrl, targetUrl]) {
+    for (const value of [url, `\r\n${url}\r\n`, ` ${url} `, `\t${url}\t`]) {
+      const rows = [row('VITE_SUPABASE_URL', value), row('SUPABASE_URL', value)];
+      const before = structuredClone(rows);
+      const output = sanitizedRows(rows);
+      for (const name of ['VITE_SUPABASE_URL', 'SUPABASE_URL']) {
+        const actual = output.find((entry) => entry.key === name).rows[0];
+        assert.equal(actual.url, url);
+        assert.equal(actual.rawUrlSha256, digest(value));
+        assert.ok(!Object.hasOwn(actual, 'unexpectedUrl'));
+        assert.equal(Object.hasOwn(actual, 'urlWhitespaceTrimmed'), value !== url);
+        if (value !== url) {
+          assert.equal(actual.urlWhitespaceTrimmed, true);
+        }
+      }
+      assert.deepEqual(rows, before);
+      assert.equal(productionRows(rows)[0].row.value, value);
+    }
+  }
+});
+
+test('inspection URL metadata refuses unknown and non-string values without disclosing them', () => {
+  for (const value of [
+    undefined,
+    null,
+    123,
+    '',
+    ' ',
+    'https://unknown.example.invalid/private',
+    `${hostedUrl}/`,
+    `${hostedUrl}?secret=hidden`,
+    `https://user:hidden@${new URL(hostedUrl).hostname}`,
+    hostedUrl.replace('https:', 'http:'),
+    hostedUrl.replace('.supabase.co', '.supabase. co'),
+  ]) {
+    const output = sanitizedRows([row('VITE_SUPABASE_URL', value)]);
+    const actual = output[0].rows[0];
+    assert.equal(actual.unexpectedUrl, true);
+    assert.ok(!Object.hasOwn(actual, 'url') && !Object.hasOwn(actual, 'urlWhitespaceTrimmed') && !Object.hasOwn(actual, 'rawUrlSha256'));
+    assert.ok(!Object.hasOwn(actual, 'value'));
+    assert.ok(!JSON.stringify(output).includes('hidden') && !JSON.stringify(output).includes('unknown.example.invalid'));
+  }
+});
+
+test('canonical metadata does not weaken exact raw-value CAS ownership', () => {
+  const before = row('VITE_SUPABASE_URL', ` ${hostedUrl}\r\n`);
+  const canonical = row('VITE_SUPABASE_URL', hostedUrl);
+  assert.equal(sanitizedRows([before])[0].rows[0].url, sanitizedRows([canonical])[0].rows[0].url);
+  assert.ok(!sameRow(before, canonical));
+  assert.ok(sameRow(before, structuredClone(before)));
+  assert.equal(before.value, ` ${hostedUrl}\r\n`);
+});
+
+test('canonical URL metadata retains exact raw whitespace drift through its digest', () => {
+  const before = row('VITE_SUPABASE_URL', ' ' + hostedUrl + '\r\n');
+  const changed = row('VITE_SUPABASE_URL', '\t' + hostedUrl + ' ');
+  const a = sanitizedRows([before])[0].rows[0];
+  const b = sanitizedRows([changed])[0].rows[0];
+  assert.equal(a.url, b.url);
+  assert.equal(a.urlWhitespaceTrimmed, true);
+  assert.equal(b.urlWhitespaceTrimmed, true);
+  assert.notEqual(a.rawUrlSha256, b.rawUrlSha256);
+  assert.notDeepEqual(a, b);
+  assert.ok(!JSON.stringify(a).includes(before.value));
+});
+
+test('compensation preserves the original whitespace URL bytes after canonical inspection', async () => {
+  const state = fixture('verify-env', true);
+  state.rows().find((entry) => entry.key === 'VITE_SUPABASE_URL' && entry.target[0] === 'production').value = ` \r\n${hostedUrl}\t`;
+  const expected = structuredClone(state.rows());
+  assert.equal(sanitizedRows(state.rows())[0].rows[0].url, hostedUrl);
+  await assert.rejects(promoteCutover(state.input, state.actions));
+  assert.deepEqual(
+    state.rows().sort((a, b) => a.id.localeCompare(b.id)),
+    expected.sort((a, b) => a.id.localeCompare(b.id)),
+  );
+});
+
+test('compensation restores decrypted encrypted originals rather than list ciphertext', async () => {
+  const state = fixture('verify-env', true);
+  for (const entry of state.rows().filter((entry) => entry.target[0] === 'production')) {
+    entry.type = 'encrypted';
+    entry.decrypted = true;
+  }
+  state.rows()[0].value = ' \r\n' + hostedUrl + '\t';
+  const expected = structuredClone(state.rows());
+  const read = state.actions.readRows;
+  state.actions.readRows = async () => {
+    const rows = (await read()).map((entry) =>
+      entry.type === 'encrypted' ? { ...entry, value: 'synthetic-ciphertext', decrypted: false } : entry,
+    );
+    return readableProductionRows(rows, async (id) => structuredClone(state.rows().find((entry) => entry.id === id)));
+  };
+  await assert.rejects(promoteCutover(state.input, state.actions));
+  assert.deepEqual(
+    state.rows().sort((a, b) => a.id.localeCompare(b.id)),
+    expected.sort((a, b) => a.id.localeCompare(b.id)),
+  );
+});
+
 test('same-state guard includes ID, timestamp, value and target scopes', () => {
   const before = row('SUPABASE_URL', hostedUrl);
   assert.ok(sameRow(before, { ...before }));

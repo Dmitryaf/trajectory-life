@@ -20,10 +20,12 @@ import {
   assertClosedGate,
   backendKeys,
   cutoverEnvironment,
+  cutoverFailureName,
   digest,
   hostedUrl,
   productionRows,
   promoteCutover,
+  readableProductionRows,
   sanitizedRows,
   targetUrl,
 } from './cutover-policy.mjs';
@@ -104,10 +106,10 @@ async function inspectAlias() {
 }
 
 async function readRows() {
-  const result = await vercelApi(`v10/projects/${projectId}/env?decrypt=true`);
+  const result = await vercelApi(`v10/projects/${projectId}/env`);
   const rows = Array.isArray(result) ? result : result.envs;
   assert.ok(Array.isArray(rows), 'Unexpected environment list response');
-  return rows;
+  return readableProductionRows(rows, (id) => vercelApi(`v1/projects/${projectId}/env/${encodeURIComponent(id)}`));
 }
 
 function pull() {
@@ -124,19 +126,23 @@ function assertClosedFlags(base) {
 
 async function candidateSmoke(candidate) {
   const origin = deploymentUrl(candidate.url);
+  record.progressStage = 'candidate-public-smoke';
   const signature = await smokePublic(origin);
+  record.progressStage = 'candidate-js-asset-read';
   let contents = '';
   for (const asset of signature.filter((entry) => entry.path.endsWith('.js'))) {
     const response = await fetch(new URL(asset.path, origin), { redirect: 'error', signal: AbortSignal.timeout(20_000) });
     assert.equal(response.status, 200);
     contents += await response.text();
   }
+  record.progressStage = 'candidate-js-backend-check';
   assert.ok(contents.includes(targetUrl) && contents.includes(key), 'Published client must contain the exact target URL and public key');
   assert.ok(!contents.includes(hostedUrl), 'Published client must not retain the Hosted production backend');
   return signature;
 }
 
 async function putRow(name, value, before) {
+  record.progressStage = 'production-env-update';
   let result;
   if (before) {
     result = await vercelApi(`v9/projects/${projectId}/env/${encodeURIComponent(before.id)}`, 'PATCH', { value });
@@ -153,6 +159,7 @@ async function putRow(name, value, before) {
 }
 
 async function restoreRow({ before, after }) {
+  record.progressStage = 'production-env-compensation';
   if (before) {
     await vercelApi(`v9/projects/${projectId}/env/${encodeURIComponent(after.id)}`, 'PATCH', { value: before.value });
     const restored = productionRows(await readRows()).find((entry) => entry.key === before.key).row;
@@ -175,27 +182,33 @@ const record = {
   publicKeySha256: digest(key),
   gateMarker: input.gate_marker,
   status: 'checking',
+  progressStage: 'current-source-check',
 };
 const assertGate = () => assertClosedGate(fetch, key, input.gate_marker);
 try {
   await assertCurrent();
+  record.progressStage = 'project-owner-check';
   const project = await vercelApi(`v9/projects/${projectId}`);
   assert.equal(project.id, projectId);
   assert.equal(project.accountId, process.env.VERCEL_ORG_ID, 'Unexpected project owner');
+  record.progressStage = 'previous-alias-check';
   const previous = await inspectAlias();
   assert.equal(previous.id, input.previous_id, 'Previous deployment changed');
   if (input.mode !== 'inspect') {
     assert.notEqual(previous.meta?.backendUrl, targetUrl, 'Initial Hosted-to-VPS cutover is already published');
   }
   record.previous = { id: previous.id, url: previous.url };
+  record.progressStage = 'production-env-read';
   const rows = await readRows();
   record.productionParameters = sanitizedRows(rows);
+  record.progressStage = 'production-env-pull';
   const base = pull();
   if (input.mode !== 'inspect') {
     assertBackendAlignment(base, target, previous);
     assert.equal(base.VITE_SUPABASE_URL.trim(), hostedUrl, 'Initial cutover starts only from Hosted production configuration');
     assertClosedFlags(base);
   }
+  record.progressStage = 'closed-gate-check';
   await assertGate();
   if (input.mode === 'inspect') {
     record.status = 'inspected';
@@ -203,6 +216,7 @@ try {
     const buildEnvironment = cutoverEnvironment({}, key);
     const rawBuildEnvironment = readFileSync('.vercel/.env.production.local', 'utf8');
     writeFileSync('.vercel/.env.production.local', appendCutoverOverrides(rawBuildEnvironment, key));
+    record.progressStage = 'candidate-build';
     vercel(['build', '--prod'], false, buildEnvironment);
     await assertCurrent();
     await assertGate();
@@ -219,13 +233,16 @@ try {
     ]) {
       args.push('--meta', meta);
     }
+    record.progressStage = 'candidate-deploy';
     const output = vercel(args, true);
     const url = output.startsWith('{') ? JSON.parse(output).url : output;
+    record.progressStage = 'candidate-inspect';
     const candidate = await inspect(deploymentUrl(url));
     assertDeployment(candidate, projectId, input.sha);
     assertCandidate(candidate, input.sha, input.ci_run, previous.id, key);
     record.candidate = { id: candidate.id, url: candidate.url };
     record.assets = await candidateSmoke(candidate);
+    record.progressStage = 'candidate-final-guards';
     await assertCurrent();
     await assertGate();
     assert.equal((await inspectAlias()).id, previous.id);
@@ -234,12 +251,14 @@ try {
     assert.match(input.candidate_id || '', /^dpl_[A-Za-z0-9]+$/);
     assert.equal(input.before_user_writes, 'true');
     assert.equal(input.runtime_acceptance, 'true', 'Operator must first accept actual target Auth and Vercel runtime authentication');
+    record.progressStage = 'promotion-candidate-check';
     const candidate = await inspect(input.candidate_id);
     assertDeployment(candidate, projectId, input.sha);
     assertCandidate(candidate, input.sha, input.ci_run, previous.id, key);
     record.candidate = { id: candidate.id, url: candidate.url };
     record.status = 'changing-production-environment';
     writeJson('qa/ci/cutover.json', record);
+    record.progressStage = 'controlled-promotion';
     await promoteCutover(
       { candidate, previous, environment, beforeUserWrites: true },
       {
@@ -249,8 +268,13 @@ try {
         readRows,
         putRow,
         restoreRow,
-        smoke: () => candidateSmoke(candidate),
+        smoke: async () => {
+          const assets = await candidateSmoke(candidate);
+          record.progressStage = 'controlled-promotion';
+          return assets;
+        },
         verifyEnvironment: async () => {
+          record.progressStage = 'production-env-verify';
           const aligned = pull();
           assertClosedFlags(aligned);
           assertBackendAlignment(aligned, target);
@@ -258,8 +282,12 @@ try {
             assert.equal(aligned[name], environment[name], 'Effective production environment differs from candidate');
           }
         },
-        promote: async (deployment) => vercel(['promote', deploymentUrl(deployment.url), '--yes']),
+        promote: async (deployment) => {
+          record.progressStage = 'alias-promotion-or-compensation';
+          vercel(['promote', deploymentUrl(deployment.url), '--yes']);
+        },
         verifyAlias: async (deployment) => {
+          record.progressStage = 'alias-assets-verify';
           assert.equal((await inspectAlias()).id, deployment.id, 'Aliases do not reference the exact deployment');
           const [canonical, custom, unique] = await Promise.all([
             assetSignature(`https://${target.alias}`),
@@ -276,8 +304,12 @@ try {
   summary(
     `Backend cutover ${input.mode}: ${record.status}; source ${input.sha}. Public candidate assets are not a claim of Deployment Protection or authenticated acceptance.`,
   );
-} catch {
+} catch (error) {
+  record.failureStage = record.progressStage;
+  record.failureName = cutoverFailureName(error);
   record.status = 'stopped-needs-operator-review';
+  // Provider errors can contain credentials; only the fixed failure name is retained.
+  // eslint-disable-next-line preserve-caught-error
   throw new Error(
     'Backend cutover stopped. Inspect current aliases, target gate and sanitized evidence; do not blindly rerun or reopen writes.',
   );
