@@ -71,7 +71,8 @@ assertDeployment(previous, projectId);
 await assetSignature(deploymentUrl(previous.url));
 
 vercel(environmentPullArgs(branch));
-assertClientBuildEnvironment(parseEnv(readFileSync(`.vercel/.env.${target.environment}.local`, 'utf8')), target.projectRef);
+const clientEnvironment = parseEnv(readFileSync(`.vercel/.env.${target.environment}.local`, 'utf8'));
+assertClientBuildEnvironment(clientEnvironment, target);
 vercel(['build', ...(branch === 'main' ? ['--prod'] : [])]);
 const output = vercel(candidateDeploymentArgs(branch, sha, source.id), true);
 // The pinned CLI supports structured output in non-interactive agent mode as
@@ -83,6 +84,7 @@ const record = {
   sha,
   branch,
   ciRun: source.id,
+  backendUrl: clientEnvironment.VITE_SUPABASE_URL.trim(),
   previous: { id: previous.id, url: previous.url },
   candidate: { id: candidate.id, url: candidate.url },
   status: 'candidate',
