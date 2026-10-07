@@ -90,7 +90,7 @@ export async function POST(request: Request): Promise<Response> {
 
   const submittedAt = new Date().toISOString();
   const emailText = [
-    'Обратная связь из закрытой беты «Траектории»',
+    'Обратная связь из «Траектории»',
     '',
     `Аккаунт: ${user.email || 'email недоступен'}`,
     `Отправлено: ${submittedAt}`,
@@ -111,7 +111,7 @@ export async function POST(request: Request): Promise<Response> {
       body: JSON.stringify({
         from: env.feedbackFromEmail,
         to: [env.feedbackToEmail],
-        subject: 'Обратная связь из закрытой беты',
+        subject: 'Обратная связь — Траектория',
         text: emailText,
       }),
     });

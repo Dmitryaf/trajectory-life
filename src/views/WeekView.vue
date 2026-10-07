@@ -125,6 +125,7 @@ const reviewCues = computed(() =>
 );
 const primaryReviewCues = computed(() => reviewCues.value.slice(0, 3));
 const {
+  navigation,
   copyPrompt,
   downloadJson,
   hasSavedReview,
@@ -227,9 +228,7 @@ watch(
     <PeriodNavigator
       :title="`${formatDate(start, { day: 'numeric', month: 'short' })} — ${formatDate(end, { day: 'numeric', month: 'short' })}`"
       :subtitle="navigatorSubtitle"
-      @previous="anchor = addDays(anchor, -7)"
-      @next="anchor = addDays(anchor, 7)"
-      @current="anchor = todayKey()"
+      v-on="navigation"
     />
 
     <ReviewNotice v-if="recoveredReview && !hasSavedReview" tag="section" class="recovered-week-link">
@@ -402,7 +401,7 @@ watch(
               <h2>Карта недели</h2>
             </div>
           </SectionHeading>
-          <div class="heatmap" :style="{ '--day-count': days.length }">
+          <div class="heatmap" role="region" aria-label="Карта недели по дням" tabindex="0" :style="{ '--day-count': days.length }">
             <div class="heatmap__corner"></div>
             <div v-for="day in days" :key="day" class="heatmap__day">
               <strong>{{ formatDate(day, { weekday: 'short' }) }}</strong

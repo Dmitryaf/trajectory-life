@@ -68,6 +68,17 @@ watch([hours, minutes], () => {
   border-radius: 14px;
   background: var(--surface);
 }
+
+.duration-field:focus-within {
+  border-color: var(--field-focus-border);
+  box-shadow: 0 0 0 4px var(--field-focus-ring);
+}
+
+.duration-field:has(input:focus-visible) {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
 .duration-field label {
   display: flex;
   min-width: 0;
@@ -86,6 +97,12 @@ watch([hours, minutes], () => {
   font-size: 20px;
   font-weight: 750;
 }
+
+.duration-field input:focus {
+  outline: none;
+  box-shadow: none;
+}
+
 .duration-field span {
   padding-right: 9px;
   color: var(--muted);
