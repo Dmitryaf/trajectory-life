@@ -74,16 +74,20 @@ test('opens the existing product entry and preserves direct product and unknown 
   await page.getByRole('link', { name: 'Войти в Траекторию' }).first().click();
   await expect(page).toHaveURL(/\/today$/);
   await expect(page.locator('.page--today')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Обратная связь', exact: true })).toBeVisible();
 
   await page.goto('/week');
   await expect(page.locator('.page--week')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Обратная связь', exact: true })).toBeVisible();
   await page.reload();
   await expect(page.locator('.page--week')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Обратная связь', exact: true })).toBeVisible();
 
   await page.goto('/missing-landing-route');
   await expect(page.getByRole('heading', { name: 'Такой страницы нет' })).toBeVisible();
   await page.getByRole('link', { name: 'Перейти к «Сегодня»' }).click();
   await expect(page).toHaveURL(/\/today$/);
+  await expect(page.locator('.page--today')).toBeVisible();
 });
 
 test('keeps the landing readable and accessible across supported widths', async ({ page, browserName }, testInfo) => {
