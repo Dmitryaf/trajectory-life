@@ -1,5 +1,9 @@
 import { createHash } from 'node:crypto';
 
+export const browserContainerImage = 'mcr.microsoft.com/playwright@sha256:cf0daee9b994042e011bc29f20cdff1a9f682a039b43fcd738f7d8a9d3bcd9d6';
+export const browserContainerTag = 'mcr.microsoft.com/playwright:v1.61.1-noble';
+export const browserPlaywrightVersion = '1.61.1';
+
 export const projects = ['chromium', 'mobile-webkit', 'webkit'];
 export const shards = [1, 2];
 export const browserJobs = projects.flatMap((project) => shards.map((shard) => `browser-${project}-${shard}`));
@@ -30,6 +34,9 @@ export function validateFreshReports(reports, identity) {
 }
 
 function validateReportSet(reports, identity, fresh) {
+  if (identity.schema !== 2 || identity.browserContainer !== browserContainerImage) {
+    throw new Error('Missing or different browser container identity');
+  }
   if (reports.length !== browserJobs.length) {
     throw new Error('Missing browser reports');
   }
