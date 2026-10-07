@@ -52,6 +52,14 @@ describe('loaded application and route events', () => {
     await flushPromises();
     await router.push('/more');
     await flushPromises();
+    await router.push('/results');
+    await flushPromises();
+    const afterResults = vi.mocked(emitProductEvent).mock.calls.length;
+    await router.push('/results?from=2026-09-01#archive');
+    await flushPromises();
+    expect(emitProductEvent).toHaveBeenCalledTimes(afterResults);
+    await router.push('/events');
+    await flushPromises();
     await router.push('/week');
     await flushPromises();
     expect(vi.mocked(emitProductEvent).mock.calls.map((call) => call[0])).toEqual([
@@ -59,6 +67,8 @@ describe('loaded application and route events', () => {
       'week_opened',
       'month_opened',
       'history_opened',
+      'journal_opened',
+      'journal_opened',
       'journal_opened',
       'week_opened',
     ]);

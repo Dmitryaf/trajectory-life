@@ -9,6 +9,8 @@ const routeEvents: Record<string, ProductEventName> = {
   '/month': 'month_opened',
   '/trends': 'history_opened',
   '/more': 'journal_opened',
+  '/results': 'journal_opened',
+  '/events': 'journal_opened',
 };
 export function useProductTelemetry(ready: () => boolean) {
   const auth = useAuthStore();

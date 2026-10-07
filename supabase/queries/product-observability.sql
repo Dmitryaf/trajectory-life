@@ -15,14 +15,19 @@ create or replace temporary view telemetry_observed_accounts as
 select a.*, case when a.observation_started_at <= a.created_at + interval '1 day'
   then 'consent_near_signup' else 'consent_later' end as consent_timing
 from telemetry_eligible_accounts a cross join telemetry_report_parameters p
-where a.enabled and a.observation_started_at >= p.as_of - interval '90 days' and a.observation_started_at <= p.as_of;
+where a.enabled and a.observation_started_at <= p.as_of;
+
+-- Only cohort calculations need complete W0. Long-standing consenting users remain in current usage reports.
+create or replace temporary view telemetry_cohort_accounts as
+select a.* from telemetry_observed_accounts a cross join telemetry_report_parameters p
+where a.observation_started_at >= p.as_of - interval '90 days';
 
 create or replace temporary view telemetry_observed_events as
 select e.*, a.observation_started_at,
   floor(extract(epoch from (e.occurred_at - a.observation_started_at)) / 604800)::integer as observation_week
 from public.product_events e join telemetry_observed_accounts a on a.id = e.user_id
 cross join telemetry_report_parameters p
-where e.occurred_at >= a.observation_started_at and e.occurred_at <= p.as_of;
+where e.occurred_at >= a.observation_started_at and e.occurred_at >= p.as_of - interval '90 days' and e.occurred_at <= p.as_of;
 
 -- 1. Coverage is not consent rate among everyone who ever saw a screen: exposure is unobserved.
 select count(*) as eligible_accounts, count(*) filter (where enabled) as consenting_accounts,
@@ -36,7 +41,7 @@ create or replace temporary view telemetry_first_use_funnel as
 select a.id,
   (select min(occurred_at) from telemetry_observed_events e where e.user_id = a.id and e.event_name = 'first_use_started' and e.observation_week = 0) as started_at,
   a.consent_timing
-from telemetry_observed_accounts a cross join telemetry_report_parameters p
+from telemetry_cohort_accounts a cross join telemetry_report_parameters p
 where a.observation_started_at + interval '7 days' <= p.as_of;
 with stages as (
   select f.*, (select min(occurred_at) from telemetry_observed_events e where e.user_id = f.id and e.event_name = 'first_use_overview_viewed'
@@ -75,7 +80,7 @@ select a.consent_timing, w.week,
   count(*) as mature_accounts,
   count(*) filter (where exists(select 1 from telemetry_observed_events e where e.user_id = a.id and e.observation_week = w.week)) as returning_accounts,
   count(*) filter (where exists(select 1 from telemetry_observed_events e where e.user_id = a.id and e.observation_week = w.week))::numeric / nullif(count(*), 0) as observed_return_rate
-from telemetry_observed_accounts a cross join (values (0), (1), (2), (4), (8)) w(week)
+from telemetry_cohort_accounts a cross join (values (0), (1), (2), (4), (8)) w(week)
 cross join telemetry_report_parameters p
 where a.observation_started_at + ((w.week + 1) * interval '7 days') <= p.as_of
 group by a.consent_timing, w.week order by a.consent_timing, w.week;
@@ -107,7 +112,7 @@ select a.id, a.consent_timing, candidate.name,
     when 'explicit_decision' then exists(select 1 from telemetry_observed_events e where e.user_id = a.id and e.observation_week = 0 and e.event_name = 'decision_saved')
   end as candidate_present,
   a.observation_started_at
-from telemetry_observed_accounts a cross join (values ('reconstructed_overview'), ('three_available_entries_then_week'), ('weekly_review'), ('explicit_decision')) candidate(name);
+from telemetry_cohort_accounts a cross join (values ('reconstructed_overview'), ('three_available_entries_then_week'), ('weekly_review'), ('explicit_decision')) candidate(name);
 
 select c.consent_timing, c.name, c.candidate_present, w.week, count(*) as mature_accounts,
   count(*) filter (where exists(select 1 from telemetry_observed_events e where e.user_id = c.id and e.observation_week = w.week)) as returning_accounts,
@@ -115,3 +120,17 @@ select c.consent_timing, c.name, c.candidate_present, w.week, count(*) as mature
 from telemetry_activation_candidates c cross join (values (4), (8)) w(week) cross join telemetry_report_parameters p
 where c.observation_started_at + ((w.week + 1) * interval '7 days') <= p.as_of
 group by c.consent_timing, c.name, c.candidate_present, w.week order by c.name, c.consent_timing, w.week, c.candidate_present;
+
+-- 9. Existing journal/experiment signals, including users who consented more than 90 days ago.
+-- Counts describe explicit observed actions, not completed experiments or meaningful reflection.
+with recent as (
+  select e.* from telemetry_observed_events e cross join telemetry_report_parameters p
+  where e.occurred_at >= p.as_of - interval '30 days'
+), signals as (
+  select * from (values ('journal_opened'), ('experiment_started')) s(event_name)
+)
+select s.event_name, count(e.id) as observed_actions, count(distinct e.user_id) as observed_accounts,
+  (select count(distinct user_id) from recent) as observed_active_accounts,
+  count(distinct e.user_id)::numeric / nullif((select count(distinct user_id) from recent), 0) as reach_per_observed_active
+from signals s left join recent e on e.event_name = s.event_name
+group by s.event_name order by s.event_name;

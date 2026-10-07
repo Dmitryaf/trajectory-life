@@ -417,7 +417,7 @@ test('separates month metric controls from the chart and keeps compact daily act
   }
 
   await page.goto('/today');
-  const settingsAction = page.locator('.daily-layout-settings .secondary-button');
+  const settingsAction = page.getByRole('link', { name: 'Настроить главную', exact: true });
   const goalAction = page.locator('#goal-actions .card-settings-link');
   await expect(settingsAction).toBeVisible();
   await expect(goalAction).toBeVisible();
@@ -799,7 +799,7 @@ for (const width of [320, 361, 390, 480, 719, 720, 721]) {
   });
 }
 
-test('separates daily layout settings from collapsed and expanded additional sections', async ({ page }, testInfo) => {
+test('keeps header daily layout settings before collapsed and expanded additional sections', async ({ page }, testInfo) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.goto('/today');
   await page.getByLabel('Дата записи', { exact: true }).evaluate((input, value) => {
@@ -807,10 +807,10 @@ test('separates daily layout settings from collapsed and expanded additional sec
     input.dispatchEvent(new Event('change', { bubbles: true }));
   }, emptyPeriodDate());
   const additional = page.locator('.daily-additional-blocks');
-  const settings = page.locator('.daily-layout-settings');
+  const settings = page.getByRole('link', { name: 'Настроить главную', exact: true });
   await expect(additional).toBeVisible();
   await expect(settings).toBeVisible();
-  await expect(page.locator('form + .daily-layout-settings')).toBeVisible();
+  await expect(page.locator('.page--today > .page-heading').getByRole('link', { name: 'Настроить главную', exact: true })).toBeVisible();
 
   for (const width of [320, 390, 768, 980, 1440]) {
     await page.setViewportSize({ width, height: 900 });
@@ -820,10 +820,21 @@ test('separates daily layout settings from collapsed and expanded additional sec
         await additional.locator('summary').click();
       }
       expectVerticalSeparation(
-        await readLayoutBox(additional, 'additional sections'),
         await readLayoutBox(settings, 'daily layout settings'),
+        await readLayoutBox(additional, 'additional sections'),
         12,
         `daily settings gap at ${width}px, expanded=${expanded}`,
+      );
+      expectBoxInside(
+        await readLayoutBox(settings, 'daily layout settings'),
+        await readLayoutBox(page.locator('.page--today > .page-heading'), 'daily heading'),
+        `daily settings inside heading at ${width}px`,
+      );
+      expectVerticalSeparation(
+        await readLayoutBox(settings, 'daily layout settings'),
+        await readLayoutBox(page.locator('.checkin-grid'), 'daily form'),
+        12,
+        `daily settings before form at ${width}px`,
       );
       await expectPageFitsViewport(page, `daily settings at ${width}px`);
       if (!expanded && (width === 390 || width === 980)) {
@@ -832,7 +843,7 @@ test('separates daily layout settings from collapsed and expanded additional sec
       }
     }
   }
-  await settings.getByRole('link', { name: 'Настроить главную' }).click();
+  await settings.click();
   await expect(page).toHaveURL(/\/settings#daily-blocks$/);
 });
 
