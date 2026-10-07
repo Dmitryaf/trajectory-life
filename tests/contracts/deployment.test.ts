@@ -101,13 +101,19 @@ describe('deployment configuration', () => {
     expect(cacheControlFor(source)).toBe('public, max-age=0, must-revalidate');
   });
 
-  it('keeps browser connections within the app and Supabase while CSP remains report-only', () => {
+  it('allows only the app, Hosted Supabase and the pinned VPS while CSP remains report-only', () => {
     const policy = headerFor('/(.*)', 'Content-Security-Policy-Report-Only');
 
     expect(policy).toContain("default-src 'self'");
     expect(policy).toContain("object-src 'none'");
     expect(policy).toContain("frame-ancestors 'none'");
-    expect(policy).toContain("connect-src 'self' https://*.supabase.co wss://*.supabase.co");
+    const connectSources = policy
+      ?.split(';')
+      .map((directive) => directive.trim().split(/\s+/))
+      .find(([name]) => name === 'connect-src');
+    expect(connectSources?.slice(1).sort()).toEqual(
+      ["'self'", 'https://*.supabase.co', 'wss://*.supabase.co', 'https://api.trajectory-life.ru', 'wss://api.trajectory-life.ru'].sort(),
+    );
     expect(policy).not.toMatch(/report-(?:uri|to)/);
     expect(headerFor('/(.*)', 'X-Content-Type-Options')).toBe('nosniff');
     expect(headerFor('/(.*)', 'X-Frame-Options')).toBe('DENY');

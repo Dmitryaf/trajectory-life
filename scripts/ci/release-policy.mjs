@@ -1,6 +1,11 @@
 export const releaseTargets = {
   develop: { environment: 'preview', projectRef: 'toieenyfwogplcmobfla', alias: 'trajectory-life-staging-trajectory3.vercel.app' },
-  main: { environment: 'production', projectRef: 'pvcitldyssqhcdmkqahj', alias: 'trajectory-app-lilac.vercel.app' },
+  main: {
+    environment: 'production',
+    projectRef: 'pvcitldyssqhcdmkqahj',
+    selfHostedUrl: 'https://api.trajectory-life.ru',
+    alias: 'trajectory-app-lilac.vercel.app',
+  },
 };
 
 export function environmentPullArgs(branch) {
