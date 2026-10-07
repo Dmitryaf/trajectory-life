@@ -71,7 +71,7 @@ jobs:
     if: needs.prepare.outputs.reuse != 'true'
     name: browser-${{ matrix.project }}-${{ matrix.shard }}
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 18
     strategy:
       fail-fast: false
       matrix:
@@ -88,7 +88,22 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
+      - name: Use official HTTPS Ubuntu mirrors
+        timeout-minutes: 1
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(uname -m)" = x86_64
+          test -f /etc/apt/apt-mirrors.txt
+          test ! -L /etc/apt/apt-mirrors.txt
+          grep -Fq 'URIs: mirror+file:/etc/apt/apt-mirrors.txt' /etc/apt/sources.list.d/ubuntu.sources
+          # Fail closed if a new runner image changes the known mirror configuration.
+          printf 'http://azure.archive.ubuntu.com/ubuntu/\tpriority:1\nhttps://archive.ubuntu.com/ubuntu/\tpriority:2\nhttps://security.ubuntu.com/ubuntu/\tpriority:3\n' | cmp -s - /etc/apt/apt-mirrors.txt
+          printf 'https://archive.ubuntu.com/ubuntu/\tpriority:1\nhttps://security.ubuntu.com/ubuntu/\tpriority:2\n' | sudo tee /etc/apt/apt-mirrors.txt > /dev/null
+          cat /etc/apt/apt-mirrors.txt
+          apt-config dump | grep -E '^Acquire::(Retries|http::Timeout|https::Timeout) '
       - name: Install selected browser
+        timeout-minutes: 5
         env:
           ENGINE: ${{ matrix.project == 'chromium' && 'chromium' || 'webkit' }}
         run: npx playwright install --with-deps "$ENGINE"
