@@ -1,0 +1,90 @@
+name: Guarded backend cutover
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        type: choice
+        options: [inspect, candidate, promote]
+        default: inspect
+        required: true
+      sha:
+        description: Exact current main SHA with accepted push CI
+        type: string
+        required: true
+      tree:
+        description: Exact source tree
+        type: string
+        required: true
+      ci_run:
+        description: Successful current-main push CI run ID
+        type: string
+        required: true
+      previous_id:
+        description: Exact current canonical Hosted deployment ID
+        type: string
+        required: true
+      candidate_id:
+        description: Required only for promote, previously accepted candidate ID
+        type: string
+      gate_marker:
+        description: Exact closed target gate marker
+        type: string
+        required: true
+      before_user_writes:
+        description: Operator confirms no production user writes on target after private acceptance
+        type: boolean
+        default: false
+      runtime_acceptance:
+        description: Operator accepted actual target Auth and Vercel runtime Auth
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: deploy-main
+  cancel-in-progress: false
+
+jobs:
+  cutover:
+    if: github.ref == 'refs/heads/main' && inputs.sha == github.sha
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      HUSKY: 0
+      VERCEL_TELEMETRY_DISABLED: 1
+      VERCEL_ORG_ID: team_sZTFAJUNjw3uCHNZarBQgdVb
+      VERCEL_PROJECT_ID: prj_O0neiglfpJG0JKq6jBYLJOE6buR4
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - name: Require existing publishing credential and target public key
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VPS_PUBLIC_KEY: ${{ secrets.VPS_SUPABASE_PUBLISHABLE_KEY }}
+        run: test -n "$VERCEL_TOKEN" && test -n "$VPS_PUBLIC_KEY"
+      - run: npm ci
+      - run: npm install --global vercel@60.1.3
+      - if: inputs.mode != 'inspect'
+        run: npx playwright install --with-deps chromium
+      - name: Inspect, stage or explicitly promote the exact checked source
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VPS_PUBLIC_KEY: ${{ secrets.VPS_SUPABASE_PUBLISHABLE_KEY }}
+        run: node scripts/ci/cutover.mjs
+      - if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-cutover-evidence
+          path: qa/ci/cutover.json
+          if-no-files-found: ignore
+          retention-days: 14

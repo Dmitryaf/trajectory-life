@@ -62,6 +62,20 @@ describe('deployment configuration', () => {
     expect(playwrightConfig).toContain("trace: isCI ? 'retain-on-failure' : 'off'");
   });
 
+  it('bounds browser installation without consuming the ten-minute test budget', () => {
+    const browserJob = ciWorkflow.split('  browsers:')[1]?.split('  test-and-build:')[0];
+    expect(browserJob).toMatch(/timeout-minutes: 18\s+strategy:/);
+    expect(browserJob).toMatch(/name: Use official HTTPS Ubuntu mirrors\s+timeout-minutes: 1/);
+    expect(browserJob).toMatch(/name: Install selected browser\s+timeout-minutes: 5/);
+    expect(browserJob).toContain('run: npx playwright install --with-deps "$ENGINE"');
+    expect(browserJob).toContain('cmp -s - /etc/apt/apt-mirrors.txt');
+    expect(browserJob).toContain('test ! -L /etc/apt/apt-mirrors.txt');
+    expect(browserJob).toContain(
+      "printf 'https://archive.ubuntu.com/ubuntu/\\tpriority:1\\nhttps://security.ubuntu.com/ubuntu/\\tpriority:2\\n'",
+    );
+    expect(playwrightConfig).toContain('globalTimeout: isCI ? 10 * 60_000 : undefined');
+  });
+
   it('keeps the aggregate mandatory even when a prerequisite fails or is skipped', () => {
     expect(ciWorkflow).toMatch(/test-and-build:\s+if: always\(\)\s+needs: \[prepare, quality, browsers\]/);
     expect(ciWorkflow).toContain('node scripts/ci/gate.mjs');
