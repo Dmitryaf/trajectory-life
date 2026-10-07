@@ -72,13 +72,21 @@ jobs:
     name: browser-${{ matrix.project }}-${{ matrix.shard }}
     runs-on: ubuntu-24.04
     timeout-minutes: 18
+    container:
+      image: mcr.microsoft.com/playwright@sha256:cf0daee9b994042e011bc29f20cdff1a9f682a039b43fcd738f7d8a9d3bcd9d6
+      options: --init --ipc=host --env ImageOS --env ImageVersion
+    defaults:
+      run:
+        shell: bash
     strategy:
       fail-fast: false
       matrix:
         project: [chromium, mobile-webkit, webkit]
         shard: [1, 2]
     env:
+      BROWSER_CONTAINER_IMAGE: mcr.microsoft.com/playwright@sha256:cf0daee9b994042e011bc29f20cdff1a9f682a039b43fcd738f7d8a9d3bcd9d6
       BROWSER_JOB: browser-${{ matrix.project }}-${{ matrix.shard }}
+      FONTCONFIG_FILE: ${{ github.workspace }}/scripts/ci/browser-fontconfig.conf
     steps:
       - uses: actions/checkout@v6
         with:
@@ -88,25 +96,14 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
-      - name: Use official HTTPS Ubuntu mirrors
+      - name: Verify baked browser environment
         timeout-minutes: 1
-        shell: bash
-        run: |
-          set -euo pipefail
-          test "$(uname -m)" = x86_64
-          test -f /etc/apt/apt-mirrors.txt
-          test ! -L /etc/apt/apt-mirrors.txt
-          grep -Fq 'URIs: mirror+file:/etc/apt/apt-mirrors.txt' /etc/apt/sources.list.d/ubuntu.sources
-          # Fail closed if a new runner image changes the known mirror configuration.
-          printf 'http://azure.archive.ubuntu.com/ubuntu/\tpriority:1\nhttps://archive.ubuntu.com/ubuntu/\tpriority:2\nhttps://security.ubuntu.com/ubuntu/\tpriority:3\n' | cmp -s - /etc/apt/apt-mirrors.txt
-          printf 'https://archive.ubuntu.com/ubuntu/\tpriority:1\nhttps://security.ubuntu.com/ubuntu/\tpriority:2\n' | sudo tee /etc/apt/apt-mirrors.txt > /dev/null
-          cat /etc/apt/apt-mirrors.txt
-          apt-config dump | grep -E '^Acquire::(Retries|http::Timeout|https::Timeout) '
-      - name: Install selected browser
-        timeout-minutes: 5
         env:
           ENGINE: ${{ matrix.project == 'chromium' && 'chromium' || 'webkit' }}
-        run: npx playwright install --with-deps "$ENGINE"
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          git rev-parse 'HEAD^{tree}'
+          node --input-type=module -e "import { verifyBrowserContainer } from './scripts/ci/runtime.mjs'; await verifyBrowserContainer();"
       - name: Run browser shard
         env:
           PROJECT: ${{ matrix.project }}

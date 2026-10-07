@@ -120,6 +120,57 @@ async function emulateSafeViewport(
   );
 }
 
+for (const width of [390, 1440]) {
+  test(`keeps weekly context and home settings above the form without losing a draft at ${width}px`, async ({ page }, testInfo) => {
+    await page.clock.setFixedTime(new Date('2026-07-21T12:00:00.000Z'));
+    await page.setViewportSize({ width, height: 900 });
+    await openDailyEntry(page);
+    const today = await page.getByLabel('Дата записи').inputValue();
+    await selectEntryDate(page, addDays(today, -1));
+    await page.getByLabel('Заметка дня', { exact: true }).fill('Синтетическая вчерашняя запись');
+    await page.locator('.floating-save-button').click();
+    await expect(page.getByText('День сохранён на устройстве', { exact: true })).toBeVisible();
+    await selectEntryDate(page, today);
+    await expect(page.getByLabel('Первый обзор недели', { exact: true })).toBeVisible();
+    await page.getByRole('button', { name: 'Больше не показывать', exact: true }).click();
+
+    const settings = page.getByRole('link', { name: 'Настроить главную' });
+    const pulse = page.getByLabel('Пульс недели', { exact: true });
+    await expect(settings).toBeVisible();
+    await expect(pulse).toBeVisible();
+    const headerBox = await readLayoutBox(page.locator('.page--today > .page-heading'), 'today heading');
+    const settingsBox = await readLayoutBox(settings, 'home settings action');
+    const dateBox = await readLayoutBox(page.locator('.entry-date-control'), 'date action');
+    const pulseBox = await readLayoutBox(pulse, 'weekly pulse');
+    const noteBox = await readLayoutBox(page.locator('.form-card--daily-summary'), 'daily note');
+    expect(settingsBox.height).toBeGreaterThanOrEqual(44);
+    expect(settingsBox.y).toBeGreaterThanOrEqual(headerBox.y);
+    expect(settingsBox.y + settingsBox.height).toBeLessThanOrEqual(headerBox.y + headerBox.height);
+    expect(Math.abs(settingsBox.y - dateBox.y)).toBeLessThanOrEqual(20);
+    expect(headerBox.height).toBeLessThan(180);
+    expect(pulseBox.y + pulseBox.height).toBeLessThanOrEqual(noteBox.y);
+    expect(pulseBox.y + pulseBox.height).toBeLessThan(650);
+    expect(await settings.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    const screenshotPath = testInfo.outputPath(`today-context-${width}px.png`);
+    await page.screenshot({ path: screenshotPath });
+    await testInfo.attach(`today-context-${width}px`, { path: screenshotPath, contentType: 'image/png' });
+
+    await page.getByLabel('Заметка дня', { exact: true }).fill('Несохранённый черновик перед настройками');
+    await expect(page.locator('.floating-save-button')).toBeVisible();
+    await settings.click();
+    await expect(page).toHaveURL(/\/settings#daily-blocks$/);
+    await page.goto('/today');
+    await expect(page.getByLabel('Заметка дня', { exact: true })).toHaveValue('Несохранённый черновик перед настройками');
+    await expect(page.getByText('Восстановлены несохранённые изменения', { exact: false })).toBeVisible();
+    await page.locator('.floating-save-button').click();
+    await expect(page.getByText('День сохранён на устройстве', { exact: true })).toBeVisible();
+    await page.reload();
+    await expect(page.getByLabel('Заметка дня', { exact: true })).toHaveValue('Несохранённый черновик перед настройками');
+    await expect(page.locator('.floating-save-button')).toBeHidden();
+  });
+}
+
 test('uses the full visible date control as the pointer and keyboard target', async ({ page }) => {
   test.slow();
   await openDailyEntry(page);

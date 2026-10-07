@@ -321,6 +321,7 @@ function openEntryDatePicker() {
           />
         </span>
         <small>Можно выбрать любой прошедший день</small>
+        <DailyLayoutSettings v-if="!firstUseTakesPriority && !isFirstEntry" />
       </div>
     </PageHeading>
 
@@ -348,6 +349,40 @@ function openEntryDatePicker() {
         <p>Можно заполнить коротко сейчас или спокойно продолжить с сегодняшнего дня.</p>
       </div>
       <ActionButton variant="secondary" class="context-action" type="button" @click="fillYesterday">Добавить запись</ActionButton>
+    </section>
+
+    <ReviewNudge
+      v-if="!firstUseTakesPriority && activeContextCue === 'review' && activeReviewReminder"
+      tag="section"
+      aria-label="Период готов к обзору"
+    >
+      <div>
+        <strong>{{ activeReviewReminder.title }}</strong>
+        <p>{{ activeReviewReminder.text }}</p>
+      </div>
+      <ActionButton :as="RouterLink" variant="secondary" class="context-action" :to="activeReviewReminder.to">{{
+        activeReviewReminder.label
+      }}</ActionButton>
+    </ReviewNudge>
+
+    <section v-else-if="!firstUseTakesPriority && activeContextCue === 'plan'" class="today-pulse" aria-label="Текущий план недели">
+      <div>
+        <EyebrowText>План недели</EyebrowText>
+        <p>{{ currentWeeklyPlan }}</p>
+      </div>
+    </section>
+
+    <section v-else-if="!firstUseTakesPriority && activeContextCue === 'pulse'" class="today-pulse" aria-label="Пульс недели">
+      <div>
+        <EyebrowText>Пульс недели</EyebrowText>
+        <p>
+          {{ currentWeekSummary.coveredEntriesCount }}
+          {{ currentWeekSummary.coveredEntriesCount === 1 ? 'заполненный день' : 'заполненных дней' }} · средний сон
+          {{ formatMinutes(currentWeekSummary.averageSleep === null ? null : Math.round(currentWeekSummary.averageSleep)) }}
+          (измерений: {{ currentWeekSummary.sleepSamples }}) · {{ currentWeekSummary.externalActionDays }} дн. с шагом к цели
+        </p>
+      </div>
+      <p v-if="currentWeekObservation">{{ currentWeekObservation.text }}</p>
     </section>
 
     <JournalQuickCapture v-if="!firstUseTakesPriority && !isFirstEntry" />
@@ -669,45 +704,11 @@ function openEntryDatePicker() {
       </details>
     </form>
 
-    <ReviewNudge
-      v-if="!firstUseTakesPriority && activeContextCue === 'review' && activeReviewReminder"
-      tag="section"
-      aria-label="Период готов к обзору"
-    >
-      <div>
-        <strong>{{ activeReviewReminder.title }}</strong>
-        <p>{{ activeReviewReminder.text }}</p>
-      </div>
-      <ActionButton :as="RouterLink" variant="secondary" class="context-action" :to="activeReviewReminder.to">{{
-        activeReviewReminder.label
-      }}</ActionButton>
-    </ReviewNudge>
-
-    <section v-else-if="!firstUseTakesPriority && activeContextCue === 'plan'" class="today-pulse" aria-label="Текущий план недели">
-      <div>
-        <EyebrowText>План недели</EyebrowText>
-        <p>{{ currentWeeklyPlan }}</p>
-      </div>
-    </section>
-
     <AiAnalysisNudge
-      v-else-if="!firstUseTakesPriority && activeContextCue === 'ai'"
+      v-if="!firstUseTakesPriority && activeContextCue === 'ai'"
       @dismiss="dismissAiAnalysisNudge()"
       @prepare="dismissAiAnalysisNudge()"
     />
-
-    <section v-else-if="!firstUseTakesPriority && activeContextCue === 'pulse'" class="today-pulse" aria-label="Пульс недели">
-      <div>
-        <EyebrowText>Пульс недели</EyebrowText>
-        <p>
-          {{ currentWeekSummary.coveredEntriesCount }}
-          {{ currentWeekSummary.coveredEntriesCount === 1 ? 'заполненный день' : 'заполненных дней' }} · средний сон
-          {{ formatMinutes(currentWeekSummary.averageSleep === null ? null : Math.round(currentWeekSummary.averageSleep)) }}
-          (измерений: {{ currentWeekSummary.sleepSamples }}) · {{ currentWeekSummary.externalActionDays }} дн. с шагом к цели
-        </p>
-      </div>
-      <p v-if="currentWeekObservation">{{ currentWeekObservation.text }}</p>
-    </section>
 
     <PwaInstallNudge
       v-if="!firstUseTakesPriority && isToday"
@@ -715,8 +716,6 @@ function openEntryDatePicker() {
       :saved-entry-count="store.dailyEntries.length"
       @availability-change="pwaNudgeAvailable = $event"
     />
-
-    <DailyLayoutSettings v-if="!firstUseTakesPriority && !isFirstEntry" />
 
     <Teleport to="body">
       <Transition name="floating-save">
