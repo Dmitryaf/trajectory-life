@@ -86,6 +86,7 @@ jobs:
     env:
       BROWSER_CONTAINER_IMAGE: mcr.microsoft.com/playwright@sha256:cf0daee9b994042e011bc29f20cdff1a9f682a039b43fcd738f7d8a9d3bcd9d6
       BROWSER_JOB: browser-${{ matrix.project }}-${{ matrix.shard }}
+      FONTCONFIG_FILE: ${{ github.workspace }}/scripts/ci/browser-fontconfig.conf
     steps:
       - uses: actions/checkout@v6
         with:
