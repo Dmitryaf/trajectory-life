@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { parseEnv } from 'node:util';
-import { assertClientBuildEnvironment } from './build-environment.mjs';
+import { assertBackendAlignment } from './cutover-policy.mjs';
 import { githubClient } from './github.mjs';
 import {
   assertDeployment,
@@ -72,9 +72,12 @@ await assetSignature(deploymentUrl(previous.url));
 
 vercel(environmentPullArgs(branch));
 const clientEnvironment = parseEnv(readFileSync(`.vercel/.env.${target.environment}.local`, 'utf8'));
-assertClientBuildEnvironment(clientEnvironment, target);
+assertBackendAlignment(clientEnvironment, target, previous);
 vercel(['build', ...(branch === 'main' ? ['--prod'] : [])]);
-const output = vercel(candidateDeploymentArgs(branch, sha, source.id), true);
+const output = vercel(
+  [...candidateDeploymentArgs(branch, sha, source.id), '--meta', `backendUrl=${clientEnvironment.VITE_SUPABASE_URL.trim()}`],
+  true,
+);
 // The pinned CLI supports structured output in non-interactive agent mode as
 // well as the documented URL-only stdout. Never guess a URL from log text.
 const candidateUrl = output.startsWith('{') ? JSON.parse(output).url : output;
