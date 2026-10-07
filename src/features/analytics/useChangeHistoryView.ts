@@ -140,11 +140,21 @@ export function useChangeHistoryView() {
     const values = monthRows.value
       .map((row, index) => {
         const value = trendMetricValues.value[index];
-        return value === null ? null : `${row.label}: ${formatTrendTooltipValue(metric, value)}`;
+        return value === null ? null : `${row.label}: ${formatTrendTooltipValue(metric, value)} (измерений: ${trendMetricSamples(index)})`;
       })
       .filter((value): value is string => Boolean(value));
     return `${selectedTrendMetricInfo.value?.label ?? 'Показатель'}: ${selectedTrendMetricInfo.value?.samples ?? 0} наблюдений. Месячные значения: ${values.join('; ')}. Текущий месяц может быть неполным; совпадение с событиями не доказывает причину.`;
   });
+  function trendMetricSamples(index: number) {
+    const summary = monthRows.value[index]?.summary;
+    if (selectedTrendMetric.value === 'sleep') {
+      return summary?.sleepSamples ?? 0;
+    }
+    if (selectedTrendMetric.value === 'energy') {
+      return summary?.energySamples ?? 0;
+    }
+    return summary?.weightSamples ?? 0;
+  }
   const trendMetricOption = computed<EChartsCoreOption>(() => {
     const metric = selectedTrendMetric.value;
     let axis: Record<string, unknown> = { scale: true, formatter: '{value}кг' };
@@ -182,7 +192,8 @@ export function useChangeHistoryView() {
           connectNulls: false,
           lineStyle: { width: 3 },
           tooltip: {
-            valueFormatter: (value: unknown) => formatTrendTooltipValue(metric, value),
+            valueFormatter: (value: unknown, dataIndex: number) =>
+              `${formatTrendTooltipValue(metric, value)} (измерений: ${trendMetricSamples(dataIndex)})`,
           },
           markLine: {
             symbol: ['none', 'none'],

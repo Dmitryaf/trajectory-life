@@ -96,7 +96,7 @@
   justify-content: space-between;
   align-items: center;
   gap: 16px;
-  margin-bottom: 14px;
+  margin: 16px 0 14px;
   padding: 16px 18px;
   border: 1px solid var(--line);
   border-radius: 18px;
@@ -372,78 +372,6 @@
   font-weight: 700;
 }
 
-.number-field {
-  width: 185px;
-  display: flex;
-  align-items: center;
-  overflow: hidden;
-  border: 1px solid var(--line);
-  border-radius: 14px;
-  background: var(--surface);
-}
-
-.number-field input {
-  padding: 10px 4px 10px 14px;
-  border: 0;
-  border-radius: 0;
-  box-shadow: none;
-  font-size: 22px;
-  font-weight: 750;
-}
-
-.number-field span {
-  padding-right: 14px;
-  color: var(--muted);
-  font-size: 13px;
-  white-space: nowrap;
-}
-
-.binary-choice {
-  display: flex;
-  gap: 8px;
-}
-
-.binary-choice button {
-  padding: 10px 18px;
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  background: var(--surface);
-  cursor: pointer;
-}
-
-.binary-choice button.selected {
-  border-color: var(--navy);
-  background: var(--navy);
-  color: var(--text-inverse);
-}
-
-.none-option {
-  margin-top: 9px;
-  padding: 9px 12px;
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  background: var(--none-option-surface);
-  color: var(--none-option-text);
-  font-size: 12px;
-  font-weight: 750;
-  cursor: pointer;
-  transition:
-    border-color 0.15s,
-    background-color 0.15s,
-    color 0.15s;
-}
-
-.none-option:hover {
-  border-color: var(--chip-border);
-  background: var(--surface);
-}
-
-.none-option.selected {
-  border-color: var(--range-tab-active-border);
-  background: var(--range-tab-active-surface);
-  color: var(--range-tab-active-text);
-}
-
 .floating-save-button {
   position: fixed;
   right: calc(24px + var(--safe-right));
@@ -588,8 +516,7 @@
     transform: translateY(6px);
   }
 
-  .sleep-field-grid > div,
-  .number-field {
+  .sleep-field-grid > div {
     width: 100%;
     flex-basis: 100%;
   }

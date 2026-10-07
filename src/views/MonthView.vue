@@ -32,7 +32,7 @@ import {
   specialDayLabel,
   summarize,
 } from '@/features/analytics';
-import { addDays, dateRange, endOfMonth, formatDate, fromDateKey, startOfMonth, startOfWeek, todayKey, toDateKey } from '@/services/dates';
+import { addDays, dateRange, endOfMonth, formatDate, startOfMonth, startOfWeek, todayKey } from '@/services/dates';
 import { buildWeightSeries } from '@/features/analytics/weightSeries';
 import { pageCount, pageItems } from '@/services/pagination';
 import { useAppStore } from '@/stores/app';
@@ -314,6 +314,7 @@ const eventRecordItems = computed(() =>
 const lifeAreaItems = computed(() => [...lifeAreaOptions, ...store.settings.customLifeAreaOptions]);
 const activeAreas = computed(() => lifeAreaItems.value.filter((option) => store.settings.activeLifeAreas.includes(option.id)));
 const {
+  navigation,
   copyPrompt,
   downloadJson,
   hasSavedReview,
@@ -348,12 +349,6 @@ watch(contextPageCount, (count) => {
 function minutesToHours(value: number | null): number | null {
   return value === null ? null : Math.round((value / 60) * 10) / 10;
 }
-
-function shiftMonth(offset: number) {
-  const date = fromDateKey(anchor.value);
-  date.setMonth(date.getMonth() + offset, 1);
-  anchor.value = toDateKey(date);
-}
 </script>
 
 <template>
@@ -368,9 +363,7 @@ function shiftMonth(offset: number) {
     <PeriodNavigator
       :title="formatDate(start, { month: 'long', year: 'numeric' })"
       :subtitle="start === startOfMonth(todayKey()) ? 'Текущий месяц' : ''"
-      @previous="shiftMonth(-1)"
-      @next="shiftMonth(1)"
-      @current="anchor = todayKey()"
+      v-on="navigation"
     />
 
     <PeriodEmptyGuide v-if="!hasPeriodData">
