@@ -30,10 +30,24 @@ defineEmits<{ dismiss: []; prepare: [] }>();
 </template>
 
 <style scoped>
+.ai-analysis-nudge {
+  flex-wrap: wrap;
+}
+.ai-analysis-nudge__copy {
+  min-width: 0;
+  flex: 1 1 300px;
+}
 .ai-analysis-nudge__actions {
   display: grid;
+  min-width: 0;
+  max-width: 100%;
   flex: 0 0 min(300px, 38%);
   gap: 8px;
+}
+.ai-analysis-nudge .secondary-button {
+  min-width: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 .ai-analysis-nudge__dismiss {
   border: 0;

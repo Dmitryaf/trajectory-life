@@ -1,17 +1,21 @@
 <script setup lang="ts">
-defineProps<{ modelValue: number | null; lowLabel: string; highLabel: string }>();
+import FormFieldLabel from './FormFieldLabel.vue';
+
+defineProps<{ modelValue: number | null; label: string; lowLabel: string; highLabel: string }>();
 defineEmits<{ 'update:modelValue': [value: number] }>();
 </script>
 
 <template>
   <div>
-    <div class="scale-picker">
+    <FormFieldLabel tag="span">{{ label }}</FormFieldLabel>
+    <div class="scale-picker" role="group" :aria-label="label">
       <button
         v-for="value in 5"
         :key="value"
         type="button"
         class="scale-picker__item"
         :class="{ 'scale-picker__item--selected': modelValue === value }"
+        :aria-pressed="modelValue === value"
         @click="$emit('update:modelValue', value)"
       >
         {{ value }}

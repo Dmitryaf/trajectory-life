@@ -48,7 +48,7 @@ export function buildObservations(entries: DailyEntry[], factorOptions: Option<C
     observations.push({
       id: 'movement-energy',
       title: 'Физическая активность и энергия',
-      text: `В дни с физической активностью энергия в среднем ${direction}: ${formatNumber(movementEnergy)} против ${formatNumber(stillEnergy)}.`,
+      text: `В дни с физической активностью энергия в среднем ${direction}: ${formatNumber(movementEnergy)} (измерений: ${movementEntries.length}) против ${formatNumber(stillEnergy)} без активности (измерений: ${stillEntries.length}).`,
     });
   }
 
@@ -65,7 +65,7 @@ export function buildObservations(entries: DailyEntry[], factorOptions: Option<C
     observations.push({
       id: 'sleep-energy',
       title: 'Сон и энергия',
-      text: `После сна от 7 часов энергия в среднем ${direction}: ${formatNumber(restedEnergy)} против ${formatNumber(shortSleepEnergy)}.`,
+      text: `После сна от 7 часов энергия в среднем ${direction}: ${formatNumber(restedEnergy)} (измерений: ${restedEntries.length}) против ${formatNumber(shortSleepEnergy)} после более короткого сна (измерений: ${shortSleepEntries.length}).`,
     });
   }
 
@@ -122,7 +122,7 @@ export function factorComparisonText(factor: FactorSummary): string {
   if (factor.sleepSamples >= 4 && factor.sleepSamplesWithout >= 4 && factor.averageSleep !== null && factor.averageSleepWithout !== null) {
     const difference = Math.round(factor.averageSleep - factor.averageSleepWithout);
     parts.push(
-      `Сон: ${formatMinutes(Math.round(factor.averageSleep))} против ${formatMinutes(Math.round(factor.averageSleepWithout))} в дни без этой отметки (${signedMinutes(difference)})`,
+      `Сон с отметкой: ${formatMinutes(Math.round(factor.averageSleep))} (измерений: ${factor.sleepSamples}), без отметки: ${formatMinutes(Math.round(factor.averageSleepWithout))} (измерений: ${factor.sleepSamplesWithout}); разница ${signedMinutes(difference)}`,
     );
   }
   if (
@@ -133,7 +133,7 @@ export function factorComparisonText(factor: FactorSummary): string {
   ) {
     const difference = factor.averageEnergy - factor.averageEnergyWithout;
     parts.push(
-      `энергия: ${formatNumber(factor.averageEnergy)} против ${formatNumber(factor.averageEnergyWithout)} (${signedNumber(difference)})`,
+      `энергия с отметкой: ${formatNumber(factor.averageEnergy)} (измерений: ${factor.energySamples}), без отметки: ${formatNumber(factor.averageEnergyWithout)} (измерений: ${factor.energySamplesWithout}); разница ${signedNumber(difference)}`,
     );
   }
   return parts.length ? `${parts.join('; ')}. Разница не доказывает, что причина именно в этом условии.` : '';

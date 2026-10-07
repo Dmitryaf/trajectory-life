@@ -29,7 +29,7 @@
   --overlay-scrim: rgba(11, 28, 27, 0.52);
   --page-glow-accent: rgba(73, 201, 155, 0.18);
   --page-glow-warm: rgba(231, 164, 59, 0.12);
-  --focus-ring: #2860a6;
+  --focus-ring: var(--accent-dark);
   --field-focus-border: #65b99a;
   --field-focus-ring: rgba(73, 201, 155, 0.11);
   --period-details-border: #dce5e1;
@@ -67,7 +67,7 @@
   --clamped-text: #4e5a70;
   --clamped-text-action: #2c745e;
   --clamped-text-action-hover: #174f40;
-  --data-note-text: #7a8497;
+  --data-note-text: #5d687e;
   --empty-guide-border: #d9e5df;
   --empty-guide-surface: rgba(255, 255, 255, 0.86);
   --empty-guide-text: #65736e;

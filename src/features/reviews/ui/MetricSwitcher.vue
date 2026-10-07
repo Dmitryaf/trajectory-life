@@ -8,12 +8,13 @@ defineEmits<{ 'update:modelValue': [value: string] }>();
 </script>
 
 <template>
-  <div class="metric-switcher" :aria-label="label">
+  <div class="metric-switcher" role="group" :aria-label="label">
     <button
       v-for="option in options"
       :key="option.id"
       type="button"
       :class="{ active: modelValue === option.id }"
+      :aria-pressed="modelValue === option.id"
       @click="$emit('update:modelValue', option.id)"
     >
       {{ option.label }}

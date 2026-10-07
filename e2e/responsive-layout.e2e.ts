@@ -380,12 +380,10 @@ test('keeps mobile form controls inside their cards', async ({ page }) => {
     expect(overflow, `form controls should stay inside cards at ${width}px`).toEqual([]);
 
     const quickCaptureBox = await page.locator('.quick-capture').boundingBox();
-    const goalCardBox = await page.locator('#goal-actions').boundingBox();
+    const dailyNoteBox = await page.locator('.form-card--daily-summary').boundingBox();
     expect(quickCaptureBox).not.toBeNull();
-    expect(goalCardBox).not.toBeNull();
-    expect(quickCaptureBox!.y, `quick actions should follow the daily form at ${width}px`).toBeGreaterThanOrEqual(
-      goalCardBox!.y + goalCardBox!.height + 12,
-    );
+    expect(dailyNoteBox).not.toBeNull();
+    expectVerticalSeparation(quickCaptureBox!, dailyNoteBox!, 12, `quick actions before the daily note at ${width}px`);
   }
 });
 
@@ -795,6 +793,43 @@ for (const width of [320, 361, 390, 480, 719, 720, 721]) {
   });
 }
 
+test('separates daily layout settings from collapsed and expanded additional sections', async ({ page }, testInfo) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.goto('/today');
+  await page.getByLabel('Дата записи', { exact: true }).evaluate((input, value) => {
+    (input as HTMLInputElement).value = value;
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+  }, emptyPeriodDate());
+  const additional = page.locator('.daily-additional-blocks');
+  const settings = page.locator('.daily-layout-settings');
+  await expect(additional).toBeVisible();
+  await expect(settings).toBeVisible();
+  await expect(page.locator('form + .daily-layout-settings')).toBeVisible();
+
+  for (const width of [320, 390, 768, 980, 1440]) {
+    await page.setViewportSize({ width, height: 900 });
+    for (const expanded of [false, true]) {
+      const isExpanded = (await additional.getAttribute('open')) !== null;
+      if (isExpanded !== expanded) {
+        await additional.locator('summary').click();
+      }
+      expectVerticalSeparation(
+        await readLayoutBox(additional, 'additional sections'),
+        await readLayoutBox(settings, 'daily layout settings'),
+        12,
+        `daily settings gap at ${width}px, expanded=${expanded}`,
+      );
+      await expectPageFitsViewport(page, `daily settings at ${width}px`);
+      if (!expanded && (width === 390 || width === 980)) {
+        await settings.scrollIntoViewIfNeeded();
+        await page.screenshot({ path: testInfo.outputPath(`daily-settings-${width}.png`) });
+      }
+    }
+  }
+  await settings.getByRole('link', { name: 'Настроить главную' }).click();
+  await expect(page).toHaveURL(/\/settings#daily-blocks$/);
+});
+
 test('keeps the returning daily form compact and visibly grouped', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 720 });
   await page.goto('/today');
@@ -818,7 +853,8 @@ test('keeps the returning daily form compact and visibly grouped', async ({ page
   expect(goalBox).not.toBeNull();
   expect(quickCaptureBox).not.toBeNull();
   expect(additionalBlocksBox).not.toBeNull();
-  expect(quickCaptureBox!.y).toBeGreaterThanOrEqual(goalBox!.y + goalBox!.height + 12);
+  const summaryBox = await readLayoutBox(page.locator('.form-card--daily-summary'), 'daily note');
+  expectVerticalSeparation(quickCaptureBox!, summaryBox, 12, 'quick capture before daily note');
   expect(goalBox!.y).toBeLessThan(additionalBlocksBox!.y);
   await expect(additionalBlocks).not.toHaveAttribute('open', '');
   await additionalBlocks.locator('summary').click();
@@ -969,6 +1005,43 @@ test('switches settings scenarios with the keyboard on a mobile screen', async (
   }));
   expect(widths.content).toBeLessThanOrEqual(widths.viewport);
 });
+
+for (const width of [320, 390, 768, 980, 1440]) {
+  test(`keeps the feedback action compact and keyboard-accessible at ${width}px`, async ({ page }, testInfo) => {
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto('/today');
+    const feedback = page.getByRole('button', { name: 'Обратная связь' });
+    const help = page.getByRole('button', { name: 'Как работает приложение' });
+    const [feedbackBox, helpBox] = await Promise.all([readLayoutBox(feedback, 'feedback action'), readLayoutBox(help, 'help action')]);
+    expect(feedbackBox.width).toBeCloseTo(helpBox.width, 0);
+    expect(feedbackBox.height).toBeCloseTo(helpBox.height, 0);
+    expect(feedbackBox.width).toBeCloseTo(feedbackBox.height, 0);
+    expectHorizontalSeparation(helpBox, feedbackBox, 8, 'header utility actions');
+    await expect(feedback).toHaveAttribute('title', 'Обратная связь');
+    await expect(feedback.locator('strong')).toBeHidden();
+    await expect(feedback.locator('use')).toHaveAttribute('href', '/icons/ui-icons.svg#feedback');
+    const actions = page.locator('.header-actions');
+    const actionsBox = await readLayoutBox(actions, 'header actions');
+    for (const action of await actions.locator(':scope > *').all()) {
+      expectBoxInside(await readLayoutBox(action, 'header action'), actionsBox, `header action at ${width}px`, 1);
+    }
+    await expectPageFitsViewport(page, `compact header at ${width}px`);
+    await page.locator('.app-header').screenshot({ path: testInfo.outputPath(`feedback-header-${width}.png`) });
+
+    await help.focus();
+    await page.keyboard.press('Tab');
+    await expect(feedback).toBeFocused();
+    await page.keyboard.press('Enter');
+    const dialog = page.getByRole('dialog', { name: 'Написать разработчику' });
+    await expect(dialog).toBeVisible();
+    await expect(dialog).not.toContainText(/закрыт.{0,20}бет/i);
+    await expect(dialog.getByLabel('Предложение, проблема или ошибка')).toBeFocused();
+    await dialog.screenshot({ path: testInfo.outputPath(`feedback-dialog-${width}.png`) });
+    await page.keyboard.press('Escape');
+    await expect(dialog).not.toBeVisible();
+    await expect(feedback).toBeFocused();
+  });
+}
 
 test('sends feedback from the built-in form without asking for recipient details', async ({ page }) => {
   let submittedMessage = '';
