@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { parseEnv } from 'node:util';
+import { resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { assertBackendAlignment, productionRows, readableProductionRows, sameRow } from './cutover-policy.mjs';
 import {
   assertTelemetryEnvironment,
@@ -25,6 +27,15 @@ import {
 } from './release-policy.mjs';
 import { assetSignature, smokePublic } from './smoke.mjs';
 import { git, summary, writeJson } from './runtime.mjs';
+
+export function assertDevelopmentRollbackGraph({ branch, deploymentId, previousId, aliasId, aliasGraph, previousGraph }) {
+  assert.equal(branch, 'develop', 'Canonical predecessor graph is only valid for development rollback');
+  assert.match(previousId, /^dpl_[a-zA-Z0-9]+$/, 'Captured predecessor identity is required');
+  assert.equal(deploymentId, previousId, 'Canonical predecessor graph cannot verify a new candidate');
+  assert.equal(aliasId, previousId, 'Rollback alias must reference the captured predecessor');
+  assert.ok(Array.isArray(previousGraph) && previousGraph.length > 0, 'Captured predecessor graph is required');
+  assert.deepEqual(aliasGraph, previousGraph, 'Restored staging assets must match the captured predecessor graph');
+}
 
 async function main() {
   const event = JSON.parse(readFileSync(process.env.GITHUB_EVENT_PATH, 'utf8'));
@@ -105,7 +116,10 @@ async function main() {
   const target = releaseTargets[branch];
   const previous = await inspect(target.alias);
   assertDeployment(previous, projectId);
-  await assetSignature(deploymentUrl(previous.url));
+  const previousGraph = await assetSignature(branch === 'develop' ? `https://${target.alias}` : deploymentUrl(previous.url));
+  if (branch === 'develop') {
+    assert.equal((await inspect(target.alias)).id, previous.id, 'Staging predecessor changed during baseline capture');
+  }
   let clientEnvironment = pullEnvironment();
   assertBackendAlignment(clientEnvironment, target, previous);
   let baseline;
@@ -179,7 +193,19 @@ async function main() {
         }
       },
       verifyAlias: async (deployment) => {
-        assert.equal((await inspect(target.alias)).id, deployment.id, 'Alias must reference the exact verified deployment');
+        const aliasId = (await inspect(target.alias)).id;
+        assert.equal(aliasId, deployment.id, 'Alias must reference the exact verified deployment');
+        if (branch === 'develop' && deployment.id === previous.id) {
+          assertDevelopmentRollbackGraph({
+            branch,
+            deploymentId: deployment.id,
+            previousId: previous.id,
+            aliasGraph: await assetSignature(`https://${target.alias}`),
+            aliasId: (await inspect(target.alias)).id,
+            previousGraph,
+          });
+          return;
+        }
         const [alias, unique] = await Promise.all([
           assetSignature(`https://${target.alias}`),
           assetSignature(deploymentUrl(deployment.url)),
@@ -256,10 +282,12 @@ async function main() {
   }
 }
 
-try {
-  await main();
-} catch {
-  // Assertion diffs can contain private environment values. Never print them.
-  console.error('Verified deployment failed; private details withheld. Inspect sanitized deployment-evidence.');
-  process.exitCode = 1;
+if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
+  try {
+    await main();
+  } catch {
+    // Assertion diffs can contain private environment values. Never print them.
+    console.error('Verified deployment failed; private details withheld. Inspect sanitized deployment-evidence.');
+    process.exitCode = 1;
+  }
 }
