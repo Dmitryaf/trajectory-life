@@ -1,4 +1,12 @@
-import { createClient, isAuthRetryableFetchError, type AuthChangeEvent, type Session, type SupabaseClient } from '@supabase/supabase-js';
+import {
+  AuthApiError,
+  AuthRetryableFetchError,
+  createClient,
+  isAuthRetryableFetchError,
+  type AuthChangeEvent,
+  type Session,
+  type SupabaseClient,
+} from '@supabase/supabase-js';
 import { CloudOperationCancelledError, type CloudOperationScope } from './cloudOperation';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
@@ -7,6 +15,97 @@ const signupEnabled = import.meta.env.VITE_ENABLE_SIGNUP === 'true';
 const cloudAuthRequired = import.meta.env.VITE_REQUIRE_AUTH === 'true';
 
 let client: SupabaseClient | null = null;
+const startupRequestTimeoutMs = 5_000;
+const cloudRequestTimeoutMs = 10_000;
+
+function cloudAuthStorageKey(): string {
+  return `sb-${new URL(supabaseUrl!).hostname.split('.')[0]}-auth-token`;
+}
+
+export function getCachedCloudSession(): Session | null {
+  if (!isCloudSyncConfigured()) {
+    return null;
+  }
+  try {
+    const cached: unknown = JSON.parse(window.localStorage.getItem(cloudAuthStorageKey()) ?? 'null');
+    if (!cached || typeof cached !== 'object') {
+      return null;
+    }
+    const session = cached as Partial<Session>;
+    if (
+      typeof session.access_token !== 'string' ||
+      !session.access_token ||
+      typeof session.refresh_token !== 'string' ||
+      !session.refresh_token ||
+      typeof session.expires_at !== 'number' ||
+      !Number.isFinite(session.expires_at) ||
+      typeof session.user?.id !== 'string' ||
+      !session.user.id
+    ) {
+      return null;
+    }
+    return session as Session;
+  } catch {
+    return null;
+  }
+}
+
+export function invalidateCachedCloudSession(session: Session | null): void {
+  if (!session) {
+    return;
+  }
+  const cached = getCachedCloudSession();
+  if (cached?.access_token === session.access_token && cached.user.id === session.user.id) {
+    window.localStorage.removeItem(cloudAuthStorageKey());
+  }
+}
+
+function ownedActiveCachedSession(): Session | null {
+  const session = getCachedCloudSession();
+  if (!session || session.expires_at! * 1000 <= Date.now()) {
+    return null;
+  }
+  try {
+    return window.localStorage.getItem('trajectory:local-owner-id') === session.user.id ? session : null;
+  } catch {
+    return null;
+  }
+}
+
+function fetchCloudRequest(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+    return Promise.reject(new TypeError('Network is offline'));
+  }
+  const controller = new AbortController();
+  const parentSignal = init?.signal ?? (input instanceof Request ? input.signal : undefined);
+  return new Promise<Response>((resolve, reject) => {
+    const cleanup = () => {
+      window.clearTimeout(timeoutId);
+      parentSignal?.removeEventListener('abort', abortFromParent);
+    };
+    const abortFromParent = () => {
+      controller.abort(parentSignal?.reason);
+      cleanup();
+      reject(parentSignal?.reason ?? new DOMException('Cloud request aborted', 'AbortError'));
+    };
+    const timeoutId = window.setTimeout(() => {
+      const error = new DOMException('Cloud request timed out', 'AbortError');
+      controller.abort(error);
+      cleanup();
+      reject(error);
+    }, cloudRequestTimeoutMs);
+    if (parentSignal?.aborted) {
+      abortFromParent();
+      return;
+    }
+    parentSignal?.addEventListener('abort', abortFromParent, { once: true });
+    // Keep the abort timer after headers so a stalled response body is bounded too.
+    globalThis.fetch(input, { ...init, signal: controller.signal }).then(resolve, (error: unknown) => {
+      cleanup();
+      reject(error);
+    });
+  });
+}
 
 export type CloudSnapshot = {
   payload: unknown;
@@ -51,7 +150,9 @@ export function getSupabaseClient(): SupabaseClient {
   }
 
   client ??= createClient(supabaseUrl!, supabaseAnonKey!, {
+    global: { fetch: fetchCloudRequest },
     auth: {
+      storageKey: cloudAuthStorageKey(),
       persistSession: true,
       autoRefreshToken: true,
       detectSessionInUrl: true,
@@ -83,18 +184,98 @@ export async function getVerifiedCloudSession(): Promise<Session | null> {
   return session;
 }
 
-export async function getStartupCloudSession(): Promise<Session | null> {
-  const session = await getCloudSession();
-  if (!session) {
-    return null;
+async function verifyStartupSession(session: Session): Promise<void> {
+  // SDK getUser can remove a newer session after a late session_not_found response.
+  // This read only verifies the captured token and leaves SDK storage/events alone.
+  let response: Response;
+  try {
+    response = await fetchCloudRequest(`${supabaseUrl!.replace(/\/$/, '')}/auth/v1/user`, {
+      headers: { apikey: supabaseAnonKey!, Authorization: `Bearer ${session.access_token}` },
+    });
+    if (response.status >= 500) {
+      throw new AuthRetryableFetchError('Auth service unavailable', response.status);
+    }
+    if (!response.ok) {
+      throw new AuthApiError('Не удалось подтвердить вход', response.status, 'startup_auth_rejected');
+    }
+    const data = await response.json();
+    if (data.id !== session.user.id) {
+      throw new AuthApiError('Не удалось подтвердить владельца сессии', 401, 'user_mismatch');
+    }
+  } catch (error) {
+    if (error instanceof AuthApiError || isAuthRetryableFetchError(error)) {
+      throw error;
+    }
+    throw new AuthRetryableFetchError('Не удалось связаться с сервисом входа', 0);
   }
+}
 
-  const { error } = await getSupabaseClient().auth.getUser();
-  if (!error || isAuthRetryableFetchError(error)) {
+type StartupCloudSessionOptions = {
+  onSessionLoaded?: (session: Session | null) => void;
+  onAuthRejected?: (error: unknown, session: Session | null) => void;
+};
+
+export async function getStartupCloudSession(options: StartupCloudSessionOptions = {}): Promise<Session | null> {
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+    const session = ownedActiveCachedSession();
+    options.onSessionLoaded?.(session);
     return session;
   }
 
-  throw error;
+  let settled = false;
+  let candidate: Session | null = null;
+  return new Promise<Session | null>((resolve, reject) => {
+    const timeoutId = window.setTimeout(() => {
+      settled = true;
+      const cached = ownedActiveCachedSession();
+      if (cached) {
+        options.onSessionLoaded?.(cached);
+        resolve(cached);
+      } else {
+        reject(new Error('Не удалось проверить вход. Подключитесь к интернету и попробуйте снова.'));
+      }
+    }, startupRequestTimeoutMs);
+
+    const request = (async () => {
+      candidate = await getCloudSession();
+      if (settled) {
+        return null;
+      }
+      options.onSessionLoaded?.(candidate);
+      if (!candidate) {
+        return null;
+      }
+      await verifyStartupSession(candidate);
+      return candidate;
+    })();
+    request.then(
+      (session) => {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        window.clearTimeout(timeoutId);
+        resolve(session);
+      },
+      (error: unknown) => {
+        if (!isAuthRetryableFetchError(error)) {
+          options.onAuthRejected?.(error, candidate);
+        }
+        if (settled) {
+          return;
+        }
+        settled = true;
+        window.clearTimeout(timeoutId);
+        const cached = isAuthRetryableFetchError(error) ? ownedActiveCachedSession() : null;
+        if (cached) {
+          options.onSessionLoaded?.(cached);
+          resolve(cached);
+        } else {
+          reject(error);
+        }
+      },
+    );
+  });
 }
 
 export function onCloudAuthChange(callback: (event: AuthChangeEvent, session: Session | null) => void) {

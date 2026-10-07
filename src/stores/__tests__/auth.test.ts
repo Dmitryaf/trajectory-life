@@ -22,6 +22,8 @@ vi.mock('@/services/cloudSync', () => ({
   clearLocalCloudSession: cloud.clearLocalSession,
   deleteCloudAccount: cloud.deleteAccount,
   getStartupCloudSession: cloud.getStartupSession,
+  getCachedCloudSession: vi.fn(() => null),
+  invalidateCachedCloudSession: vi.fn(),
   isSignupConfigured: vi.fn(() => true),
   isCloudAuthRequired: cloud.authRequired,
   isCloudSyncConfigured: cloud.configured,
