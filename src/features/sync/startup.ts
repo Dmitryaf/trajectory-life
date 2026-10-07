@@ -62,7 +62,7 @@ async function reconcileCloudSnapshot(store: AppStore, userId: string | null | u
       return;
     }
     meta = services.getMeta(userId);
-    const snapshot = await services.loadSnapshot(scope);
+    const snapshot = await loadStartupSnapshot(services, scope);
     scope.assertCurrent();
     if (reconciliationDeferred(store)) {
       return;
@@ -131,6 +131,23 @@ async function reconcileCloudSnapshot(store: AppStore, userId: string | null | u
     });
   } catch (error) {
     reportReconciliationFailure(store, scope, meta, error);
+  }
+}
+
+async function loadStartupSnapshot(services: StartupSyncServices, scope: CloudOperationScope) {
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+    throw new Error('Нет соединения с сетью');
+  }
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      services.loadSnapshot(scope),
+      new Promise<never>((_, reject) => {
+        timeoutId = setTimeout(() => reject(new Error('Не удалось проверить облако за 5 секунд')), 5_000);
+      }),
+    ]);
+  } finally {
+    clearTimeout(timeoutId);
   }
 }
 
