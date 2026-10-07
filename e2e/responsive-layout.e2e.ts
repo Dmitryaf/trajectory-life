@@ -675,6 +675,7 @@ test('keeps the document position within its scroll range while paging the chang
     await page.goto('/trends');
 
     const history = page.locator('.history-timeline--featured');
+    const list = history.locator('.history-timeline__list');
     const pagination = history.locator('.archive-pagination');
     const pageLabel = pagination.locator('span');
     await expect(pagination).toBeVisible();
@@ -692,23 +693,28 @@ test('keeps the document position within its scroll range while paging the chang
     const next = pagination.getByRole('button', { name: 'Дальше' });
     await next.click();
     await expect(pageLabel).toHaveText(/^2 из \d+$/);
-    await page.waitForTimeout(550);
+    await expect.poll(() => list.evaluate((element) => element.style.height)).toBe('');
     const afterNext = await page.evaluate(() => ({
       top: window.scrollY,
       maximum: Math.max(0, document.documentElement.scrollHeight - window.innerHeight),
     }));
     expect(beforeNext, 'The shorter page must exercise the browser scroll boundary').toBeGreaterThan(afterNext.maximum);
-    expect(afterNext.top).toBeCloseTo(Math.min(beforeNext, afterNext.maximum), 0);
+    expect(afterNext.top).toBeGreaterThanOrEqual(0);
+    expect(afterNext.top).toBeLessThanOrEqual(afterNext.maximum);
+    // Releasing a fractional list height can settle the scroll position by one CSS pixel.
+    expect(Math.abs(afterNext.top - Math.min(beforeNext, afterNext.maximum))).toBeLessThanOrEqual(1);
 
     const beforePrevious = await placePaginationInViewport();
     await pagination.getByRole('button', { name: 'Назад' }).click();
     await expect(pageLabel).toHaveText(/^1 из \d+$/);
-    await page.waitForTimeout(550);
+    await expect.poll(() => list.evaluate((element) => element.style.height)).toBe('');
     const afterPrevious = await page.evaluate(() => ({
       top: window.scrollY,
       maximum: Math.max(0, document.documentElement.scrollHeight - window.innerHeight),
     }));
-    expect(afterPrevious.top).toBeCloseTo(Math.min(beforePrevious, afterPrevious.maximum), 0);
+    expect(afterPrevious.top).toBeGreaterThanOrEqual(0);
+    expect(afterPrevious.top).toBeLessThanOrEqual(afterPrevious.maximum);
+    expect(Math.abs(afterPrevious.top - Math.min(beforePrevious, afterPrevious.maximum))).toBeLessThanOrEqual(1);
   }
 });
 
