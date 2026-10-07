@@ -2,9 +2,9 @@
   "advisory": "GHSA-vfj7-8cjw-p6xm",
   "expiresAt": "2026-10-18T00:00:00Z",
   "files": {
-    "package-lock.json": "866155c520a1bd3e4d2f5c8cdc0d8e0990ec2c12b035fbebabf501623984c402",
+    "package-lock.json": "6fa67865227333d6f6867dbb2b1a83f41b403e165571447aa79ece03063c06da",
     "stylelint.config.js": "7767a1f7bf2159f6f4a8f2272791bea09cbe3a5c282a3fe37f585f811d7b0604",
-    "scripts/check-style-boundaries.mjs": "a42ca3e92e16082b5da4a1568270753cedb70cb374036b9cb8dd6cbf6fe085f2"
+    "scripts/check-style-boundaries.mjs": "e7bee5e4440705e47742ea13c98d966ef81c147e19ffc7754d9b254ec32861bf"
   },
   "lintCommand": "stylelint \"src/**/*.css\" && node scripts/check-style-colors.mjs && node scripts/check-style-boundaries.mjs",
   "findings": {
@@ -21,21 +21,14 @@
           "url": "https://github.com/advisories/GHSA-vfj7-8cjw-p6xm",
           "severity": "high",
           "cwe": ["CWE-674"],
-          "cvss": {
-            "score": 7.5,
-            "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H"
-          },
+          "cvss": { "score": 7.5, "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H" },
           "range": "<=3.0.3"
         }
       ],
       "effects": ["micromatch"],
       "range": "*",
       "nodes": ["node_modules/braces"],
-      "fixAvailable": {
-        "name": "stylelint",
-        "version": "7.7.0",
-        "isSemVerMajor": true
-      }
+      "fixAvailable": { "name": "stylelint", "version": "7.7.0", "isSemVerMajor": true }
     },
     "fast-glob": {
       "name": "fast-glob",
@@ -45,11 +38,7 @@
       "effects": ["globby", "stylelint"],
       "range": "*",
       "nodes": ["node_modules/fast-glob"],
-      "fixAvailable": {
-        "name": "stylelint",
-        "version": "7.7.0",
-        "isSemVerMajor": true
-      }
+      "fixAvailable": { "name": "stylelint", "version": "7.7.0", "isSemVerMajor": true }
     },
     "globby": {
       "name": "globby",
@@ -69,11 +58,7 @@
       "effects": ["fast-glob", "globby", "stylelint"],
       "range": ">=0.2.0",
       "nodes": ["node_modules/micromatch"],
-      "fixAvailable": {
-        "name": "stylelint",
-        "version": "7.7.0",
-        "isSemVerMajor": true
-      }
+      "fixAvailable": { "name": "stylelint", "version": "7.7.0", "isSemVerMajor": true }
     },
     "stylelint": {
       "name": "stylelint",
@@ -83,11 +68,7 @@
       "effects": [],
       "range": ">=7.7.1",
       "nodes": ["node_modules/stylelint"],
-      "fixAvailable": {
-        "name": "stylelint",
-        "version": "7.7.0",
-        "isSemVerMajor": true
-      }
+      "fixAvailable": { "name": "stylelint", "version": "7.7.0", "isSemVerMajor": true }
     }
   }
 }

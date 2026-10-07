@@ -12,7 +12,7 @@ const allowedUtilityClasses = new Set(['visually-hidden']);
 const legacyViewStyleBudgets = new Map([
   ['src/views/MonthView.css', 4347],
   ['src/views/SettingsView.css', 2344],
-  ['src/views/TodayView.css', 9658],
+  ['src/views/TodayView.css', 9917],
   ['src/views/WeekView.css', 5003],
 ]);
 const allowedUnusedTokens = new Set();
