@@ -5,6 +5,8 @@ import {
   clearCloudSyncMeta,
   clearLocalCloudSession,
   deleteCloudAccount,
+  getCachedCloudSession,
+  invalidateCachedCloudSession,
   getStartupCloudSession,
   isSignupConfigured,
   isCloudAuthRequired,
@@ -119,6 +121,7 @@ export const useAuthStore = defineStore('auth', {
     authRequired: isCloudAuthRequired(),
     signupEnabled: isSignupConfigured(),
     initialized: false,
+    sessionRevision: 0,
     operation: null as AuthOperation | null,
     session: null as Session | null,
     recoveryRequired: false,
@@ -137,6 +140,7 @@ export const useAuthStore = defineStore('auth', {
       if (this.initialized || this.loading) {
         return;
       }
+      const revision = this.sessionRevision;
       this.operation = 'initializing';
       this.error = '';
       try {
@@ -147,8 +151,32 @@ export const useAuthStore = defineStore('auth', {
 
         this.recoveryRequired = hasPasswordRecoveryRedirect();
         persistPasswordRecovery(this.recoveryRequired);
+        const cachedToken = getCachedCloudSession()?.access_token;
+        let rejectedToken: string | undefined;
+        let sdkStartupPending = true;
+        const startupTokens = new Set([cachedToken]);
         unsubscribeAuth?.();
         const listener = onCloudAuthChange((event, session) => {
+          // SDK startup events describe storage, not a verified sign-in.
+          if (event === 'INITIAL_SESSION') {
+            sdkStartupPending = false;
+            return;
+          }
+          if (
+            sdkStartupPending &&
+            this.sessionRevision === revision &&
+            (event === 'SIGNED_IN' || (event === 'TOKEN_REFRESHED' && !this.initialized))
+          ) {
+            startupTokens.add(session?.access_token);
+            return;
+          }
+          if (session?.access_token && session.access_token === rejectedToken) {
+            return;
+          }
+          if (event === 'SIGNED_IN' && startupTokens.has(session?.access_token)) {
+            return;
+          }
+          this.sessionRevision += 1;
           this.session = session;
           if (event === 'PASSWORD_RECOVERY') {
             this.recoveryRequired = true;
@@ -156,17 +184,39 @@ export const useAuthStore = defineStore('auth', {
           }
         });
         unsubscribeAuth = () => listener.data.subscription.unsubscribe();
-        this.session = await getStartupCloudSession();
+        const session = await getStartupCloudSession({
+          onAuthRejected: (error, candidate) => {
+            if (this.sessionRevision !== revision) {
+              return;
+            }
+            rejectedToken = candidate?.access_token ?? cachedToken;
+            invalidateCachedCloudSession(candidate);
+            if (!this.initialized || this.session?.access_token !== candidate?.access_token) {
+              return;
+            }
+            this.sessionRevision += 1;
+            this.session = null;
+            this.error = error instanceof Error ? error.message : 'Не удалось проверить вход';
+          },
+        });
+        if (this.sessionRevision === revision) {
+          this.session = session;
+        }
         this.initialized = true;
       } catch (error) {
-        this.session = null;
-        this.error = error instanceof Error ? error.message : 'Не удалось проверить вход';
+        if (this.sessionRevision === revision) {
+          this.session = null;
+          this.error = error instanceof Error ? error.message : 'Не удалось проверить вход';
+        }
         this.initialized = true;
       } finally {
-        this.operation = null;
+        if (this.operation === 'initializing') {
+          this.operation = null;
+        }
       }
     },
     async signIn(email: string, password: string) {
+      this.sessionRevision += 1;
       this.operation = 'signing-in';
       this.error = '';
       this.notice = '';
@@ -180,6 +230,7 @@ export const useAuthStore = defineStore('auth', {
       }
     },
     async signUp(email: string, password: string) {
+      this.sessionRevision += 1;
       this.operation = 'signing-up';
       this.error = '';
       try {
@@ -230,6 +281,7 @@ export const useAuthStore = defineStore('auth', {
       }
     },
     async completePasswordRecovery(password: string) {
+      this.sessionRevision += 1;
       if (!this.recoveryRequired || !this.session) {
         throw new Error('Ссылка восстановления недействительна');
       }
@@ -254,6 +306,7 @@ export const useAuthStore = defineStore('auth', {
       }
     },
     async cancelPasswordRecovery() {
+      this.sessionRevision += 1;
       this.operation = 'canceling-password-recovery';
       this.error = '';
       try {
@@ -271,6 +324,7 @@ export const useAuthStore = defineStore('auth', {
       }
     },
     async deleteAccount() {
+      this.sessionRevision += 1;
       const userId = this.session?.user.id;
       if (!userId) {
         throw new Error('Сессия не найдена');
@@ -297,6 +351,7 @@ export const useAuthStore = defineStore('auth', {
       }
     },
     async signOut() {
+      this.sessionRevision += 1;
       this.operation = 'signing-out';
       this.error = '';
       try {
