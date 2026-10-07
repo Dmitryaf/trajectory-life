@@ -2,7 +2,7 @@
   "advisory": "GHSA-vfj7-8cjw-p6xm",
   "expiresAt": "2026-10-18T00:00:00Z",
   "files": {
-    "package-lock.json": "ab9f8fd0d7759f4b692e39e14bb20999ac84e6dad248b00adbebbe8e2b1ac77c",
+    "package-lock.json": "866155c520a1bd3e4d2f5c8cdc0d8e0990ec2c12b035fbebabf501623984c402",
     "stylelint.config.js": "7767a1f7bf2159f6f4a8f2272791bea09cbe3a5c282a3fe37f585f811d7b0604",
     "scripts/check-style-boundaries.mjs": "e834ed90a67f42c54e71c7a8bc7fecaf715d25dcd47bd0ea7d1038d8bf18b613"
   },
