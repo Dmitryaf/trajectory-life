@@ -3,10 +3,11 @@
 import { flushPromises, mount } from '@vue/test-utils';
 import { createPinia, setActivePinia } from 'pinia';
 import { createMemoryHistory, createRouter } from 'vue-router';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import ProductShell from '@/features/app-shell/ui/ProductShell.vue';
 import { useAppStore } from '@/stores/app';
 import { useAuthStore } from '@/stores/auth';
+import { getCloudSyncMeta, saveCloudSyncMeta, type CloudSnapshot } from '@/services/cloudSync';
 
 const sync = vi.hoisted(() => ({
   prepareLocalCacheOwner: vi.fn(),
@@ -180,4 +181,115 @@ describe('application startup', () => {
     expect(cloud.subscribe).toHaveBeenLastCalledWith('user-2', expect.any(Function));
     wrapper.unmount();
   });
+});
+
+describe('bounded startup cloud reconciliation', () => {
+  let startup: typeof import('@/features/sync/startup');
+
+  beforeEach(async () => {
+    startup = await vi.importActual<typeof import('@/features/sync/startup')>('@/features/sync/startup');
+    setActivePinia(createPinia());
+    const auth = useAuthStore();
+    auth.session = { user: { id: 'user-1' } } as typeof auth.session;
+    window.localStorage.clear();
+    saveCloudSyncMeta('user-1', {
+      lastCloudRevision: 7,
+      lastCloudUpdatedAt: '2026-10-05T10:00:00.000Z',
+      lastSyncedAt: '2026-10-05T10:01:00.000Z',
+    });
+    vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.useRealTimers();
+    window.localStorage.clear();
+  });
+
+  function createReconciliation() {
+    const store = useAppStore();
+    const importLocalData = vi.spyOn(store, 'importLocalData').mockResolvedValue(undefined);
+    const syncCloudSnapshot = vi
+      .spyOn(store, 'syncCloudSnapshot')
+      .mockResolvedValue({ status: 'synced', updatedAt: '2026-10-07T10:00:00.000Z' });
+    const setCloudSyncState = vi.spyOn(store, 'setCloudSyncState');
+    const services = {
+      loadSnapshot: vi.fn<() => Promise<CloudSnapshot | null>>().mockResolvedValue(null),
+      loadBase: vi.fn().mockResolvedValue(null),
+      getMeta: getCloudSyncMeta,
+      markConflict: vi.fn(),
+      markSynced: vi.fn(),
+    };
+    return { store, services, importLocalData, syncCloudSnapshot, setCloudSyncState };
+  }
+
+  it.each([false, true])('keeps persisted pending/conflict metadata unchanged while offline (conflict=%s)', async (conflict) => {
+    vi.spyOn(window.navigator, 'onLine', 'get').mockReturnValue(false);
+    saveCloudSyncMeta('user-1', { pending: true, conflict });
+    const metaBefore = getCloudSyncMeta('user-1');
+    const { store, services, importLocalData, syncCloudSnapshot, setCloudSyncState } = createReconciliation();
+    store.settings.activeFocusTitle = 'Локальная цель';
+    const localBefore = { ...store.exportData(), exportedAt: '' };
+
+    await startup.reconcileCloudSnapshotOnStartup(store, 'user-1', services);
+
+    expect(services.loadSnapshot).not.toHaveBeenCalled();
+    expect(services.loadBase).not.toHaveBeenCalled();
+    expect(importLocalData).not.toHaveBeenCalled();
+    expect(syncCloudSnapshot).not.toHaveBeenCalled();
+    expect(services.markConflict).not.toHaveBeenCalled();
+    expect(services.markSynced).not.toHaveBeenCalled();
+    expect(getCloudSyncMeta('user-1')).toEqual(metaBefore);
+    expect({ ...store.exportData(), exportedAt: '' }).toEqual(localBefore);
+    expect(setCloudSyncState).toHaveBeenCalledWith(conflict ? 'conflict' : 'pending', expect.any(String), {
+      error: 'Нет соединения с сетью',
+    });
+  });
+
+  it.each(['reconcileCloudSnapshotOnStartup', 'reconcileCloudSnapshotAfterResume'] as const)(
+    'finishes a stalled %s after five seconds and ignores its late snapshot',
+    async (reconcile) => {
+      vi.spyOn(window.navigator, 'onLine', 'get').mockReturnValue(true);
+      vi.useFakeTimers();
+      const { store, services, importLocalData, syncCloudSnapshot, setCloudSyncState } = createReconciliation();
+      const metaBefore = getCloudSyncMeta('user-1');
+      const localBefore = { ...store.exportData(), exportedAt: '' };
+      let finish!: (snapshot: CloudSnapshot) => void;
+      services.loadSnapshot.mockImplementation(
+        () =>
+          new Promise<CloudSnapshot>((resolve) => {
+            finish = resolve;
+          }),
+      );
+      const finished = vi.fn();
+      const reconciliation = startup[reconcile](store, 'user-1', services).then(finished);
+
+      await vi.advanceTimersByTimeAsync(4_999);
+      expect(finished).not.toHaveBeenCalled();
+      await vi.advanceTimersByTimeAsync(1);
+      await reconciliation;
+
+      expect(finished).toHaveBeenCalledOnce();
+      expect(setCloudSyncState).toHaveBeenCalledWith('pending', expect.any(String), {
+        error: 'Не удалось проверить облако за 5 секунд',
+      });
+      expect(vi.getTimerCount()).toBe(0);
+      finish({
+        userId: 'user-1',
+        revision: 8,
+        updatedAt: '2026-10-07T10:00:00.000Z',
+        payload: { ...localBefore, settings: { ...store.settings, activeFocusTitle: 'Поздняя облачная цель' } },
+      });
+      await vi.advanceTimersByTimeAsync(0);
+
+      expect(importLocalData).not.toHaveBeenCalled();
+      expect(syncCloudSnapshot).not.toHaveBeenCalled();
+      expect(services.loadBase).not.toHaveBeenCalled();
+      expect(services.markConflict).not.toHaveBeenCalled();
+      expect(services.markSynced).not.toHaveBeenCalled();
+      expect(setCloudSyncState).toHaveBeenCalledOnce();
+      expect(getCloudSyncMeta('user-1')).toEqual(metaBefore);
+      expect({ ...store.exportData(), exportedAt: '' }).toEqual(localBefore);
+    },
+  );
 });
