@@ -6,7 +6,6 @@ import { notifyError, notifySaved } from '@/services/notifications';
 import DialogCloseButton from '@/shared/ui/overlays/DialogCloseButton.vue';
 import DialogSurface from '@/shared/ui/overlays/DialogSurface.vue';
 import UtilityTriggerButton from '@/shared/ui/actions/UtilityTriggerButton.vue';
-import EyebrowText from '@/shared/ui/typography/EyebrowText.vue';
 import FormFieldLabel from '@/shared/ui/forms/FormFieldLabel.vue';
 import { useBodyScrollLock } from '@/shared/ui/overlays/useBodyScrollLock';
 import { useDialogBackdropClose } from '@/shared/ui/overlays/useDialogBackdropClose';
@@ -63,7 +62,14 @@ async function submit() {
 </script>
 
 <template>
-  <UtilityTriggerButton class="beta-feedback-link" icon="event" aria-label="Обратная связь" aria-haspopup="dialog" @click="open">
+  <UtilityTriggerButton
+    class="feedback-trigger"
+    icon="feedback"
+    aria-label="Обратная связь"
+    title="Обратная связь"
+    aria-haspopup="dialog"
+    @click="open"
+  >
     Обратная связь
   </UtilityTriggerButton>
 
@@ -83,16 +89,15 @@ async function submit() {
     >
       <div class="dialog-heading feedback-dialog__heading">
         <div>
-          <EyebrowText>Закрытая бета</EyebrowText>
           <h2 id="feedback-title">Написать разработчику</h2>
         </div>
         <DialogCloseButton label="Закрыть форму" :disabled="isSending" @click="close" />
       </div>
 
       <form @submit.prevent="submit">
-        <FormFieldLabel for="beta-feedback-message">Предложение, проблема или ошибка</FormFieldLabel>
+        <FormFieldLabel for="feedback-message">Предложение, проблема или ошибка</FormFieldLabel>
         <textarea
-          id="beta-feedback-message"
+          id="feedback-message"
           ref="messageInput"
           v-model="message"
           rows="7"

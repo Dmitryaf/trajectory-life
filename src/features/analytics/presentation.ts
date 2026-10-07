@@ -27,10 +27,10 @@ export function weekSummaryText(summary: PeriodSummary, activeAreas: LifeAreaId[
     );
   }
   if (summary.averageSleep !== null) {
-    parts.push(`средний сон ${formatMinutes(Math.round(summary.averageSleep))}`);
+    parts.push(`средний сон ${formatMinutes(Math.round(summary.averageSleep))} (измерений: ${summary.sleepSamples})`);
   }
   if (summary.averageTimeInBed !== null && summary.averageSleep !== null && summary.averageTimeInBed - summary.averageSleep >= 45) {
-    parts.push(`в кровати ${formatMinutes(Math.round(summary.averageTimeInBed))}`);
+    parts.push(`в кровати ${formatMinutes(Math.round(summary.averageTimeInBed))} (измерений: ${summary.timeInBedSamples})`);
   }
   let text = `За неделю: ${parts.join(', ')}.`;
   if (present.length) {

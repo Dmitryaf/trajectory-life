@@ -1,5 +1,6 @@
 .range-tabs {
   display: flex;
+  flex-wrap: wrap;
   min-width: 0;
   gap: 8px;
   margin: -8px 0 18px;
@@ -7,6 +8,9 @@
 
 .range-tabs :deep(button),
 .range-tabs :deep(a) {
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
   display: inline-flex;
   align-items: center;
   justify-content: center;

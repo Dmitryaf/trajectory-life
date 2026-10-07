@@ -48,6 +48,7 @@ export const Scale: Story = {
       const value = ref<number | null>(3);
       return { value };
     },
-    template: '<div style="max-width: 420px"><ScalePicker v-model="value" low-label="нет сил" high-label="много сил" /></div>',
+    template:
+      '<div style="max-width: 420px"><ScalePicker v-model="value" label="Энергия" low-label="нет сил" high-label="много сил" /></div>',
   }),
 };

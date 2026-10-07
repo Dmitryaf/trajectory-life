@@ -1,10 +1,19 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { assertGate, browserJobs, isTrustedRun, proofLifetimeMs, validateProof } from './policy.mjs';
+import { assertGate, browserJobs, isTrustedRun, proofLifetimeMs, validateFreshReports, validateProof } from './policy.mjs';
 import { findProof } from './github.mjs';
 
 const repository = 'owner/project';
-const identity = { tree: 'tree-a', imageVersion: 'image-a', node: 'v22', playwright: '1.61.1' };
+const identity = {
+  schema: 1,
+  tree: 'tree-a',
+  image: 'ubuntu24',
+  imageVersion: 'image-a',
+  node: 'v22',
+  playwright: '1.61.1',
+  workers: 1,
+  shards: 2,
+};
 const run = {
   id: 12,
   run_attempt: 1,
@@ -20,6 +29,45 @@ const reports = browserJobs.map((job) => ({ job, identity, status: 'passed', pas
 const proof = { schema: 1, runId: run.id, runAttempt: 1, sha: run.head_sha, reports };
 const jobs = browserJobs.map((name) => ({ name, conclusion: 'success' }));
 const validResults = { prepare: { result: 'success' }, quality: { result: 'success' }, browsers: { result: 'success' } };
+
+test('fresh shards may use different runner image versions without rewriting their evidence', () => {
+  const copy = structuredClone(reports);
+  copy[0].identity.imageVersion = 'image-b';
+  const original = structuredClone(copy);
+  assert.doesNotThrow(() => validateFreshReports(copy, identity));
+  assert.deepEqual(copy, original);
+  assert.throws(() => validateProof({ ...proof, reports: copy }, run, jobs, identity, repository));
+});
+
+for (const key of ['tree', 'node', 'playwright', 'image', 'workers', 'shards', 'schema']) {
+  test(`fresh shards still reject a different ${key}`, () => {
+    const copy = structuredClone(reports);
+    copy[0].identity[key] = 'other';
+    assert.throws(() => validateFreshReports(copy, identity));
+  });
+}
+
+for (const imageVersion of [undefined, '', ' ', 123]) {
+  test(`fresh shards reject missing or invalid runner image versions: ${String(imageVersion)}`, () => {
+    const copy = structuredClone(reports);
+    copy[0].identity.imageVersion = imageVersion;
+    assert.throws(() => validateFreshReports(copy, identity));
+  });
+}
+
+for (const patch of [{ failed: 1 }, { flaky: 1 }, { interrupted: 1 }, { passed: 0 }, { status: 'failed' }]) {
+  test(`fresh shards reject unsuccessful evidence: ${JSON.stringify(patch)}`, () => {
+    const copy = structuredClone(reports);
+    Object.assign(copy[0], patch);
+    assert.throws(() => validateFreshReports(copy, identity));
+  });
+}
+
+test('fresh evidence requires exactly all six distinct shards', () => {
+  assert.throws(() => validateFreshReports(reports.slice(1), identity));
+  assert.throws(() => validateFreshReports([...reports, reports[0]], identity));
+  assert.throws(() => validateFreshReports([reports[1], ...reports.slice(1)], identity));
+});
 
 test('accepts all six clean shards for the identical source and runner', () => {
   assert.doesNotThrow(() => validateProof(proof, run, jobs, identity, repository));

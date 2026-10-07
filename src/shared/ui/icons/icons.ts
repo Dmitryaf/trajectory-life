@@ -11,6 +11,7 @@ export type UiIconName =
   | 'download'
   | 'edit'
   | 'event'
+  | 'feedback'
   | 'goal'
   | 'help'
   | 'history'

@@ -284,14 +284,14 @@ describe('analytics', () => {
     expect(prompt).toContain('подробности: Показал сценарий двум пользователям и записал вопросы');
     expect(prompt).toContain('Наблюдаемый результат цели: Показать работающий сценарий трём людям.');
     expect(prompt).toContain('Цель нужно пересмотреть 2026-07-31.');
-    expect(prompt).toContain('если данных меньше трёх сопоставимых наблюдений, прямо назови это малым количеством данных');
+    expect(prompt).toContain('минимум четыре сопоставимых наблюдения в каждой группе');
     expect(prompt).toContain('не утверждай, что одно вызвало другое');
     expect(prompt).toContain('факт — конкретная сохранённая запись');
     expect(prompt).toContain('наблюдение — осторожное описание');
     expect(prompt).toContain('гипотеза — возможное объяснение');
     expect(prompt).toContain('проверка — небольшой способ');
     expect(prompt).toContain('вывод пользователя — только явно сохранённый');
-    expect(prompt).toContain('точными датами и числом наблюдений');
+    expect(prompt).toContain('доступными датами или периодами и числом наблюдений в каждой группе');
     expect(prompt).toContain('не давай обязательный совет только ради заполнения формата');
     expect(prompt).not.toContain('Данные JSON');
     expect(prompt).not.toContain('custom:context:rain');
@@ -315,7 +315,7 @@ describe('analytics', () => {
     expect(prompt).toContain('Не называй действие результатом, если ответ извне не записан.');
   });
 
-  it('names a sample below three observations as insufficient for a conclusion', () => {
+  it('keeps a small descriptive sample separate from a supported comparison', () => {
     const payload = buildAiReportPayload('week', '2026-07-16', {
       entries: [entry('2026-07-13', { energy: 2 }), entry('2026-07-14', { energy: 4 })],
       results: [],
@@ -327,7 +327,7 @@ describe('analytics', () => {
 
     const prompt = buildAiReportPrompt(payload, defaultSettings);
     expect(prompt).toContain('Энергия: 3 / 5 (2 измерения).');
-    expect(prompt).toContain('если данных меньше трёх сопоставимых наблюдений, прямо назови это малым количеством данных');
+    expect(prompt).toContain('если в любой из сравниваемых групп меньше четырёх наблюдений');
     expect(prompt).toContain('пропуск не считай нулём');
   });
 

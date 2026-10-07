@@ -79,7 +79,7 @@ function appendSleepCues(cues: ReviewCue[], entries: DailyEntry[], summary: Peri
       tone: 'warning',
     });
   } else if (summary.averageSleep !== null) {
-    cues.push({ id: 'sleep-baseline', title: 'Сон за период', text: sleepContextText(summary), tone: 'neutral' });
+    cues.push({ id: 'sleep-baseline', title: 'Сон за период', text: sleepContextText(summary, entries), tone: 'neutral' });
   }
   const timingVariation = Math.max(summary.bedtimeVariationMinutes ?? 0, summary.wakeTimeVariationMinutes ?? 0);
   if (summary.sleepTimingSamples >= 4 && timingVariation >= 90) {
@@ -266,10 +266,20 @@ function limitCues(cues: ReviewCue[], requiredIds: string[]): ReviewCue[] {
   return selected.sort((a, b) => cues.indexOf(a) - cues.indexOf(b));
 }
 
-function sleepContextText(summary: PeriodSummary): string {
-  const sleep = summary.averageSleep === null ? '—' : formatMinutes(Math.round(summary.averageSleep));
-  const inBed = summary.averageTimeInBed === null ? '' : `, в кровати ${formatMinutes(Math.round(summary.averageTimeInBed))}`;
-  const efficiency = summary.averageSleepEfficiency === null ? '' : `, доля сна около ${Math.round(summary.averageSleepEfficiency)}%`;
+function sleepContextText(summary: PeriodSummary, entries: DailyEntry[]): string {
+  const sleep =
+    summary.averageSleep === null ? '—' : `${formatMinutes(Math.round(summary.averageSleep))} (измерений: ${summary.sleepSamples})`;
+  const inBed =
+    summary.averageTimeInBed === null
+      ? ''
+      : `, в кровати ${formatMinutes(Math.round(summary.averageTimeInBed))} (измерений: ${summary.timeInBedSamples})`;
+  const pairedSamples = entries.filter(
+    (entry) => entry.specialDay === null && entry.sleepMinutes !== null && entry.timeInBedMinutes !== null && entry.timeInBedMinutes > 0,
+  ).length;
+  const efficiency =
+    summary.averageSleepEfficiency === null
+      ? ''
+      : `, доля сна около ${Math.round(summary.averageSleepEfficiency)}% (пар измерений: ${pairedSamples})`;
   return `Средний сон за период: ${sleep}${inBed}${efficiency}. Длительность сна и время в кровати показаны отдельно.`;
 }
 

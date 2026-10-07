@@ -19,7 +19,7 @@ import UiIcon from '@/shared/ui/icons/UiIcon.vue';
   justify-content: space-between;
   align-items: center;
   gap: 12px;
-  margin: -4px 0 14px;
+  margin: 16px 0 14px;
   padding: 10px 12px;
   border: 1px solid var(--daily-layout-border);
   border-radius: 14px;
