@@ -99,7 +99,10 @@ jobs:
         timeout-minutes: 1
         env:
           ENGINE: ${{ matrix.project == 'chromium' && 'chromium' || 'webkit' }}
-        run: node --input-type=module -e "import { verifyBrowserContainer } from './scripts/ci/runtime.mjs'; await verifyBrowserContainer();"
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          git rev-parse 'HEAD^{tree}'
+          node --input-type=module -e "import { verifyBrowserContainer } from './scripts/ci/runtime.mjs'; await verifyBrowserContainer();"
       - name: Run browser shard
         env:
           PROJECT: ${{ matrix.project }}
