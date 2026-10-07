@@ -1,11 +1,20 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { assertGate, browserJobs, isTrustedRun, proofLifetimeMs, validateFreshReports, validateProof } from './policy.mjs';
+import {
+  assertGate,
+  browserContainerImage,
+  browserJobs,
+  isTrustedRun,
+  proofLifetimeMs,
+  validateFreshReports,
+  validateProof,
+} from './policy.mjs';
 import { findProof } from './github.mjs';
 
 const repository = 'owner/project';
 const identity = {
-  schema: 1,
+  schema: 2,
+  browserContainer: browserContainerImage,
   tree: 'tree-a',
   image: 'ubuntu24',
   imageVersion: 'image-a',
@@ -39,7 +48,7 @@ test('fresh shards may use different runner image versions without rewriting the
   assert.throws(() => validateProof({ ...proof, reports: copy }, run, jobs, identity, repository));
 });
 
-for (const key of ['tree', 'node', 'playwright', 'image', 'workers', 'shards', 'schema']) {
+for (const key of ['tree', 'node', 'playwright', 'image', 'workers', 'shards', 'schema', 'browserContainer']) {
   test(`fresh shards still reject a different ${key}`, () => {
     const copy = structuredClone(reports);
     copy[0].identity[key] = 'other';
@@ -208,4 +217,26 @@ test('selects a complete original run and ignores the current run', async () => 
     assert.equal(id, run.id);
   });
   assert.equal(result.runId, run.id);
+});
+
+for (const container of [
+  undefined,
+  '',
+  'mcr.microsoft.com/playwright:v1.61.1-noble',
+  'mcr.microsoft.com/playwright@sha256:' + '0'.repeat(64),
+]) {
+  test(`fresh and reused evidence reject missing or different container: ${String(container)}`, () => {
+    const copy = structuredClone(reports);
+    copy[0].identity.browserContainer = container;
+    assert.throws(() => validateFreshReports(copy, identity));
+    assert.throws(() => validateProof({ ...proof, reports: copy }, run, jobs, identity, repository));
+  });
+}
+test('a legacy context cannot authorize a legacy host-only browser proof', () => {
+  const legacy = structuredClone(identity);
+  legacy.schema = 1;
+  delete legacy.browserContainer;
+  const oldReports = browserJobs.map((job) => ({ ...reports[0], job, identity: legacy }));
+  assert.throws(() => validateFreshReports(oldReports, legacy));
+  assert.throws(() => validateProof({ ...proof, reports: oldReports }, run, jobs, legacy, repository));
 });

@@ -12,7 +12,7 @@ import {
   environmentPullArgs,
   releaseTargets,
 } from './release-policy.mjs';
-import { assetSignature, smokePublic } from './smoke.mjs';
+import { assertPublishedBackend, assetSignature, publishedJavaScript, smokePublic } from './smoke.mjs';
 import {
   appendCutoverOverrides,
   assertBackendAlignment,
@@ -129,15 +129,9 @@ async function candidateSmoke(candidate) {
   record.progressStage = 'candidate-public-smoke';
   const signature = await smokePublic(origin);
   record.progressStage = 'candidate-js-asset-read';
-  let contents = '';
-  for (const asset of signature.filter((entry) => entry.path.endsWith('.js'))) {
-    const response = await fetch(new URL(asset.path, origin), { redirect: 'error', signal: AbortSignal.timeout(20_000) });
-    assert.equal(response.status, 200);
-    contents += await response.text();
-  }
+  const contents = await publishedJavaScript(origin, signature);
   record.progressStage = 'candidate-js-backend-check';
-  assert.ok(contents.includes(targetUrl) && contents.includes(key), 'Published client must contain the exact target URL and public key');
-  assert.ok(!contents.includes(hostedUrl), 'Published client must not retain the Hosted production backend');
+  assertPublishedBackend(contents, targetUrl, key, hostedUrl);
   return signature;
 }
 

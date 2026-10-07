@@ -48,7 +48,9 @@ describe('public landing', () => {
     await flushPromises();
 
     expect(wrapper.get('h1').text()).toBe('Политика данных');
-    expect(wrapper.findAll('h2')).toHaveLength(5);
+    expect(wrapper.findAll('h2')).toHaveLength(6);
+    expect(wrapper.text()).toContain('Статистика использования');
+    expect(wrapper.text()).toContain('старше 90 дней');
     expect(wrapper.find('details').exists()).toBe(false);
     expect(wrapper.find('.app-shell').exists()).toBe(false);
     expect(wrapper.text()).toContain('Администратор приложения и компании');
