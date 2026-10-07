@@ -5,47 +5,39 @@ import UiIcon from '@/shared/ui/icons/UiIcon.vue';
 </script>
 
 <template>
-  <div class="daily-layout-settings">
-    <span>Хотите добавить или убрать разделы?</span>
-    <ActionButton :as="RouterLink" variant="secondary" class="context-action" to="/settings#daily-blocks">
-      Настроить главную <UiIcon name="arrow-right" />
-    </ActionButton>
-  </div>
+  <ActionButton :as="RouterLink" variant="secondary" class="daily-layout-settings" to="/settings#daily-blocks">
+    Настроить главную <UiIcon name="arrow-right" />
+  </ActionButton>
 </template>
 
 <style scoped>
 .daily-layout-settings {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
-  margin: 16px 0 14px;
-  padding: 10px 12px;
-  border: 1px solid var(--daily-layout-border);
-  border-radius: 14px;
-  background: var(--daily-layout-surface);
-  color: var(--daily-layout-text);
-  font-size: 12px;
-}
-.context-action {
+  grid-column: 2;
+  grid-row: 2;
   flex: 0 0 auto;
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
-  min-height: 40px;
-  padding: 9px 13px;
+  min-height: 44px;
+  padding: 9px 10px;
   border-radius: 12px;
   box-shadow: none;
   font-size: 13px;
   line-height: 1.2;
 }
-.context-action :deep(.ui-icon) {
+.daily-layout-settings :deep(.ui-icon) {
   font-size: 16px;
 }
 @media (max-width: 720px) {
   .daily-layout-settings {
-    margin-right: 2px;
-    margin-left: 2px;
+    grid-row: 1;
+  }
+}
+@media (max-width: 359px) {
+  .daily-layout-settings {
+    grid-column: 1;
+    grid-row: 2;
   }
 }
 </style>

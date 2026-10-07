@@ -62,17 +62,20 @@ describe('deployment configuration', () => {
     expect(playwrightConfig).toContain("trace: isCI ? 'retain-on-failure' : 'off'");
   });
 
-  it('bounds browser installation without consuming the ten-minute test budget', () => {
+  it('uses a pinned baked browser image without weakening the ten-minute test budget', () => {
     const browserJob = ciWorkflow.split('  browsers:')[1]?.split('  test-and-build:')[0];
-    expect(browserJob).toMatch(/timeout-minutes: 18\s+strategy:/);
-    expect(browserJob).toMatch(/name: Use official HTTPS Ubuntu mirrors\s+timeout-minutes: 1/);
-    expect(browserJob).toMatch(/name: Install selected browser\s+timeout-minutes: 5/);
-    expect(browserJob).toContain('run: npx playwright install --with-deps "$ENGINE"');
-    expect(browserJob).toContain('cmp -s - /etc/apt/apt-mirrors.txt');
-    expect(browserJob).toContain('test ! -L /etc/apt/apt-mirrors.txt');
+    expect(browserJob).toContain('timeout-minutes: 18');
     expect(browserJob).toContain(
-      "printf 'https://archive.ubuntu.com/ubuntu/\\tpriority:1\\nhttps://security.ubuntu.com/ubuntu/\\tpriority:2\\n'",
+      'image: mcr.microsoft.com/playwright@sha256:cf0daee9b994042e011bc29f20cdff1a9f682a039b43fcd738f7d8a9d3bcd9d6',
     );
+    expect(browserJob).toContain('options: --init --ipc=host --env ImageOS --env ImageVersion');
+    expect(browserJob).toMatch(/defaults:\s+run:\s+shell: bash/);
+    expect(browserJob).toMatch(/name: Verify baked browser environment\s+timeout-minutes: 1/);
+    expect(browserJob).toContain('await verifyBrowserContainer()');
+    expect(browserJob).toContain('node-version-file: .nvmrc');
+    expect(browserJob).toContain('run: npm ci');
+    expect(browserJob).not.toContain('apt');
+    expect(browserJob).not.toContain('playwright install');
     expect(playwrightConfig).toContain('globalTimeout: isCI ? 10 * 60_000 : undefined');
   });
 

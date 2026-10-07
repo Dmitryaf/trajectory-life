@@ -40,7 +40,6 @@ const features = [
           <p class="landing-kicker">Траектория</p>
           <h1 id="landing-title">Дневник дел, событий и самочувствия</h1>
           <p class="landing-hero__lead">Сохраняйте важное за день и возвращайтесь к нему в обзорах недели и месяца.</p>
-          <p class="landing-hero__boundary">Можно записать одну мысль, пропустить день или заполнить только нужные поля.</p>
           <div class="landing-actions">
             <ActionButton as="a" variant="primary" href="#product">Посмотреть примеры</ActionButton
             ><RouterLink v-if="signupAvailable" :to="signUpLocation">Создать аккаунт</RouterLink
