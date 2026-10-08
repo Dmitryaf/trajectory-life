@@ -5,6 +5,12 @@ import { resolve } from 'node:path';
 import { promoteVerified } from './release-policy.mjs';
 import {
   assertTelemetryEnvironment,
+  assertSignupEnvironment,
+  assertOwnerInventory,
+  signupFlag,
+  readableSignupFlag,
+  changeSignupFlag,
+  signupKey,
   assertTelemetryTransition,
   changeTelemetryFlag,
   flagEvidence,
@@ -103,7 +109,7 @@ test('all four raw/effective VPS rows, auth and signup remain exact', () => {
   for (const change of [
     { SUPABASE_URL: ' ' + url },
     { SUPABASE_ANON_KEY: 'sb_publishable_other' },
-    { VITE_ENABLE_SIGNUP: 'true' },
+    { VITE_ENABLE_SIGNUP: 'other' },
     { VITE_REQUIRE_AUTH: 'false' },
   ]) {
     assert.throws(() => assertTelemetryEnvironment({ ...environment, ...change }, rows, previous, previous.id));
@@ -158,7 +164,13 @@ for (const target of [['production'], ['preview'], ['development'], []]) {
       const before = { ...environment, VERCEL_OIDC_TOKEN: 'synthetic-generated-before' };
       const after = { ...before, VITE_PRODUCT_TELEMETRY_ENABLED: 'true', VERCEL_OIDC_TOKEN: 'synthetic-generated-after' };
       assert.throws(() => assertTelemetryTransition(before, after, beforeRows, afterRows, 'true'));
-      assertTelemetryTransition(before, { ...after, VERCEL_OIDC_TOKEN: before.VERCEL_OIDC_TOKEN }, beforeRows, afterRows, 'true');
+      if (side === 'both') {
+        assertTelemetryTransition(before, { ...after, VERCEL_OIDC_TOKEN: before.VERCEL_OIDC_TOKEN }, beforeRows, afterRows, 'true');
+      } else {
+        assert.throws(() =>
+          assertTelemetryTransition(before, { ...after, VERCEL_OIDC_TOKEN: before.VERCEL_OIDC_TOKEN }, beforeRows, afterRows, 'true'),
+        );
+      } // Full owner inventories may no longer add/remove rows.
     });
   }
 }
@@ -298,7 +310,7 @@ test('workflow keeps push-CI publication and manual main-only shared concurrency
   assert.ok(workflow.includes('inputs.sha == github.sha'));
   assert.ok(workflow.includes("github.event.workflow_run.head_branch || 'main'"));
   assert.ok(workflow.includes('ref: ${{ github.event.workflow_run.head_sha }}'));
-  assert.ok(workflow.includes('options: [inspect, enable, disable]'));
+  assert.ok(workflow.includes('options: [inspect, enable, disable, signup-enable, signup-disable]'));
 });
 
 test('emergency disable changes true to false without backend enable attestations', async () => {
@@ -391,3 +403,271 @@ test('runner suppresses private assertion/provider error details', () => {
   );
   assert.ok(!runner.includes('console.error(error)'));
 });
+
+const signup = { ...flag, id: 'signup-id', key: signupKey };
+const enabledTelemetry = { ...flag, value: 'true' };
+const signupRows = [
+  ...rows,
+  enabledTelemetry,
+  signup,
+  { id: 'private-id', key: 'PRIVATE_SERVER_CONFIG', value: '[SENSITIVE]', type: 'encrypted', target: ['production'], updatedAt: 1 },
+];
+const signupEnvironment = { ...environment, VITE_PRODUCT_TELEMETRY_ENABLED: 'true' };
+for (const mode of ['signup-enable', 'signup-disable']) {
+  test(mode + ' requires Root signup acceptance and fresh backup bindings', () => {
+    const input = {
+      ...baseInput,
+      mode,
+      signup_backend_accepted: true,
+      post_open_backup_accepted: true,
+      backend_receipt_sha256: 'c'.repeat(64),
+      backup_receipt_sha256: 'd'.repeat(64),
+    };
+    assert.equal(dispatch(input).telemetry.mode, mode);
+    for (const field of ['signup_backend_accepted', 'post_open_backup_accepted', 'backend_receipt_sha256', 'backup_receipt_sha256']) {
+      assert.throws(() => dispatch({ ...input, [field]: '' }));
+    }
+  });
+}
+test('signup existing dedicated readable owner and effective telemetry true are mandatory', async () => {
+  assert.equal(signupFlag(signupRows).id, signup.id);
+  assertSignupEnvironment(signupEnvironment, signupRows, previous, previous.id);
+  for (const change of [
+    { target: ['production', 'preview'] },
+    { gitBranch: 'main' },
+    { configurationId: 'integration' },
+    { system: true },
+    { customEnvironmentIds: ['custom'] },
+    { visibility: 'secret' },
+    { updatedAt: undefined },
+    { value: '[SENSITIVE]' },
+  ]) {
+    assert.throws(() => signupFlag([{ ...signup, ...change }]));
+  }
+  assert.throws(() => signupFlag([]));
+  assert.throws(() => signupFlag([signup, signup]));
+  assert.throws(() =>
+    assertSignupEnvironment({ ...signupEnvironment, VITE_PRODUCT_TELEMETRY_ENABLED: 'false' }, signupRows, previous, previous.id),
+  );
+  assert.throws(() =>
+    assertSignupEnvironment(
+      signupEnvironment,
+      signupRows.map((r) => (r.id === flag.id ? { ...r, value: 'false' } : r)),
+      previous,
+      previous.id,
+    ),
+  );
+  const listed = { ...signup, type: 'encrypted', value: 'ciphertext' };
+  assert.deepEqual(
+    await readableSignupFlag([listed], async () => ({
+      ...listed,
+      decrypted: true,
+      value: 'false',
+      system: false,
+      configurationId: null,
+      customEnvironmentIds: [],
+    })),
+    { ...listed, value: 'false', decrypted: true },
+  );
+});
+test('signup transition preserves telemetry/every other effective value and complete owner inventory', () => {
+  const after = { ...signupEnvironment, VITE_ENABLE_SIGNUP: 'true', VERCEL_OIDC_TOKEN: 'new-generated' };
+  const before = { ...signupEnvironment, VERCEL_OIDC_TOKEN: 'old-generated' };
+  const updated = signupRows.map((r) => (r.id === signup.id ? { ...r, value: 'true', updatedAt: 2 } : r));
+  assertTelemetryTransition(before, after, signupRows, updated, 'true', signupKey);
+  for (const changed of [
+    { ...after, VITE_PRODUCT_TELEMETRY_ENABLED: 'false' },
+    { ...after, PRIVATE_SERVER_CONFIG: 'other' },
+  ]) {
+    assert.throws(() => assertTelemetryTransition(before, changed, signupRows, updated, 'true', signupKey));
+  }
+  for (const changed of [
+    updated.filter((r) => r.id !== 'private-id'),
+    [...updated, { ...signupRows[3], id: 'new-private' }],
+    updated.map((r) => (r.id === 'private-id' ? { ...r, updatedAt: 2 } : r)),
+    updated.map((r) => (r.id === 'private-id' ? { ...r, value: 'new-ciphertext' } : r)),
+  ]) {
+    assert.throws(() => assertTelemetryTransition(before, after, signupRows, changed, 'true', signupKey));
+  }
+  const ownerOidc = { id: 'oidc', key: 'VERCEL_OIDC_TOKEN', value: '[SENSITIVE]', target: ['preview'] };
+  assert.throws(() => assertTelemetryTransition(before, after, [...signupRows, ownerOidc], [...updated, ownerOidc], 'true', signupKey));
+  assert.throws(() => assertTelemetryTransition(before, { ...after, VERCEL_OIDC_TOKEN: '' }, signupRows, updated, 'true', signupKey));
+});
+test('telemetry emergency disable remains valid while signup is true and preserves it', async () => {
+  const env = { ...signupEnvironment, VITE_ENABLE_SIGNUP: 'true' };
+  const own = signupRows.map((r) => (r.id === signup.id ? { ...r, value: 'true' } : r));
+  assertTelemetryEnvironment(env, own, previous, previous.id);
+  let row = { ...enabledTelemetry };
+  await changeTelemetryFlag(
+    row,
+    'false',
+    {
+      assertCurrent: async () => {},
+      assertPreviousAlias: async () => {},
+      readFlag: async () => row,
+      update: async (id, value) => (row = { ...row, value, updatedAt: 2 }),
+      save: async () => {},
+    },
+    async () =>
+      assertTelemetryTransition(
+        env,
+        { ...env, VITE_PRODUCT_TELEMETRY_ENABLED: 'false' },
+        own,
+        own.map((r) => (r.id === flag.id ? row : r)),
+        'false',
+      ),
+    {},
+  );
+  assert.equal(row.value, 'false');
+  assert.throws(() =>
+    assertTelemetryTransition(env, { ...env, VITE_ENABLE_SIGNUP: 'false', VITE_PRODUCT_TELEMETRY_ENABLED: 'false' }, own, own, 'false'),
+  );
+});
+function signupFlow(failure) {
+  let row = { ...signup },
+    writes = 0,
+    alias = previous.id;
+  const record = {};
+  const inventory = () => signupRows.map((r) => (r.id === signup.id ? row : r));
+  const actions = {
+    assertCurrent: async () => assertOwnerInventory(signupRows, inventory(), signupKey),
+    assertPreviousAlias: async () => assert.equal(alias, previous.id),
+    readFlag: async () => ({ ...row }),
+    update: async (id, value) => {
+      assert.equal(id, signup.id);
+      writes++;
+      row = { ...row, value, updatedAt: row.updatedAt + 1 };
+      if (failure === 'ambiguous' && writes === 1) {
+        throw Error('lost');
+      }
+      return { ...row };
+    },
+    save: async () => {},
+  };
+  const release = async (after) => {
+    assertTelemetryTransition(
+      signupEnvironment,
+      { ...signupEnvironment, VITE_ENABLE_SIGNUP: 'true' },
+      signupRows,
+      inventory(),
+      'true',
+      signupKey,
+    );
+    if (failure === 'foreign-owner') {
+      row = { ...row, updatedAt: 99 };
+      throw Error('foreign');
+    }
+    if (failure === 'candidate') {
+      throw Error('candidate');
+    }
+    if (failure === 'signup-drift-before-promotion') {
+      row = { ...row, value: 'false', updatedAt: 99 };
+      assertOwnerInventory(signupRows, inventory(), signupKey, after);
+    }
+    if (failure === 'foreign-alias') {
+      alias = 'dpl_foreign';
+      throw Error('foreign');
+    }
+    record.status = 'promoted-and-verified';
+  };
+  return { run: () => changeSignupFlag(signup, 'true', actions, release, record), record, state: () => ({ row, writes }) };
+}
+for (const failure of [undefined, 'candidate', 'ambiguous', 'foreign-owner', 'signup-drift-before-promotion', 'foreign-alias']) {
+  test('real selected signup row flow ' + (failure || 'success'), async () => {
+    const h = signupFlow(failure);
+    if (failure) {
+      await assert.rejects(h.run());
+    } else {
+      await h.run();
+    }
+    assert.equal(h.state().writes, failure === 'candidate' ? 2 : 1);
+    assert.equal(h.state().row.key, signupKey);
+    if (failure === 'candidate') {
+      assert.equal(h.record.signupCompensation, 'previous-value-restored-and-verified');
+    }
+    if (failure && failure !== 'candidate') {
+      assert.equal(h.record.signupCompensation, 'refused-or-ambiguous-operator-reinspection-required');
+    }
+    if (!failure) {
+      assert.equal(h.record.status, 'promoted-and-verified');
+    }
+  });
+}
+test('runner binds signup metadata/receipt and full inventory again before candidate promotion', () => {
+  const runner = readFileSync(resolve(process.cwd(), 'scripts/ci/deploy.mjs'), 'utf8');
+  assert.ok(runner.includes('candidate.meta?.signupEnabled'));
+  assert.ok(runner.includes('assertOwnerInventory(baseline.rows, current.rows, operation.key, expectedFlag)'));
+  assert.ok(runner.includes('operation.signup ? changeSignupFlag : changeTelemetryFlag'));
+});
+
+for (const foreign of [false, true]) {
+  test('signup actual promoteVerified compensation ' + (foreign ? 'refuses foreign alias' : 'restores VPS alias then signup'), async () => {
+    const old = { ...previous, projectId: 'project', readyState: 'READY' };
+    const candidate = {
+      id: 'dpl_candidate',
+      url: 'candidate.vercel.app',
+      projectId: 'project',
+      readyState: 'READY',
+      meta: { sourceSha: sha, backendUrl: url, signupEnabled: 'true', telemetryEnabled: 'true' },
+    };
+    let alias = old,
+      row = { ...signup };
+    const calls = [];
+    const record = {};
+    const actions = {
+      assertCurrent: async () => {},
+      assertPreviousAlias: async () => assert.equal(alias.id, old.id),
+      readFlag: async () => row,
+      update: async (id, value) => {
+        assert.equal(id, signup.id);
+        calls.push('signup:' + value);
+        return (row = { ...row, value, updatedAt: row.updatedAt + 1 });
+      },
+      save: async () => {},
+    };
+    await assert.rejects(
+      changeSignupFlag(
+        signup,
+        'true',
+        actions,
+        (after) =>
+          promoteVerified(
+            { candidate, previous: old, sha, projectId: 'project' },
+            {
+              smoke: async () => {},
+              assertCurrent: async () =>
+                assertOwnerInventory(
+                  signupRows,
+                  signupRows.map((r) => (r.id === signup.id ? row : r)),
+                  signupKey,
+                  after,
+                ),
+              inspectAlias: async () => alias,
+              promote: async (d) => {
+                calls.push('alias:' + d.id);
+                alias = d;
+              },
+              verifyAlias: async (d) => {
+                if (d.id === candidate.id) {
+                  if (foreign) {
+                    alias = { ...old, id: 'dpl_foreign' };
+                  }
+                  throw Error('verify');
+                }
+                assert.equal(alias.id, old.id);
+              },
+            },
+          ),
+        record,
+      ),
+    );
+    assert.deepEqual(
+      calls,
+      foreign ? ['signup:true', 'alias:dpl_candidate'] : ['signup:true', 'alias:dpl_candidate', 'alias:dpl_previous', 'signup:false'],
+    );
+    assert.equal(
+      record.signupCompensation,
+      foreign ? 'refused-or-ambiguous-operator-reinspection-required' : 'previous-value-restored-and-verified',
+    );
+  });
+}
