@@ -147,27 +147,59 @@ for (const width of [1440, 390]) {
     }
     await mountExperience();
     const host = page.locator('#telemetry-experience-test');
-    await expect(host.getByRole('heading', { name: 'Помочь улучшать Траекторию?' })).toBeVisible();
+    const dialog = page.getByRole('dialog', { name: 'Помочь улучшать Траекторию?' });
+    await expect(dialog).toBeVisible();
+    const originalDialog = await dialog.elementHandle();
+    await expect(dialog).toHaveAttribute('aria-modal', 'true');
+    await expect(dialog).not.toContainText('Если выбрать «Не сейчас»');
+    await expect(dialog).not.toContainText('Без сети сбор на этом устройстве');
+    expect(await dialog.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
+    await expect(page.locator('body')).toHaveCSS('overflow', 'hidden');
+    const close = dialog.getByRole('button', { name: 'Не сейчас', exact: true }).first();
+    await expect(close).toBeFocused();
+    await page.keyboard.press('Shift+Tab');
+    await expect(dialog.locator('summary')).toBeFocused();
+    await page.keyboard.press('Tab');
+    await expect(close).toBeFocused();
+    await page.evaluate(async () => {
+      const path = '/src/stores/app.ts';
+      const { useAppStore } = await import(path);
+      useAppStore().cloudSyncStatus = 'syncing';
+    });
+    await expect(dialog).toBeVisible();
+    expect(await originalDialog!.evaluate((element) => element === document.querySelector('[role="dialog"][aria-modal="true"]'))).toBe(
+      true,
+    );
+    await page.evaluate(async () => {
+      const path = '/src/stores/app.ts';
+      const { useAppStore } = await import(path);
+      useAppStore().cloudSyncStatus = 'synced';
+    });
+    await expect(dialog).toBeVisible();
+    expect(await originalDialog!.evaluate((element) => element === document.querySelector('[role="dialog"][aria-modal="true"]'))).toBe(
+      true,
+    );
     expect(operations).not.toContain('grant');
     expect(operations).not.toContain('ingest');
-    const allow = host.getByRole('button', { name: 'Разрешить', exact: true });
-    const later = host.getByRole('button', { name: 'Не сейчас', exact: true });
+    const allow = dialog.getByRole('button', { name: 'Разрешить', exact: true });
+    const later = dialog.locator('.consent-experience__actions').getByRole('button', { name: 'Не сейчас', exact: true });
     expect((await allow.boundingBox())!.height).toBe((await later.boundingBox())!.height);
     await later.focus();
     await page.keyboard.press('Enter');
     await expect(page.locator('#next-heading')).toBeFocused();
+    await expect(page.locator('body')).not.toHaveCSS('overflow', 'hidden');
     await expect.poll(() => decision).toBe('snoozed');
     await expectSettledDecision('snoozed');
     await mountExperience();
-    await expect(host.locator('.consent-experience')).toHaveCount(0);
+    await expect(dialog).toHaveCount(0);
     await expectSettledDecision('snoozed');
     now += 8 * 86_400_000;
     await mountExperience('ConsentExperience', true);
-    await expect(host).toContainText('последнее автоматическое предложение');
+    await expect(dialog).toContainText('последнее автоматическое предложение');
     expect(operations.filter((op) => op === 'reminder')).toHaveLength(1);
     offline = true;
-    await host.getByRole('button', { name: 'Не предлагать' }).click();
-    await expect(host.locator('.consent-experience')).toHaveCount(0);
+    await dialog.getByRole('button', { name: 'Не предлагать' }).click();
+    await expect(dialog).toHaveCount(0);
     await mountExperience('TelemetryConsent');
     const toggle = host.getByRole('switch');
     await expect(toggle).toHaveAttribute('aria-checked', 'false');
@@ -179,7 +211,7 @@ for (const width of [1440, 390]) {
     await expect.poll(() => decision).toBe('declined');
     await expect(toggle).toBeEnabled();
     await mountExperience('ConsentExperience', true);
-    await expect(host.locator('.consent-experience')).toHaveCount(0);
+    await expect(dialog).toHaveCount(0);
     expect(operations.filter((op) => op === 'reminder')).toHaveLength(1);
     expect(await host.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
   });
