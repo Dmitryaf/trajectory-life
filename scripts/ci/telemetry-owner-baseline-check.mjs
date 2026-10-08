@@ -18,6 +18,7 @@ import {
   signupKey,
   inventoryHash,
   operate,
+  stableEffectiveHash,
   pins,
 } from './telemetry-owner-baseline.mjs';
 
@@ -498,7 +499,7 @@ test('fresh CAS diagnostics expose only valid changed key names and never relax 
       const x = structuredClone(before);
       if (++count === 2) {
         if (scenario === 'effective') {
-          x.environment.VERCEL_OIDC_TOKEN = 'private-token-after';
+          x.environment.PRIVATE_CONFIG = 'private-token-after';
         }
         if (scenario === 'backend') {
           x.environment.SUPABASE_URL = 'private-backend-after';
@@ -518,7 +519,7 @@ test('fresh CAS diagnostics expose only valid changed key names and never relax 
     assert.equal(a.calls.post, 0);
     assert.equal(r.ownerRepresentationEqual, scenario !== 'inventory');
     assert.equal(r.effectiveRepresentationEqual, scenario === 'inventory');
-    const expectedKeys = { effective: ['VERCEL_OIDC_TOKEN'], backend: ['SUPABASE_URL'], inventory: [], 'invalid-key': [] };
+    const expectedKeys = { effective: ['PRIVATE_CONFIG'], backend: ['SUPABASE_URL'], inventory: [], 'invalid-key': [] };
     assert.deepEqual(r.changedEffectiveKeyNames, expectedKeys[scenario]);
     assert.equal(r.changedInvalidEffectiveKeyCount, scenario === 'invalid-key' ? 1 : 0);
     assert.equal(r.freshDiagnostics.fourBackendDiagnostic.length, 4);
@@ -533,4 +534,85 @@ test('fresh CAS diagnostics expose only valid changed key names and never relax 
       assert.ok(!serialized.includes(secret));
     }
   }
+});
+
+test('provider-generated OIDC value rotation preserves strict key presence and permits inspect/bootstrap', async () => {
+  const before = fixture();
+  before.environment.VERCEL_OIDC_TOKEN = 'opaque-before';
+  for (const mode of ['inspect', 'bootstrap-false']) {
+    const a = actions(before);
+    const original = a.snapshot;
+    let n = 0;
+    a.snapshot = async () => {
+      const x = await original();
+      x.environment.VERCEL_OIDC_TOKEN = 'opaque-rotation-' + ++n;
+      return x;
+    };
+    const r = await operate(mode, a, { mode: 'inspect', sourceSha: sha, sourceBranch: pins.branch, sourceRunId: '122' });
+    assert.equal(r.status, mode === 'inspect' ? 'owner-baseline-inspected' : 'production-false-flag-bootstrapped-no-deployment');
+    assert.equal(a.calls.post, mode === 'inspect' ? 0 : 1);
+    assert.equal(r.effectiveRepresentationEqual, false);
+    assert.equal(r.stableEffectiveRepresentationEqual, true);
+    assert.deepEqual(r.excludedEffectiveValueKeys, ['VERCEL_OIDC_TOKEN']);
+    assert.equal(r.stableEffectiveRepresentationSha256, stableEffectiveHash(before.environment, before.rows));
+    if (mode === 'inspect') {
+      assertPriorProof(r, { ...env, absence_inspection_run: '122' }, before);
+    }
+    assert.ok(!JSON.stringify(a.calls.saved).includes('opaque-rotation'));
+    assert.ok(!JSON.stringify(a.calls.saved).includes('opaque-before'));
+  }
+});
+
+test('OIDC exclusion refuses any owner row, key presence change and unrelated value drift before POST', async () => {
+  for (const kind of ['owner-row', 'removed', 'added', 'other-key']) {
+    const before = fixture();
+    before.environment.VERCEL_OIDC_TOKEN = 'opaque-token';
+    if (kind === 'owner-row') {
+      before.rows.push({
+        id: 'oidc-owner',
+        key: 'VERCEL_OIDC_TOKEN',
+        type: 'plain',
+        target: ['preview'],
+        value: 'owner-controlled',
+        updatedAt: 1,
+      });
+    }
+    if (kind === 'added') {
+      delete before.environment.VERCEL_OIDC_TOKEN;
+    }
+    const a = actions(before);
+    const original = a.snapshot;
+    let n = 0;
+    a.snapshot = async () => {
+      const x = await original();
+      if (++n === 2) {
+        if (kind === 'removed') {
+          delete x.environment.VERCEL_OIDC_TOKEN;
+        }
+        if (kind === 'added') {
+          x.environment.VERCEL_OIDC_TOKEN = 'new-opaque-token';
+        }
+        if (kind === 'other-key') {
+          x.environment.PRIVATE_CONFIG = 'unrelated-drift';
+        }
+      }
+      return x;
+    };
+    const r = await operate('bootstrap-false', a, {});
+    assert.equal(r.status, 'failed-stopped-no-deployment');
+    assert.equal(a.calls.post, 0);
+  }
+});
+
+test('post-create comparison excludes only unowned OIDC value, preserving keyset and every other value', () => {
+  const x = fixture();
+  const before = { ...x.environment, VERCEL_OIDC_TOKEN: 'first' };
+  const after = { ...before, [flagKey]: 'false', VERCEL_OIDC_TOKEN: 'second' };
+  assertEffectiveAddition(before, after, flagKey, x.rows, [...x.rows, flag()]);
+  const owner = [...x.rows, { id: 'owner-oidc', key: 'VERCEL_OIDC_TOKEN', type: 'plain', value: 'first' }];
+  assert.throws(() => assertEffectiveAddition(before, after, flagKey, owner, owner));
+  const missing = { ...after };
+  delete missing.VERCEL_OIDC_TOKEN;
+  assert.throws(() => assertEffectiveAddition(before, missing, flagKey, x.rows, x.rows));
+  assert.throws(() => assertEffectiveAddition(before, { ...after, PRIVATE_CONFIG: 'different' }, flagKey, x.rows, x.rows));
 });
