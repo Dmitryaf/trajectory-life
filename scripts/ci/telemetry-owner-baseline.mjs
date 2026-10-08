@@ -338,6 +338,17 @@ export async function operate(mode, actions, record) {
     }
     await phase('fresh-current-source-and-mutators', actions.assertCurrent);
     const fresh = await phase('fresh-owner-cas', actions.snapshot);
+    const changedEffectiveKeys = [...new Set([...Object.keys(before.environment), ...Object.keys(fresh.environment)])].filter(
+      (key) => before.environment[key] !== fresh.environment[key],
+    );
+    Object.assign(record, {
+      freshDiagnostics: baselineDiagnostics(fresh),
+      ownerRepresentationEqual: inventoryHash(fresh.rows) === inventoryHash(before.rows),
+      effectiveRepresentationEqual: hashObject(fresh.environment) === hashObject(before.environment),
+      changedEffectiveKeyNames: changedEffectiveKeys.filter((key) => /^[A-Z_][A-Z0-9_]{0,127}$/.test(key)).sort(),
+      changedInvalidEffectiveKeyCount: changedEffectiveKeys.filter((key) => !/^[A-Z_][A-Z0-9_]{0,127}$/.test(key)).length,
+    });
+    await actions.save(record);
     assertBackend(backendRows(fresh), fresh.environment, fresh.canonical, fresh.custom);
     assert.equal(inventoryHash(fresh.rows), inventoryHash(before.rows));
     assert.equal(hashObject(fresh.environment), hashObject(before.environment));
