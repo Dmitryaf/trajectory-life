@@ -161,7 +161,8 @@
   line-height: 1.6;
 }
 .auth-mode button,
-.auth-mode a {
+.auth-mode a,
+.auth-policy-link {
   padding: 6px 0;
   border: 0;
   background: transparent;
@@ -172,7 +173,8 @@
   text-decoration: none;
 }
 .auth-mode button:hover,
-.auth-mode a:hover {
+.auth-mode a:hover,
+.auth-policy-link:hover {
   color: var(--accent-dark);
 }
 .auth-mode button:disabled {
