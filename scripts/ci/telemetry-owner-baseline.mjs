@@ -50,6 +50,18 @@ function canonical(value) {
   return value;
 }
 const hashObject = (value) => digest(JSON.stringify(canonical(value)));
+const generatedOidcKey = 'VERCEL_OIDC_TOKEN';
+
+export function stableEffectiveHash(environment, rows) {
+  inventoryHash(rows);
+  assert.ok(!rows.some((row) => row.key === generatedOidcKey), 'OWNER_OIDC_ROW_FORBIDS_GENERATED_TOKEN_EXCLUSION');
+  const stable = { ...environment };
+  if (Object.hasOwn(stable, generatedOidcKey)) {
+    assert.ok(typeof stable[generatedOidcKey] === 'string' && stable[generatedOidcKey].length > 0);
+    stable[generatedOidcKey] = '[provider-generated-opaque-token]';
+  }
+  return hashObject(stable);
+}
 
 export function inventoryHash(rows) {
   assert.ok(Array.isArray(rows) && rows.length <= 1000);
@@ -131,6 +143,13 @@ export function baselineDiagnostics(snapshot) {
     })),
     ownerInventoryRepresentationSha256: inventoryHash(snapshot.rows),
     effectiveRepresentationSha256: hashObject(snapshot.environment),
+    stableEffectiveRepresentationSha256: snapshot.rows.some((row) => row.key === generatedOidcKey)
+      ? null
+      : stableEffectiveHash(snapshot.environment, snapshot.rows),
+    excludedEffectiveValueKeys:
+      !snapshot.rows.some((row) => row.key === generatedOidcKey) && Object.hasOwn(snapshot.environment, generatedOidcKey)
+        ? [generatedOidcKey]
+        : [],
   };
 }
 
@@ -245,7 +264,7 @@ export function assertSingleAddition(before, after, created, key = flagKey) {
   assert.ok(!before.some((row) => row.id === created.id));
 }
 
-export function assertEffectiveAddition(before, after, selectedKey = flagKey) {
+export function assertEffectiveAddition(before, after, selectedKey = flagKey, beforeRows = [], afterRows = []) {
   checkedKey(selectedKey);
   assert.ok(before[selectedKey] === undefined || before[selectedKey] === 'false');
   assert.equal(after[selectedKey], 'false');
@@ -258,10 +277,12 @@ export function assertEffectiveAddition(before, after, selectedKey = flagKey) {
       .sort(),
   );
   for (const [key, value] of Object.entries(before)) {
-    if (key !== selectedKey) {
+    if (key !== selectedKey && key !== generatedOidcKey) {
       assert.equal(after[key], value);
     }
   }
+  const withoutSelected = (environment) => Object.fromEntries(Object.entries(environment).filter(([key]) => key !== selectedKey));
+  assert.equal(stableEffectiveHash(withoutSelected(before), beforeRows), stableEffectiveHash(withoutSelected(after), afterRows));
 }
 
 export function assertPriorProof(proof, env, snapshot, now = Date.now(), key = flagKey) {
@@ -278,7 +299,7 @@ export function assertPriorProof(proof, env, snapshot, now = Date.now(), key = f
   assert.equal(key === signupKey ? proof.signupAbsentAllScopes : proof.flagAbsentAllScopes, true);
   assert.deepEqual(key === signupKey ? proof.signupRows : proof.flagRows, []);
   assert.equal(proof.ownerInventoryRepresentationSha256, inventoryHash(snapshot.rows));
-  assert.equal(proof.effectiveRepresentationSha256, hashObject(snapshot.environment));
+  assert.equal(proof.stableEffectiveRepresentationSha256, stableEffectiveHash(snapshot.environment, snapshot.rows));
   const age = now - Date.parse(proof.checkedAtUtc);
   assert.ok(Number.isFinite(age) && age >= 0 && age <= 15 * 60_000);
 }
@@ -345,13 +366,15 @@ export async function operate(mode, actions, record) {
       freshDiagnostics: baselineDiagnostics(fresh),
       ownerRepresentationEqual: inventoryHash(fresh.rows) === inventoryHash(before.rows),
       effectiveRepresentationEqual: hashObject(fresh.environment) === hashObject(before.environment),
+      stableEffectiveRepresentationEqual:
+        stableEffectiveHash(fresh.environment, fresh.rows) === stableEffectiveHash(before.environment, before.rows),
       changedEffectiveKeyNames: changedEffectiveKeys.filter((key) => /^[A-Z_][A-Z0-9_]{0,127}$/.test(key)).sort(),
       changedInvalidEffectiveKeyCount: changedEffectiveKeys.filter((key) => !/^[A-Z_][A-Z0-9_]{0,127}$/.test(key)).length,
     });
     await actions.save(record);
     assertBackend(backendRows(fresh), fresh.environment, fresh.canonical, fresh.custom);
     assert.equal(inventoryHash(fresh.rows), inventoryHash(before.rows));
-    assert.equal(hashObject(fresh.environment), hashObject(before.environment));
+    assert.equal(stableEffectiveHash(fresh.environment, fresh.rows), stableEffectiveHash(before.environment, before.rows));
     if (mode === 'inspect') {
       record.status = 'owner-baseline-inspected';
     } else {
@@ -368,7 +391,7 @@ export async function operate(mode, actions, record) {
       assert.equal(matches.length, 1);
       const created = assertCreated(result, matches[0], selectedKey);
       assertSingleAddition(fresh.rows, after.rows, created, selectedKey);
-      assertEffectiveAddition(fresh.environment, after.environment, selectedKey);
+      assertEffectiveAddition(fresh.environment, after.environment, selectedKey, fresh.rows, after.rows);
       assertBackend(backendRows(after), after.environment, after.canonical, after.custom);
       await phase('final-current-source-and-mutators', actions.assertCurrent);
       record.creation = 'one-false-row-verified';
