@@ -5,7 +5,7 @@ on:
     inputs:
       mode:
         type: choice
-        options: [inspect, enable, disable]
+        options: [inspect, enable, disable, signup-enable, signup-disable]
         default: inspect
         required: true
       sha:
@@ -28,15 +28,19 @@ on:
         description: Root accepted post-opening ES256 telemetry, consent cleanup, CORS and retention
         type: boolean
         default: false
+      signup_backend_accepted:
+        description: Root accepted actual production backend signup and owned cleanup
+        type: boolean
+        default: false
       post_open_backup_accepted:
         description: Root accepted a fresh verified backup after public opening
         type: boolean
         default: false
       backend_receipt_sha256:
-        description: Root private backend acceptance receipt digest, required for enable
+        description: Root private backend acceptance receipt digest, required for enable and signup modes
         type: string
       backup_receipt_sha256:
-        description: Root private post-opening backup receipt digest, required for enable
+        description: Root private fresh backup receipt digest, required for enable and signup modes
         type: string
   workflow_run:
     workflows: [CI]

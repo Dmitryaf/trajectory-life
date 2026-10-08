@@ -4,11 +4,17 @@ import { readFileSync } from 'node:fs';
 import { parseEnv } from 'node:util';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { assertBackendAlignment, productionRows, readableProductionRows, sameRow } from './cutover-policy.mjs';
+import { assertBackendAlignment, readableProductionRows, sameRow } from './cutover-policy.mjs';
 import {
   assertTelemetryEnvironment,
   assertTelemetryTransition,
   changeTelemetryFlag,
+  changeSignupFlag,
+  flagEvidence,
+  assertSignupEnvironment,
+  assertOwnerInventory,
+  readableSignupFlag,
+  releaseOperation,
   customProductionAlias,
   readableTelemetryFlag,
   releaseSource,
@@ -42,6 +48,7 @@ async function main() {
   const tree = git('rev-parse', 'HEAD^{tree}');
   const source = releaseSource(event, process.env.GITHUB_EVENT_NAME, process.env.GITHUB_REF, git('rev-parse', 'HEAD'), tree);
   const telemetry = source.telemetry;
+  const operation = telemetry && releaseOperation(telemetry.mode);
   const api = githubClient();
   const sha = git('rev-parse', 'HEAD');
   const branch = source.head_branch;
@@ -109,7 +116,10 @@ async function main() {
     const rows = Array.isArray(result) ? result : result.envs;
     const readById = (id) => vercelApi(`v1/projects/${projectId}/env/${encodeURIComponent(id)}`);
     const readable = await readableProductionRows(rows, readById);
-    return { rows: readable, flag: await readableTelemetryFlag(rows, readById) };
+    const telemetryRow = await readableTelemetryFlag(rows, readById);
+    const selected = operation.signup ? await readableSignupFlag(rows, readById) : telemetryRow;
+    const replacements = new Map([telemetryRow, selected].map((row) => [row.id, row]));
+    return { rows: readable.map((row) => replacements.get(row.id) || row), flag: selected, telemetryFlag: telemetryRow };
   }
 
   await assertCurrent();
@@ -140,9 +150,7 @@ async function main() {
     await assertTelemetryAliases();
     const current = await readTelemetryRows();
     assert.ok(sameRow(current.flag, expectedFlag), 'Telemetry flag changed during candidate verification');
-    for (const { key, row } of productionRows(baseline.rows)) {
-      assert.ok(sameRow(row, productionRows(current.rows).find((entry) => entry.key === key).row), 'Backend owner row changed');
-    }
+    assertOwnerInventory(baseline.rows, current.rows, operation.key, expectedFlag);
   }
 
   async function publishCandidate() {
@@ -154,6 +162,8 @@ async function main() {
         `backendUrl=${clientEnvironment.VITE_SUPABASE_URL.trim()}`,
         '--meta',
         `telemetryEnabled=${clientEnvironment[telemetryKey] === 'true'}`,
+        '--meta',
+        `signupEnabled=${clientEnvironment.VITE_ENABLE_SIGNUP === 'true'}`,
       ],
       true,
     );
@@ -166,6 +176,11 @@ async function main() {
       String(clientEnvironment[telemetryKey] === 'true'),
       'Candidate telemetry metadata differs',
     );
+    assert.equal(
+      candidate.meta?.signupEnabled,
+      String(clientEnvironment.VITE_ENABLE_SIGNUP === 'true'),
+      'Candidate signup metadata differs',
+    );
     record ||= {};
     Object.assign(record, {
       sha,
@@ -175,6 +190,7 @@ async function main() {
       backendUrl: clientEnvironment.VITE_SUPABASE_URL.trim(),
       telemetryEnabled: clientEnvironment[telemetryKey] === 'true',
       frontendTelemetryEnabled: clientEnvironment[telemetryKey] ?? 'false',
+      signupEnabled: clientEnvironment.VITE_ENABLE_SIGNUP === 'true',
       previous: { id: previous.id, url: previous.url },
       candidate: { id: candidate.id, url: candidate.url },
       status: 'candidate',
@@ -212,6 +228,12 @@ async function main() {
         ]);
         assert.deepEqual(alias, unique, 'Canonical assets must match the verified deployment');
         if (telemetry) {
+          const currentOwner = await readTelemetryRows();
+          assertOwnerInventory(baseline.rows, currentOwner.rows, operation.key, expectedFlag);
+          assertTelemetryEnvironment(clientEnvironment, currentOwner.rows, previous, telemetry.previous_id);
+          if (operation.signup) {
+            assertSignupEnvironment(clientEnvironment, currentOwner.rows, previous, telemetry.previous_id);
+          }
           assert.equal((await inspect(customProductionAlias)).id, deployment.id, 'Custom alias must match the exact deployment');
           assert.deepEqual(await assetSignature(`https://${customProductionAlias}`), unique, 'Custom alias assets differ');
         }
@@ -240,9 +262,17 @@ async function main() {
     const custom = await assertTelemetryAliases();
     baseline = await readTelemetryRows();
     assertTelemetryEnvironment(clientEnvironment, baseline.rows, previous, telemetry.previous_id);
-    assert.equal(clientEnvironment[telemetryKey], baseline.flag.value, 'Effective telemetry flag differs from owner row');
-    record = telemetryInspection({ ...source, sha, tree }, previous, custom, clientEnvironment, baseline.flag, baseline.rows);
+    assert.equal(clientEnvironment[operation.key], baseline.flag.value, 'Effective selected flag differs from owner row');
+    if (operation.signup) {
+      assertSignupEnvironment(clientEnvironment, baseline.rows, previous, telemetry.previous_id);
+    }
+    record = telemetryInspection({ ...source, sha, tree }, previous, custom, clientEnvironment, baseline.telemetryFlag, baseline.rows);
     record.operation = telemetry.mode;
+    record.mutableFlagKey = operation.key;
+    if (operation.signup) {
+      record.signupBefore = flagEvidence(baseline.flag);
+    }
+    record.rootSignupBackendAccepted = telemetry.signup_backend_accepted === true || telemetry.signup_backend_accepted === 'true';
     record.rootBackendAccepted = telemetry.backend_accepted === true || telemetry.backend_accepted === 'true';
     record.rootPostOpenBackupAccepted = telemetry.post_open_backup_accepted === true || telemetry.post_open_backup_accepted === 'true';
     record.rootBackendReceiptSha256 = telemetry.backend_receipt_sha256 || null;
@@ -258,21 +288,27 @@ async function main() {
       const beforeEnvironment = clientEnvironment;
       const flagActions = {
         assertCurrent: assertTelemetryCurrent,
-        assertPreviousAlias: assertTelemetryAliases,
+        assertPreviousAlias: async () => {
+          await assertTelemetryAliases();
+          assertOwnerInventory(baseline.rows, (await readTelemetryRows()).rows, operation.key);
+        },
         readFlag: async () => (await readTelemetryRows()).flag,
         update: (id, value) => vercelApi(`v9/projects/${projectId}/env/${encodeURIComponent(id)}`, 'PATCH', { value }),
         save: async (value) => writeJson('qa/ci/deployment.json', value),
       };
-      await changeTelemetryFlag(
+      await (operation.signup ? changeSignupFlag : changeTelemetryFlag)(
         baseline.flag,
-        telemetry.mode === 'enable' ? 'true' : 'false',
+        operation.desired,
         flagActions,
         async (after) => {
           expectedFlag = after;
           clientEnvironment = pullEnvironment();
           const current = await readTelemetryRows();
-          assertTelemetryTransition(beforeEnvironment, clientEnvironment, baseline.rows, current.rows, after.value);
+          assertTelemetryTransition(beforeEnvironment, clientEnvironment, baseline.rows, current.rows, after.value, operation.key);
           assertTelemetryEnvironment(clientEnvironment, current.rows, previous, telemetry.previous_id);
+          if (operation.signup) {
+            assertSignupEnvironment(clientEnvironment, current.rows, previous, telemetry.previous_id);
+          }
           await assertTelemetryCurrent();
           await publishCandidate();
         },
