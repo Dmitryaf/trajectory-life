@@ -41,7 +41,7 @@ on:
       operator_mode:
         description: Temporary owner-baseline branch only (canonical mode must remain inspect)
         type: choice
-        options: [inspect, bootstrap-false]
+        options: [inspect, bootstrap-false, bootstrap-signup-false]
         default: inspect
         required: true
       absence_inspection_run:
@@ -118,7 +118,7 @@ jobs:
       github.event_name == 'workflow_dispatch' &&
       github.ref == 'refs/heads/codex/telemetry-owner-baseline-20261008' &&
       inputs.mode == 'inspect' &&
-      (inputs.operator_mode == 'inspect' || inputs.operator_mode == 'bootstrap-false')
+      (inputs.operator_mode == 'inspect' || inputs.operator_mode == 'bootstrap-false' || inputs.operator_mode == 'bootstrap-signup-false')
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     env:

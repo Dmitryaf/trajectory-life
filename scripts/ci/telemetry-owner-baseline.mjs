@@ -23,6 +23,16 @@ export const pins = Object.freeze({
   customAlias: 'trajectory-life.ru',
 });
 export const flagKey = 'VITE_PRODUCT_TELEMETRY_ENABLED';
+export const signupKey = 'VITE_ENABLE_SIGNUP';
+const operatorModes = ['inspect', 'bootstrap-false', 'bootstrap-signup-false'];
+function checkedKey(key) {
+  assert.ok([flagKey, signupKey].includes(key));
+  return key;
+}
+function bootstrapKey(mode) {
+  assert.ok(operatorModes.includes(mode) && mode !== 'inspect');
+  return mode === 'bootstrap-signup-false' ? signupKey : flagKey;
+}
 export const artifactName = 'telemetry-owner-baseline';
 const receiptFile = 'qa/ci/telemetry-owner-baseline.json';
 
@@ -55,9 +65,10 @@ export function inventoryHash(rows) {
   );
 }
 
-export function flagEvidence(rows) {
+export function flagEvidence(rows, key = flagKey) {
+  checkedKey(key);
   return rows
-    .filter((row) => row.key === flagKey)
+    .filter((row) => row.key === key)
     .map((row) => {
       const readable = row.type === 'plain' || row.decrypted === true;
       return {
@@ -89,6 +100,8 @@ export function baselineDiagnostics(snapshot) {
     typeof snapshot.environment.VITE_SUPABASE_ANON_KEY === 'string' ? digest(snapshot.environment.VITE_SUPABASE_ANON_KEY) : null;
   return {
     flagRows: flagEvidence(snapshot.flagRows),
+    signupRows: flagEvidence(snapshot.signupRows || snapshot.rows, signupKey),
+    signupAbsentAllScopes: !snapshot.rows.some((row) => row.key === signupKey),
     flagAbsentAllScopes: !snapshot.rows.some((row) => row.key === flagKey),
     effectiveFrontFlagKind: flagKind(snapshot.environment[flagKey]),
     effectiveServerFlagKind: flagKind(snapshot.environment.PRODUCT_TELEMETRY_ENABLED),
@@ -121,9 +134,10 @@ export function baselineDiagnostics(snapshot) {
   };
 }
 
-export function assertAbsent(rows) {
+export function assertAbsent(rows, key = flagKey) {
+  checkedKey(key);
   inventoryHash(rows);
-  assert.equal(rows.filter((row) => row.key === flagKey).length, 0, 'ALL_SCOPE_FLAG_ABSENCE_REQUIRED');
+  assert.equal(rows.filter((row) => row.key === key).length, 0, 'ALL_SCOPE_FLAG_ABSENCE_REQUIRED');
 }
 
 export function assertDispatch(event, env, head, branch) {
@@ -140,10 +154,10 @@ export function assertDispatch(event, env, head, branch) {
     assert.equal(input[name], expected);
   }
   assert.equal(input.mode, 'inspect');
-  assert.ok(['inspect', 'bootstrap-false'].includes(input.operator_mode));
+  assert.ok(operatorModes.includes(input.operator_mode));
   assert.match(env.GITHUB_RUN_ID || '', /^[1-9][0-9]*$/);
   assert.match(env.GITHUB_RUN_ATTEMPT || '', /^[1-9][0-9]*$/);
-  if (input.operator_mode === 'bootstrap-false') {
+  if (input.operator_mode !== 'inspect') {
     assert.match(input.absence_inspection_run || '', /^[1-9][0-9]*$/);
     assert.match(input.absence_receipt_sha256 || '', /^[a-f0-9]{64}$/);
     assert.notEqual(input.absence_inspection_run, env.GITHUB_RUN_ID);
@@ -182,17 +196,25 @@ export function assertBackend(rows, environment, canonicalDeployment, customDepl
     assert.equal(deployment.meta?.publicKeySha256, digest(environment.VITE_SUPABASE_ANON_KEY));
   }
   assert.equal(environment.VITE_REQUIRE_AUTH, 'true');
-  assert.equal(environment.VITE_ENABLE_SIGNUP, 'false');
+  assert.ok([undefined, 'false'].includes(environment.VITE_ENABLE_SIGNUP));
+  const signupRows = rows.filter((row) => row.key === signupKey && row.target?.includes('production'));
+  if (signupRows.length) {
+    assert.equal(signupRows.length, 1);
+    assert.equal(signupRows[0].value, 'false');
+    assert.equal(environment.VITE_ENABLE_SIGNUP, 'false');
+    assert.ok(signupRows[0].type === 'plain' || signupRows[0].decrypted === true);
+  }
   assert.ok([undefined, 'false'].includes(environment[flagKey]));
   assert.ok([undefined, 'false'].includes(environment.PRODUCT_TELEMETRY_ENABLED));
   return evidence;
 }
 
-export function assertCreated(result, observed) {
+export function assertCreated(result, observed, key = flagKey) {
+  checkedKey(key);
   assert.ok(result && Array.isArray(result.failed) && result.failed.length === 0 && result.created && !Array.isArray(result.created));
   const returned = result.created;
   for (const row of [returned, observed]) {
-    assert.ok(row && row.key === flagKey && row.type === 'plain' && row.value === 'false');
+    assert.ok(row && row.key === key && row.type === 'plain' && row.value === 'false');
     assert.deepEqual(row.target, ['production']);
     assert.ok(typeof row.id === 'string' && row.id && Number.isSafeInteger(row.updatedAt) && row.updatedAt >= 0);
     assert.ok([undefined, ''].includes(row.gitBranch) && [undefined, null, ''].includes(row.configurationId));
@@ -203,33 +225,36 @@ export function assertCreated(result, observed) {
   return observed;
 }
 
-export function assertSingleAddition(before, after, created) {
-  assertAbsent(before);
+export function assertSingleAddition(before, after, created, key = flagKey) {
+  checkedKey(key);
+  assertAbsent(before, key);
   assert.equal(after.length, before.length + 1);
-  assert.equal(after.filter((row) => row.key === flagKey).length, 1);
+  assert.equal(after.filter((row) => row.key === key).length, 1);
   assert.equal(inventoryHash(after.filter((row) => row.id !== created.id)), inventoryHash(before));
   assert.ok(!before.some((row) => row.id === created.id));
 }
 
-export function assertEffectiveAddition(before, after) {
-  assert.ok(before[flagKey] === undefined || before[flagKey] === 'false');
-  assert.equal(after[flagKey], 'false');
+export function assertEffectiveAddition(before, after, selectedKey = flagKey) {
+  checkedKey(selectedKey);
+  assert.ok(before[selectedKey] === undefined || before[selectedKey] === 'false');
+  assert.equal(after[selectedKey], 'false');
   assert.deepEqual(
     Object.keys(after)
-      .filter((key) => key !== flagKey)
+      .filter((key) => key !== selectedKey)
       .sort(),
     Object.keys(before)
-      .filter((key) => key !== flagKey)
+      .filter((key) => key !== selectedKey)
       .sort(),
   );
   for (const [key, value] of Object.entries(before)) {
-    if (key !== flagKey) {
+    if (key !== selectedKey) {
       assert.equal(after[key], value);
     }
   }
 }
 
-export function assertPriorProof(proof, env, snapshot, now = Date.now()) {
+export function assertPriorProof(proof, env, snapshot, now = Date.now(), key = flagKey) {
+  checkedKey(key);
   assert.equal(proof.status, 'owner-baseline-inspected');
   assert.equal(proof.mode, 'inspect');
   assert.equal(proof.sourceSha, env.GITHUB_SHA);
@@ -239,12 +264,17 @@ export function assertPriorProof(proof, env, snapshot, now = Date.now()) {
   assert.equal(proof.mainTree, pins.tree);
   assert.equal(proof.ciRun, pins.ciRun);
   assert.equal(proof.candidateId, pins.candidateId);
-  assert.equal(proof.flagAbsentAllScopes, true);
-  assert.deepEqual(proof.flagRows, []);
+  assert.equal(key === signupKey ? proof.signupAbsentAllScopes : proof.flagAbsentAllScopes, true);
+  assert.deepEqual(key === signupKey ? proof.signupRows : proof.flagRows, []);
   assert.equal(proof.ownerInventoryRepresentationSha256, inventoryHash(snapshot.rows));
   assert.equal(proof.effectiveRepresentationSha256, hashObject(snapshot.environment));
   const age = now - Date.parse(proof.checkedAtUtc);
   assert.ok(Number.isFinite(age) && age >= 0 && age <= 15 * 60_000);
+}
+
+function backendRows(snapshot) {
+  const signup = new Map((snapshot.signupRows || []).map((row) => [row.id, row]));
+  return snapshot.readableRows.map((row) => signup.get(row.id) || row);
 }
 
 export async function operate(mode, actions, record) {
@@ -254,6 +284,8 @@ export async function operate(mode, actions, record) {
     return work();
   };
   try {
+    assert.ok(operatorModes.includes(mode));
+    const selectedKey = mode === 'inspect' ? null : bootstrapKey(mode);
     await phase('current-source-and-mutators', actions.assertCurrent);
     const before = await phase('owner-and-effective-baseline', actions.snapshot);
     Object.assign(record, baselineDiagnostics(before));
@@ -268,13 +300,13 @@ export async function operate(mode, actions, record) {
       canonicalAlias: pins.canonicalAlias,
       customAlias: pins.customAlias,
       backendUrl: targetUrl,
-      fourBackend: assertBackend(before.readableRows, before.environment, before.canonical, before.custom),
+      fourBackend: assertBackend(backendRows(before), before.environment, before.canonical, before.custom),
       flagRows: flagEvidence(before.flagRows),
       flagAbsentAllScopes: !before.rows.some((row) => row.key === flagKey),
       ownerInventoryRepresentationSha256: inventoryHash(before.rows),
       effectiveRepresentationSha256: hashObject(before.environment),
       requireAuth: before.environment.VITE_REQUIRE_AUTH,
-      signupEnabled: before.environment.VITE_ENABLE_SIGNUP,
+      signupEnabled: before.environment.VITE_ENABLE_SIGNUP ?? null,
       frontendFlagEffective: before.environment[flagKey] ?? null,
       serverFlagEffective: before.environment.PRODUCT_TELEMETRY_ENABLED ?? null,
       unrelatedSecretEffectiveValuesCompared: false,
@@ -284,36 +316,42 @@ export async function operate(mode, actions, record) {
       productionAliasesChanged: false,
     });
     await actions.save(record);
-    if (mode === 'bootstrap-false') {
+    if (selectedKey) {
       await phase('prior-inspection-and-absence', async () => {
-        assertAbsent(before.rows);
-        await actions.assertPrior(before);
+        assertAbsent(before.rows, selectedKey);
+        if (selectedKey === flagKey) {
+          assert.equal(before.environment[signupKey], 'false');
+        }
+        await actions.assertPrior(before, selectedKey);
       });
     }
     await phase('fresh-current-source-and-mutators', actions.assertCurrent);
     const fresh = await phase('fresh-owner-cas', actions.snapshot);
-    assertBackend(fresh.readableRows, fresh.environment, fresh.canonical, fresh.custom);
+    assertBackend(backendRows(fresh), fresh.environment, fresh.canonical, fresh.custom);
     assert.equal(inventoryHash(fresh.rows), inventoryHash(before.rows));
     assert.equal(hashObject(fresh.environment), hashObject(before.environment));
     if (mode === 'inspect') {
       record.status = 'owner-baseline-inspected';
     } else {
-      assert.equal(mode, 'bootstrap-false');
-      assertAbsent(fresh.rows);
+      assertAbsent(fresh.rows, selectedKey);
+      if (selectedKey === flagKey) {
+        assert.equal(fresh.environment[signupKey], 'false');
+      }
       record.creation = 'attempted-no-retry';
       const result = await phase('create-one-production-false', () =>
-        actions.create({ key: flagKey, value: 'false', type: 'plain', target: ['production'] }),
+        actions.create({ key: selectedKey, value: 'false', type: 'plain', target: ['production'] }),
       );
       const after = await phase('verify-created-owner-and-effective', actions.snapshot);
-      const matches = after.rows.filter((row) => row.key === flagKey);
+      const matches = after.rows.filter((row) => row.key === selectedKey);
       assert.equal(matches.length, 1);
-      const created = assertCreated(result, matches[0]);
-      assertSingleAddition(fresh.rows, after.rows, created);
-      assertEffectiveAddition(fresh.environment, after.environment);
-      assertBackend(after.readableRows, after.environment, after.canonical, after.custom);
+      const created = assertCreated(result, matches[0], selectedKey);
+      assertSingleAddition(fresh.rows, after.rows, created, selectedKey);
+      assertEffectiveAddition(fresh.environment, after.environment, selectedKey);
+      assertBackend(backendRows(after), after.environment, after.canonical, after.custom);
       await phase('final-current-source-and-mutators', actions.assertCurrent);
       record.creation = 'one-false-row-verified';
-      record.createdFlag = flagEvidence([created])[0];
+      record.createdFlagKey = selectedKey;
+      record.createdFlag = flagEvidence([created], selectedKey)[0];
       record.status = 'production-false-flag-bootstrapped-no-deployment';
     }
     record.checkedAtUtc = new Date(actions.now()).toISOString();
@@ -426,15 +464,15 @@ async function main(mode) {
     inventoryHash(rows);
     const readById = (id) => owner(`v1/projects/${pins.projectId}/env/${encodeURIComponent(id)}`);
     const readableRows = await readableProductionRows(rows, readById);
-    const flagRows = [];
-    for (const row of rows.filter((item) => item.key === flagKey)) {
+    const publicFlagRows = [];
+    for (const row of rows.filter((item) => [flagKey, signupKey].includes(item.key))) {
       if (row.type === 'encrypted' && row.decrypted !== true) {
         const actual = await readById(row.id);
         assert.equal(actual.decrypted, true);
         assert.ok(sameProductionMetadata(row, actual));
-        flagRows.push({ ...row, value: actual.value, decrypted: true });
+        publicFlagRows.push({ ...row, value: actual.value, decrypted: true });
       } else {
-        flagRows.push(row);
+        publicFlagRows.push(row);
       }
     }
     const canonicalDeployment = await inspect(pins.canonicalAlias);
@@ -442,9 +480,17 @@ async function main(mode) {
     vercel(environmentPullArgs('main'));
     const environment = parseEnv(readFileSync('.vercel/.env.production.local', 'utf8'));
     assert.ok(Date.now() - started <= 120_000, 'FRESH_OWNER_SNAPSHOT_REQUIRED');
-    return { rows, readableRows, flagRows, environment, canonical: canonicalDeployment, custom };
+    return {
+      rows,
+      readableRows,
+      flagRows: publicFlagRows.filter((row) => row.key === flagKey),
+      signupRows: publicFlagRows.filter((row) => row.key === signupKey),
+      environment,
+      canonical: canonicalDeployment,
+      custom,
+    };
   };
-  const assertPrior = async (before) => {
+  const assertPrior = async (before, selectedKey) => {
     const run = await gh(`actions/runs/${input.absence_inspection_run}`);
     assert.ok(run.status === 'completed' && run.conclusion === 'success' && run.event === 'workflow_dispatch');
     assert.equal(run.head_sha, env.GITHUB_SHA);
@@ -464,7 +510,7 @@ async function main(mode) {
     const proof = JSON.parse(raw);
     assert.equal(proof.sourceRunAttempt, String(run.run_attempt));
     assert.ok(Date.parse(proof.checkedAtUtc) >= Date.parse(attempt.run_started_at));
-    assertPriorProof(proof, { ...env, absence_inspection_run: input.absence_inspection_run }, before);
+    assertPriorProof(proof, { ...env, absence_inspection_run: input.absence_inspection_run }, before, Date.now(), selectedKey);
   };
   const result = await operate(
     mode,
@@ -486,8 +532,8 @@ async function main(mode) {
 
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
   if (process.argv.length === 2) {
-    console.log(JSON.stringify({ status: 'offline-plan', liveCalls: 0, allowed: ['inspect', 'bootstrap-false'], branch: pins.branch }));
-  } else if (process.argv.length === 3 && ['inspect', 'bootstrap-false'].includes(process.argv[2])) {
+    console.log(JSON.stringify({ status: 'offline-plan', liveCalls: 0, allowed: operatorModes, branch: pins.branch }));
+  } else if (process.argv.length === 3 && operatorModes.includes(process.argv[2])) {
     await main(process.argv[2]);
   } else {
     console.error('UNSUPPORTED_OPERATOR_MODE');
