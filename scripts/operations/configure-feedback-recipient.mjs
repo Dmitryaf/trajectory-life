@@ -1,7 +1,10 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { readFileSync, writeFileSync, mkdirSync, mkdtempSync, chmodSync, rmSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { tmpdir } from 'node:os';
+import { parseEnv } from 'node:util';
+import { join, resolve, dirname, basename } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 export const PROJECT = 'prj_O0neiglfpJG0JKq6jBYLJOE6buR4';
@@ -32,8 +35,9 @@ export function dedicated(rows, key, required = true) {
   }
   assert.deepEqual(r.target, ['production'], 'ROW_SCOPE');
   assert.ok(!r.gitBranch && !r.configurationId && !r.system && !r.customEnvironmentIds?.length, 'ROW_MANAGED');
-  assert.ok(r.visibility === undefined || r.visibility === 'config', 'ROW_VISIBILITY');
-  assert.ok(['plain', 'encrypted'].includes(r.type), 'ROW_TYPE');
+  const sensitiveRecipient = ['FEEDBACK_TO_EMAIL', 'ERROR_TO_EMAIL'].includes(key) && r.type === 'sensitive';
+  assert.ok(r.visibility === undefined || r.visibility === 'config' || (sensitiveRecipient && r.visibility === 'secret'), 'ROW_VISIBILITY');
+  assert.ok(['plain', 'encrypted'].includes(r.type) || sensitiveRecipient, 'ROW_TYPE');
   assert.ok(typeof r.id === 'string' && r.id.length > 0 && Number.isFinite(r.updatedAt), 'ROW_ID_TIME');
   return r;
 }
@@ -76,7 +80,7 @@ export function otherRowsUnchanged(before, after, selected) {
     'OTHER_ENV_DRIFT',
   );
 }
-export async function snapshot(api, expectedId, diagnostic = () => {}) {
+export async function snapshot(api, expectedId, diagnostic = () => {}, pull) {
   assert.match(expectedId, /^dpl_[A-Za-z0-9]+$/);
   for (const host of ['trajectory-app-lilac.vercel.app', 'trajectory-life.ru']) {
     const a = await api(`v4/aliases/${host}`);
@@ -110,10 +114,29 @@ export async function snapshot(api, expectedId, diagnostic = () => {}) {
         customEnvironmentCount: Array.isArray(r.customEnvironmentIds) ? r.customEnvironmentIds.length : null,
       })),
   });
+  let pulled;
+  if (
+    rows.some((r) => ['FEEDBACK_TO_EMAIL', 'ERROR_TO_EMAIL'].includes(r.key) && r.target?.includes('production') && r.type === 'sensitive')
+  ) {
+    // Validate both scopes BEFORE invoking the deployment-authorized pull.
+    dedicated(rows, 'FEEDBACK_TO_EMAIL');
+    dedicated(rows, 'ERROR_TO_EMAIL', false);
+    assert.equal(typeof pull, 'function', 'SENSITIVE_PULL_REQUIRED');
+    pulled = await pull();
+    const afterPull = await api(`v10/projects/${PROJECT}/env`);
+    const afterRows = Array.isArray(afterPull) ? afterPull : afterPull.envs;
+    assert.equal(fingerprint(inventory(afterRows)), fingerprint(inventory(rows)), 'OWNER_CHANGED_DURING_PULL');
+    diagnostic({ sensitiveRecipientReadMethod: 'fresh-vercel-60.1.3-production-pull', privatePullPersistedInArtifacts: false });
+  }
   const read = async (key, required = true) => {
     const r = dedicated(rows, key, required);
     if (!r) {
       return null;
+    }
+    if (r.type === 'sensitive') {
+      const value = pulled?.[key];
+      assert.ok(typeof value === 'string' && !/\[(?:SENSITIVE|REDACTED)\]/.test(value), 'SENSITIVE_PULL_UNREADABLE');
+      return address(value);
     }
     if (r.type === 'plain' || r.decrypted === true) {
       assert.ok(typeof r.value === 'string', 'VALUE');
@@ -157,7 +180,7 @@ export async function snapshot(api, expectedId, diagnostic = () => {}) {
   assert.equal(await read('SUPABASE_ANON_KEY'), browserKey, 'KEY_ALIGNMENT');
   return { rows, feedback, error, publicKeySha256: sha(browserKey) };
 }
-export async function operate(mode, api, expectedId, prior, record, save, now = () => Date.now(), recipient) {
+export async function operate(mode, api, expectedId, prior, record, save, now = () => Date.now(), recipient, pull) {
   address(recipient);
   const start = now();
   const window = () => assert.ok(now() - start <= 120_000, 'WINDOW_EXPIRED');
@@ -167,7 +190,7 @@ export async function operate(mode, api, expectedId, prior, record, save, now = 
     Object.assign(record, fields);
     save();
   };
-  const before = await snapshot(api, expectedId, diagnostic);
+  const before = await snapshot(api, expectedId, diagnostic, pull);
   Object.assign(record, {
     checkedAtUtc: new Date(now()).toISOString(),
     deploymentId: expectedId,
@@ -198,7 +221,7 @@ export async function operate(mode, api, expectedId, prior, record, save, now = 
   assert.ok(now() - Date.parse(prior.checkedAtUtc) >= 0 && now() - Date.parse(prior.checkedAtUtc) <= 900_000, 'PRIOR_STALE');
   let current = before;
   const fresh = async () => {
-    const next = await snapshot(api, expectedId, diagnostic);
+    const next = await snapshot(api, expectedId, diagnostic, pull);
     assert.equal(fingerprint(inventory(next.rows)), fingerprint(inventory(current.rows)), 'FRESH_CAS');
     window();
     current = next;
@@ -218,7 +241,7 @@ export async function operate(mode, api, expectedId, prior, record, save, now = 
     assert.deepEqual(response.failed || [], [], 'CREATE_FAILED');
     const created = Array.isArray(response.created) ? response.created[0] : response.created;
     assert.ok(created?.id, 'CREATE_AMBIGUOUS');
-    const next = await snapshot(api, expectedId);
+    const next = await snapshot(api, expectedId, diagnostic, pull);
     assert.equal(dedicated(next.rows, 'ERROR_TO_EMAIL').id, created.id, 'CREATE_OWNER');
     assert.equal(next.error, current.feedback, 'TECHNICAL_RECIPIENT');
     otherRowsUnchanged(current.rows, next.rows, ['ERROR_TO_EMAIL']);
@@ -235,7 +258,7 @@ export async function operate(mode, api, expectedId, prior, record, save, now = 
     save();
     const updated = await api(`v9/projects/${PROJECT}/env/${encodeURIComponent(row.id)}`, 'PATCH', { value: recipient });
     assert.equal(updated?.id, row.id, 'PATCH_AMBIGUOUS');
-    const next = await snapshot(api, expectedId);
+    const next = await snapshot(api, expectedId, diagnostic, pull);
     assert.equal(dedicated(next.rows, 'FEEDBACK_TO_EMAIL').id, row.id, 'PATCH_OWNER');
     const beforeMetadata = rowMetadata(row);
     const afterMetadata = rowMetadata(dedicated(next.rows, 'FEEDBACK_TO_EMAIL'));
@@ -320,7 +343,8 @@ async function main() {
       assert.ok(Buffer.byteLength(raw) <= 2 * 1024 * 1024, 'BODY_LIMIT');
       return JSON.parse(raw);
     };
-    await operate(mode, api, expectedId, prior, record, save, undefined, process.env.RELEASE_FEEDBACK_RECIPIENT);
+    const pull = () => freshProductionPull(token);
+    await operate(mode, api, expectedId, prior, record, save, undefined, process.env.RELEASE_FEEDBACK_RECIPIENT, pull);
   } catch (error) {
     record.status = 'refused-or-incomplete';
     const firstLine = typeof error?.message === 'string' ? error.message.split('\n')[0] : '';
@@ -368,6 +392,11 @@ async function main() {
       'TOKEN',
       'PROVIDER_HTTP',
       'BODY_LIMIT',
+      'SENSITIVE_PULL_REQUIRED',
+      'SENSITIVE_PULL_UNREADABLE',
+      'OWNER_CHANGED_DURING_PULL',
+      'CLI_VERSION',
+      'PRIVATE_PULL_FAILED',
     ];
     record.category = safeCodes.includes(firstLine) ? firstLine : 'PRIVATE_DETAILS_WITHHELD';
     record.operatorReinspectionRequired = record.mutationAttempted;
@@ -375,6 +404,43 @@ async function main() {
     process.exitCode = 1;
   }
   console.log(JSON.stringify({ status: record.status, phase: record.phase, mutationAttempted: record.mutationAttempted }));
+}
+export function freshProductionPull(token, run = execFileSync) {
+  const previousMask = process.umask(0o077);
+  let directory;
+  try {
+    directory = mkdtempSync(join(tmpdir(), 'trajectory-feedback-pull-'));
+    chmodSync(directory, 0o700);
+    mkdirSync(join(directory, '.vercel'), { mode: 0o700 });
+    writeFileSync(join(directory, '.vercel', 'project.json'), JSON.stringify({ projectId: PROJECT, orgId: TEAM }), { mode: 0o600 });
+    const options = {
+      cwd: directory,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+      timeout: 60_000,
+      maxBuffer: 2 * 1024 * 1024,
+      env: { ...process.env, VERCEL_ORG_ID: TEAM, VERCEL_PROJECT_ID: PROJECT },
+    };
+    const version = run('vercel', ['--version'], options);
+    assert.equal(String(version).trim(), '60.1.3', 'CLI_VERSION');
+    run('vercel', ['pull', '--yes', '--environment=production', '--scope', TEAM, '--token', token], options);
+    const file = join(directory, '.vercel', '.env.production.local');
+    chmodSync(file, 0o600);
+    const parsed = parseEnv(readFileSync(file, 'utf8'));
+    // Do not retain unrelated sensitive values, OIDC token, or raw plaintext.
+    return Object.fromEntries(
+      ['FEEDBACK_TO_EMAIL', 'ERROR_TO_EMAIL'].filter((key) => Object.hasOwn(parsed, key)).map((key) => [key, parsed[key]]),
+    );
+  } catch {
+    throw new Error('PRIVATE_PULL_FAILED');
+  } finally {
+    process.umask(previousMask);
+    if (directory) {
+      assert.equal(dirname(resolve(directory)), resolve(tmpdir()), 'PRIVATE_TMP_OWNER');
+      assert.ok(basename(directory).startsWith('trajectory-feedback-pull-'), 'PRIVATE_TMP_OWNER');
+      rmSync(directory, { recursive: true, force: false });
+    }
+  }
 }
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
   await main();
