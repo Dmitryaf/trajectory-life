@@ -97,7 +97,21 @@ export function assertTelemetryEnvironment(environment, rows, previous, expected
 
 export function assertTelemetryTransition(beforeEnvironment, afterEnvironment, beforeRows, afterRows, desired) {
   assert.deepEqual(Object.keys(afterEnvironment).sort(), Object.keys(beforeEnvironment).sort(), 'Effective config keys changed');
+  assert.ok(Array.isArray(beforeRows) && Array.isArray(afterRows), 'Complete owner inventories are required');
+  // A generated provider OIDC token may rotate between pulls. A project-owned
+  // row in ANY scope disables this exception; presence/key sets remain exact.
+  const generatedOidc = ![...beforeRows, ...afterRows].some((row) => row.key === 'VERCEL_OIDC_TOKEN');
   for (const [key, value] of Object.entries(beforeEnvironment)) {
+    if (
+      key === 'VERCEL_OIDC_TOKEN' &&
+      generatedOidc &&
+      typeof value === 'string' &&
+      value.length > 0 &&
+      typeof afterEnvironment[key] === 'string' &&
+      afterEnvironment[key].length > 0
+    ) {
+      continue;
+    }
     assert.equal(afterEnvironment[key], key === telemetryKey ? desired : value, 'An unrelated effective parameter changed');
   }
   for (const key of backendKeys) {
