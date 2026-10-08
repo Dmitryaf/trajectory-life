@@ -2,6 +2,12 @@ import assert from 'node:assert/strict';
 import { backendKeys, digest, productionRows, sameProductionMetadata, sameRow, targetUrl } from './cutover-policy.mjs';
 
 export const telemetryKey = 'VITE_PRODUCT_TELEMETRY_ENABLED';
+export const signupKey = 'VITE_ENABLE_SIGNUP';
+export function releaseOperation(mode) {
+  assert.ok(['inspect', 'enable', 'disable', 'signup-enable', 'signup-disable'].includes(mode));
+  const signup = mode.startsWith('signup-');
+  return { key: signup ? signupKey : telemetryKey, signup, desired: mode.endsWith('enable') ? 'true' : 'false' };
+}
 export const customProductionAlias = 'trajectory-life.ru';
 
 export function releaseSource(event, eventName, ref, sha, tree) {
@@ -12,7 +18,7 @@ export function releaseSource(event, eventName, ref, sha, tree) {
   assert.equal(eventName, 'workflow_dispatch', 'Unsupported publication event');
   assert.equal(ref, 'refs/heads/main', 'Telemetry dispatch must use main');
   const input = event.inputs || {};
-  assert.ok(['inspect', 'enable', 'disable'].includes(input.mode), 'Unsupported telemetry operation');
+  assert.ok(['inspect', 'enable', 'disable', 'signup-enable', 'signup-disable'].includes(input.mode), 'Unsupported telemetry operation');
   assert.match(input.sha || '', /^[a-f0-9]{40}$/);
   assert.match(input.tree || '', /^[a-f0-9]{40}$/);
   assert.equal(input.sha, sha, 'Dispatch source differs from checkout');
@@ -33,12 +39,27 @@ export function releaseSource(event, eventName, ref, sha, tree) {
       assert.match(input[key] || '', /^[a-f0-9]{64}$/, 'Root must bind its private acceptance receipts');
     }
   }
+  if (input.mode.startsWith('signup-')) {
+    for (const key of ['signup_backend_accepted', 'post_open_backup_accepted']) {
+      assert.ok(input[key] === true || input[key] === 'true', 'Root must accept backend signup and a fresh backup');
+    }
+    for (const key of ['backend_receipt_sha256', 'backup_receipt_sha256']) {
+      assert.match(input[key] || '', /^[a-f0-9]{64}$/, 'Root must bind signup acceptance and fresh backup receipts');
+    }
+  }
   return { id: Number(input.ci_run), head_branch: 'main', telemetry: input };
 }
 
 export function telemetryFlag(rows, readable = true) {
+  return releaseFlag(rows, telemetryKey, readable);
+}
+export function signupFlag(rows, readable = true) {
+  return releaseFlag(rows, signupKey, readable);
+}
+function releaseFlag(rows, key, readable = true) {
+  assert.ok([telemetryKey, signupKey].includes(key));
   assert.ok(Array.isArray(rows));
-  const matches = rows.filter((row) => row.key === telemetryKey && row.target?.includes('production'));
+  const matches = rows.filter((row) => row.key === key && row.target?.includes('production'));
   assert.equal(matches.length, 1, 'One existing production telemetry flag is required');
   const row = matches[0];
   assert.deepEqual(row.target, ['production'], 'Telemetry flag cannot share Preview scope');
@@ -62,13 +83,19 @@ export function telemetryFlag(rows, readable = true) {
 }
 
 export async function readableTelemetryFlag(rows, readById) {
-  const row = telemetryFlag(rows, false);
+  return readableReleaseFlag(rows, readById, telemetryKey);
+}
+export async function readableSignupFlag(rows, readById) {
+  return readableReleaseFlag(rows, readById, signupKey);
+}
+async function readableReleaseFlag(rows, readById, key) {
+  const row = releaseFlag(rows, key, false);
   if (row.type === 'plain' || row.decrypted === true) {
-    return telemetryFlag([row]);
+    return releaseFlag([row], key);
   }
   const actual = await readById(row.id);
   assert.equal(actual?.decrypted, true, 'Telemetry flag was not decrypted');
-  telemetryFlag([actual]);
+  releaseFlag([actual], key);
   assert.ok(sameProductionMetadata(row, actual), 'Telemetry metadata changed during decryption');
   return { ...row, value: actual.value, decrypted: true };
 }
@@ -88,14 +115,67 @@ export function assertTelemetryEnvironment(environment, rows, previous, expected
   }
   assert.equal(environment.VITE_SUPABASE_ANON_KEY, environment.SUPABASE_ANON_KEY, 'Browser/server public key differs');
   assert.equal(environment.VITE_REQUIRE_AUTH, 'true');
-  assert.equal(environment.VITE_ENABLE_SIGNUP, 'false');
+  assert.ok(['false', 'true'].includes(environment.VITE_ENABLE_SIGNUP), 'Signup must be an explicit boolean');
   assert.ok(
     [undefined, 'false', 'true'].includes(environment.PRODUCT_TELEMETRY_ENABLED),
     'Server telemetry declaration must be a boolean flag',
   );
 }
 
-export function assertTelemetryTransition(beforeEnvironment, afterEnvironment, beforeRows, afterRows, desired) {
+export function assertSignupEnvironment(environment, rows, previous, expectedPreviousId) {
+  assertTelemetryEnvironment(environment, rows, previous, expectedPreviousId);
+  assert.equal(environment[telemetryKey], 'true', 'Signup release must preserve enabled telemetry');
+  assert.equal(telemetryFlag(rows).value, 'true', 'Telemetry owner must remain enabled');
+  assert.equal(signupFlag(rows).value, environment[signupKey], 'Effective signup differs from its dedicated owner');
+}
+
+// Compare the entire LIST representation, including unrelated masked secrets,
+// without decrypting them or claiming their effective plaintext was observed.
+function ownerRepresentation(row) {
+  const sort = (value) => {
+    if (Array.isArray(value)) {
+      return value.map(sort);
+    }
+    if (value && typeof value === 'object') {
+      return Object.fromEntries(
+        Object.keys(value)
+          .sort()
+          .map((key) => [key, sort(value[key])]),
+      );
+    }
+    return value;
+  };
+  return JSON.stringify(sort(row));
+}
+export function assertOwnerInventory(beforeRows, afterRows, mutableKey, expected) {
+  assert.ok([telemetryKey, signupKey].includes(mutableKey));
+  assert.ok(Array.isArray(beforeRows) && Array.isArray(afterRows), 'Complete owner inventories are required');
+  const index = (rows) => {
+    assert.ok(rows.every((row) => typeof row.id === 'string' && row.id));
+    const map = new Map(rows.map((row) => [row.id, row]));
+    assert.equal(map.size, rows.length, 'Duplicate owner row IDs');
+    return map;
+  };
+  const before = index(beforeRows),
+    after = index(afterRows);
+  assert.deepEqual([...after.keys()].sort(), [...before.keys()].sort(), 'Owner inventory IDs changed');
+  for (const [id, row] of before) {
+    const actual = after.get(id);
+    const selected = row.key === mutableKey && row.target?.includes('production');
+    if (selected) {
+      assert.equal(actual.key, row.key);
+      if (expected) {
+        assert.equal(expected.id, id);
+        assert.ok(sameRow(actual, expected), 'Selected owner changed before promotion');
+      }
+    } else {
+      assert.equal(ownerRepresentation(actual), ownerRepresentation(row), 'Unrelated owner representation changed');
+    }
+  }
+}
+
+export function assertTelemetryTransition(beforeEnvironment, afterEnvironment, beforeRows, afterRows, desired, mutableKey = telemetryKey) {
+  assertOwnerInventory(beforeRows, afterRows, mutableKey);
   assert.deepEqual(Object.keys(afterEnvironment).sort(), Object.keys(beforeEnvironment).sort(), 'Effective config keys changed');
   assert.ok(Array.isArray(beforeRows) && Array.isArray(afterRows), 'Complete owner inventories are required');
   // A generated provider OIDC token may rotate between pulls. A project-owned
@@ -112,7 +192,7 @@ export function assertTelemetryTransition(beforeEnvironment, afterEnvironment, b
     ) {
       continue;
     }
-    assert.equal(afterEnvironment[key], key === telemetryKey ? desired : value, 'An unrelated effective parameter changed');
+    assert.equal(afterEnvironment[key], key === mutableKey ? desired : value, 'An unrelated effective parameter changed');
   }
   for (const key of backendKeys) {
     const before = productionRows(beforeRows).find((entry) => entry.key === key).row;
@@ -136,6 +216,14 @@ export function flagEvidence(row) {
 // Vercel has no atomic row CAS. Shared deploy-main concurrency and exact owner
 // checks protect our writes; ambiguous responses never authorize compensation.
 export async function changeTelemetryFlag(before, desired, actions, release, record) {
+  assert.equal(before.key, telemetryKey);
+  return changeReleaseFlag(before, desired, actions, release, record, 'telemetry');
+}
+export async function changeSignupFlag(before, desired, actions, release, record) {
+  assert.equal(before.key, signupKey);
+  return changeReleaseFlag(before, desired, actions, release, record, 'signup');
+}
+async function changeReleaseFlag(before, desired, actions, release, record, kind) {
   let after;
   let mutationAttempted = false;
   try {
@@ -143,7 +231,7 @@ export async function changeTelemetryFlag(before, desired, actions, release, rec
     assert.notEqual(before.value, desired, 'Telemetry flag is already at the requested value');
     await actions.assertCurrent();
     assert.ok(sameRow(await actions.readFlag(), before), 'Telemetry flag changed before update');
-    record.telemetryMutation = 'attempted';
+    record[kind + 'Mutation'] = 'attempted';
     mutationAttempted = true;
     await actions.save(record);
     const returned = await actions.update(before.id, desired);
@@ -157,12 +245,12 @@ export async function changeTelemetryFlag(before, desired, actions, release, rec
       'Telemetry owner metadata changed during update',
     );
     after = observed;
-    record.telemetryMutation = 'verified';
-    record.telemetryAfter = flagEvidence(after);
+    record[kind + 'Mutation'] = 'verified';
+    record[kind + 'After'] = flagEvidence(after);
     await actions.save(record);
     return await release(after);
   } catch (error) {
-    record.telemetryCompensation = 'not-needed';
+    record[kind + 'Compensation'] = 'not-needed';
     if (mutationAttempted) {
       try {
         await actions.assertPreviousAlias();
@@ -178,12 +266,12 @@ export async function changeTelemetryFlag(before, desired, actions, release, rec
             restored.updatedAt >= after.updatedAt && sameRow({ ...before, updatedAt: restored.updatedAt }, restored),
             'Telemetry compensation was not verified',
           );
-          record.telemetryCompensation = 'previous-value-restored-and-verified';
+          record[kind + 'Compensation'] = 'previous-value-restored-and-verified';
         } else {
-          record.telemetryCompensation = 'original-row-unchanged';
+          record[kind + 'Compensation'] = 'original-row-unchanged';
         }
       } catch {
-        record.telemetryCompensation = 'refused-or-ambiguous-operator-reinspection-required';
+        record[kind + 'Compensation'] = 'refused-or-ambiguous-operator-reinspection-required';
       }
     }
     record.status = 'failed';
