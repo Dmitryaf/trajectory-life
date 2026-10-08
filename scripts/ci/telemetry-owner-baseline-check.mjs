@@ -15,6 +15,7 @@ import {
   assertSingleAddition,
   flagEvidence,
   flagKey,
+  signupKey,
   inventoryHash,
   operate,
   pins,
@@ -61,10 +62,10 @@ function fixture() {
   };
   return { rows, readableRows: rows, flagRows: [], environment, canonical: deployment, custom: structuredClone(deployment) };
 }
-function flag() {
-  return { id: 'new-flag', key: flagKey, value: 'false', type: 'plain', target: ['production'], updatedAt: 10 };
+function flag(selectedKey = flagKey) {
+  return { id: 'new-flag', key: selectedKey, value: 'false', type: 'plain', target: ['production'], updatedAt: 10 };
 }
-function actions(before = fixture()) {
+function actions(before = fixture(), selectedKey = flagKey) {
   const calls = { post: 0, source: 0, saved: [] };
   let snapshotCount = 0;
   return {
@@ -79,16 +80,21 @@ function actions(before = fixture()) {
       snapshotCount++;
       const result = structuredClone(before);
       if (snapshotCount > 2) {
-        result.rows.push(flag());
-        result.flagRows.push(flag());
-        result.environment[flagKey] = 'false';
+        result.rows.push(flag(selectedKey));
+        if (selectedKey === flagKey) {
+          result.flagRows.push(flag(selectedKey));
+        } else {
+          result.signupRows = [flag(selectedKey)];
+        }
+        result.readableRows = result.rows;
+        result.environment[selectedKey] = 'false';
       }
       return result;
     },
     create: async (body) => {
       calls.post++;
-      assert.deepEqual(body, { key: flagKey, value: 'false', type: 'plain', target: ['production'] });
-      return { created: flag(), failed: [] };
+      assert.deepEqual(body, { key: selectedKey, value: 'false', type: 'plain', target: ['production'] });
+      return { created: flag(selectedKey), failed: [] };
     },
   };
 }
@@ -327,10 +333,98 @@ test('temporary operator job is manual same-branch with shared concurrency; auto
   assert.ok(operator.includes('if: always()'));
   assert.ok(operator.includes(`github.ref == 'refs/heads/${pins.branch}'`));
   assert.ok(text.includes('options: [inspect, enable, disable]'));
-  assert.ok(text.includes('options: [inspect, bootstrap-false]'));
+  assert.ok(text.includes('options: [inspect, bootstrap-false, bootstrap-signup-false]'));
   assert.ok(operator.includes("inputs.mode == 'inspect'"));
   assert.ok(operator.includes('OPERATOR_MODE: ${{ inputs.operator_mode }}'));
   assert.ok(operator.includes('vercel@60.1.3'));
   assert.ok(!operator.includes('playwright'));
   assert.ok(!operator.includes('node scripts/ci/deploy.mjs'));
+});
+
+test('missing signup is inspected honestly, never treated as false for telemetry creation', async () => {
+  const x = fixture();
+  delete x.environment[signupKey];
+  const a = actions(x);
+  const r = await operate('inspect', a, {});
+  assert.equal(r.status, 'owner-baseline-inspected');
+  assert.equal(r.effectiveSignupKind, 'missing');
+  assert.equal(r.signupEnabled, null);
+  assert.equal(r.signupAbsentAllScopes, true);
+  assert.deepEqual(r.signupRows, []);
+  const b = actions(x);
+  assert.equal((await operate('bootstrap-false', b, {})).status, 'failed-stopped-no-deployment');
+  assert.equal(b.calls.post, 0);
+});
+
+test('signup bootstrap creates only one production false; telemetry remains absent', async () => {
+  const x = fixture();
+  delete x.environment[signupKey];
+  const a = actions(x, signupKey);
+  const r = await operate('bootstrap-signup-false', a, {});
+  assert.equal(r.status, 'production-false-flag-bootstrapped-no-deployment');
+  assert.equal(a.calls.post, 1);
+  assert.equal(r.createdFlagKey, signupKey);
+  assert.equal(r.createdFlag.boolean, false);
+  assert.equal(r.frontendFlagEffective, null);
+});
+
+test('signup all-scope existing row and wrong effective value prohibit creation', async () => {
+  for (const target of [['preview'], ['production'], ['production', 'preview']]) {
+    const x = fixture();
+    delete x.environment[signupKey];
+    x.rows.push({ ...flag(signupKey), target });
+    const a = actions(x, signupKey);
+    assert.equal((await operate('bootstrap-signup-false', a, {})).status, 'failed-stopped-no-deployment');
+    assert.equal(a.calls.post, 0);
+  }
+  const x = fixture();
+  x.environment[signupKey] = 'true';
+  const a = actions(x, signupKey);
+  assert.equal((await operate('bootstrap-signup-false', a, {})).status, 'failed-stopped-no-deployment');
+  assert.equal(a.calls.post, 0);
+});
+
+test('signup prior proof requires successful inspect and selected-key absence, not old failed receipt', async () => {
+  const x = fixture();
+  delete x.environment[signupKey];
+  const proof = await operate('inspect', actions(x), { mode: 'inspect', sourceSha: sha, sourceBranch: pins.branch, sourceRunId: '122' });
+  const e = { ...env, absence_inspection_run: '122' };
+  assertPriorProof(proof, e, x, Date.now(), signupKey);
+  for (const c of [{ status: 'failed-stopped-no-deployment' }, { signupAbsentAllScopes: false }, { signupRows: [{ id: 'x' }] }]) {
+    assert.throws(() => assertPriorProof({ ...proof, ...c }, e, x, Date.now(), signupKey));
+  }
+  const changed = structuredClone(x);
+  changed.environment[signupKey] = 'false';
+  assert.throws(() => assertPriorProof(proof, e, changed, Date.now(), signupKey));
+});
+
+test('finite key allowlist refuses arbitrary keys and cross-key POST response', () => {
+  assert.throws(() => assertAbsent(fixture().rows, 'ARBITRARY'));
+  assert.throws(() => assertCreated({ created: flag(), failed: [] }, flag(), signupKey));
+  const before = fixture().environment;
+  delete before[signupKey];
+  assertEffectiveAddition(before, { ...before, [signupKey]: 'false' }, signupKey);
+  assert.throws(() => assertEffectiveAddition(before, { ...before, [signupKey]: 'false', [flagKey]: 'false' }, signupKey));
+  const bootstrap = {
+    ...inputs,
+    operator_mode: 'bootstrap-signup-false',
+    absence_inspection_run: '122',
+    absence_receipt_sha256: 'c'.repeat(64),
+  };
+  assert.equal(assertDispatch({ inputs: bootstrap }, env, sha, pins.branch).operator_mode, 'bootstrap-signup-false');
+  assert.throws(() => assertDispatch({ inputs: { ...bootstrap, absence_inspection_run: '' } }, env, sha, pins.branch));
+});
+
+test('lost signup creation response never retries, compensates, or exposes provider error', async () => {
+  const x = fixture();
+  delete x.environment[signupKey];
+  const a = actions(x, signupKey);
+  a.create = async () => {
+    a.calls.post++;
+    throw Error('private-secret-error');
+  };
+  const r = await operate('bootstrap-signup-false', a, {});
+  assert.equal(a.calls.post, 1);
+  assert.equal(r.failureCategory, 'creation-unverified-operator-inspection-required');
+  assert.ok(!JSON.stringify(r).includes('private-secret-error'));
 });
