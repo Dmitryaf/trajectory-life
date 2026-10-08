@@ -51,6 +51,12 @@ describe('public landing', () => {
     expect(wrapper.findAll('h2')).toHaveLength(6);
     expect(wrapper.text()).toContain('Статистика использования');
     expect(wrapper.text()).toContain('старше 90 дней');
+    expect(wrapper.text()).toContain('удаление через 30 дней');
+    expect(wrapper.text()).toContain('для переноса и восстановления хранятся до очистки администратором');
+    expect(wrapper.text()).toContain('Единый срок хранения технических записей пока не установлен');
+    expect(wrapper.text()).not.toContain('Без сети запрос на удаление');
+    expect(wrapper.text()).not.toContain('Скачанные файлы и записи на других устройствах');
+    expect(wrapper.text()).not.toContain('очищаются по расписанию сервиса и его подрядчиков');
     expect(wrapper.find('details').exists()).toBe(false);
     expect(wrapper.find('.app-shell').exists()).toBe(false);
     expect(wrapper.text()).toContain('Администратор приложения и компании');
