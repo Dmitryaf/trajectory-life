@@ -1,10 +1,7 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { readFileSync, writeFileSync, mkdirSync, mkdtempSync, chmodSync, rmSync } from 'node:fs';
-import { execFileSync } from 'node:child_process';
-import { tmpdir } from 'node:os';
-import { parseEnv } from 'node:util';
-import { join, resolve, dirname, basename } from 'node:path';
+import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 export const PROJECT = 'prj_O0neiglfpJG0JKq6jBYLJOE6buR4';
@@ -75,12 +72,12 @@ function visibilityKind(value) {
 }
 export function otherRowsUnchanged(before, after, selected) {
   assert.equal(
-    fingerprint(inventory(before.filter((r) => !selected.includes(r.key)))),
-    fingerprint(inventory(after.filter((r) => !selected.includes(r.key)))),
+    fingerprint(inventory(before.filter((r) => !selected.includes(r.id)))),
+    fingerprint(inventory(after.filter((r) => !selected.includes(r.id)))),
     'OTHER_ENV_DRIFT',
   );
 }
-export async function snapshot(api, expectedId, diagnostic = () => {}, pull) {
+export async function snapshot(api, expectedId, diagnostic = () => {}) {
   assert.match(expectedId, /^dpl_[A-Za-z0-9]+$/);
   for (const host of ['trajectory-app-lilac.vercel.app', 'trajectory-life.ru']) {
     const a = await api(`v4/aliases/${host}`);
@@ -114,30 +111,16 @@ export async function snapshot(api, expectedId, diagnostic = () => {}, pull) {
         customEnvironmentCount: Array.isArray(r.customEnvironmentIds) ? r.customEnvironmentIds.length : null,
       })),
   });
-  let pulled;
-  if (
-    rows.some((r) => ['FEEDBACK_TO_EMAIL', 'ERROR_TO_EMAIL'].includes(r.key) && r.target?.includes('production') && r.type === 'sensitive')
-  ) {
-    // Validate both scopes BEFORE invoking the deployment-authorized pull.
-    dedicated(rows, 'FEEDBACK_TO_EMAIL');
-    dedicated(rows, 'ERROR_TO_EMAIL', false);
-    assert.equal(typeof pull, 'function', 'SENSITIVE_PULL_REQUIRED');
-    pulled = await pull();
-    const afterPull = await api(`v10/projects/${PROJECT}/env`);
-    const afterRows = Array.isArray(afterPull) ? afterPull : afterPull.envs;
-    assert.equal(fingerprint(inventory(afterRows)), fingerprint(inventory(rows)), 'OWNER_CHANGED_DURING_PULL');
-    diagnostic({ sensitiveRecipientReadMethod: 'fresh-vercel-60.1.3-production-pull', privatePullPersistedInArtifacts: false });
-  }
+  const recipientRow = dedicated(rows, 'FEEDBACK_TO_EMAIL');
+  assert.equal(recipientRow.id, 'GaUHNETHZAAkFqBN', 'FIXED_RECIPIENT_ID');
+  assert.equal(recipientRow.type, 'sensitive', 'FIXED_RECIPIENT_TYPE');
+  assert.equal(dedicated(rows, 'ERROR_TO_EMAIL', false), null, 'ERROR_TO_EXPECTED_ABSENT');
   const read = async (key, required = true) => {
     const r = dedicated(rows, key, required);
     if (!r) {
       return null;
     }
-    if (r.type === 'sensitive') {
-      const value = pulled?.[key];
-      assert.ok(typeof value === 'string' && !/\[(?:SENSITIVE|REDACTED)\]/.test(value), 'SENSITIVE_PULL_UNREADABLE');
-      return address(value);
-    }
+    assert.notEqual(r.type, 'sensitive', 'UNEXPECTED_SENSITIVE_READ');
     if (r.type === 'plain' || r.decrypted === true) {
       assert.ok(typeof r.value === 'string', 'VALUE');
       return r.value;
@@ -153,11 +136,6 @@ export async function snapshot(api, expectedId, diagnostic = () => {}, pull) {
     assert.ok(typeof actual.value === 'string' && !actual.value.includes('[SENSITIVE]'), 'READABLE');
     return actual.value;
   };
-  const feedback = address(await read('FEEDBACK_TO_EMAIL'));
-  const error = await read('ERROR_TO_EMAIL', false);
-  if (error !== null) {
-    address(error);
-  }
   const sender = await read('FEEDBACK_FROM_EMAIL');
   assert.ok(sender, 'SENDER');
   const senderAddress = sender.match(/<([^<>]+)>$/)?.[1] || sender;
@@ -178,9 +156,9 @@ export async function snapshot(api, expectedId, diagnostic = () => {}, pull) {
   const browserKey = await read('VITE_SUPABASE_ANON_KEY');
   assert.match(browserKey, /^sb_publishable_[A-Za-z0-9_-]+$/);
   assert.equal(await read('SUPABASE_ANON_KEY'), browserKey, 'KEY_ALIGNMENT');
-  return { rows, feedback, error, publicKeySha256: sha(browserKey) };
+  return { rows, recipientRow, errorFallbackUsesFeedback: true, publicKeySha256: sha(browserKey) };
 }
-export async function operate(mode, api, expectedId, prior, record, save, now = () => Date.now(), recipient, pull) {
+export async function operate(mode, api, expectedId, prior, record, save, now = () => Date.now(), recipient) {
   address(recipient);
   const start = now();
   const window = () => assert.ok(now() - start <= 120_000, 'WINDOW_EXPIRED');
@@ -190,95 +168,65 @@ export async function operate(mode, api, expectedId, prior, record, save, now = 
     Object.assign(record, fields);
     save();
   };
-  const before = await snapshot(api, expectedId, diagnostic, pull);
+  const before = await snapshot(api, expectedId, diagnostic);
   Object.assign(record, {
     checkedAtUtc: new Date(now()).toISOString(),
     deploymentId: expectedId,
     inventorySha256: fingerprint(inventory(before.rows)),
-    feedbackRecipientSha256: sha(before.feedback),
     requestedRecipientSha256: sha(recipient),
-    feedbackRecipientMatchesRequested: before.feedback === recipient,
-    technicalRecipientSha256: sha(before.error ?? before.feedback),
-    errorRecipientExplicit: before.error !== null,
     publicKeySha256: before.publicKeySha256,
+    recipientWriteOnly: true,
+    errorFallbackUsesFeedback: true,
+    recipientPlaintextReadbackVerified: false,
     unrelatedSecretPlaintextCompared: false,
   });
   save();
+  window();
   if (mode === 'inspect') {
-    window();
-    record.status = 'feedback-mail-config-inspected';
+    record.status = 'feedback-mail-config-inspected-write-only';
     save();
     return;
   }
   assert.equal(mode, 'apply');
-  assert.equal(prior.status, 'feedback-mail-config-inspected', 'PRIOR_STATUS');
+  assert.equal(prior.status, 'feedback-mail-config-inspected-write-only', 'PRIOR_STATUS');
   assert.equal(prior.deploymentId, expectedId);
-  assert.equal(prior.inventorySha256, record.inventorySha256);
-  assert.equal(prior.feedbackRecipientSha256, record.feedbackRecipientSha256);
-  assert.equal(prior.technicalRecipientSha256, record.technicalRecipientSha256);
+  assert.equal(prior.inventorySha256, record.inventorySha256, 'PRIOR_INVENTORY');
   assert.equal(prior.requestedRecipientSha256, sha(recipient));
   assert.equal(prior.operatorSourceSha, record.operatorSourceSha);
+  assert.equal(prior.recipientWriteOnly, true);
+  assert.equal(prior.errorFallbackUsesFeedback, true);
   assert.ok(now() - Date.parse(prior.checkedAtUtc) >= 0 && now() - Date.parse(prior.checkedAtUtc) <= 900_000, 'PRIOR_STALE');
-  let current = before;
-  const fresh = async () => {
-    const next = await snapshot(api, expectedId, diagnostic, pull);
-    assert.equal(fingerprint(inventory(next.rows)), fingerprint(inventory(current.rows)), 'FRESH_CAS');
-    window();
-    current = next;
-  };
-  // Preserve the previous fallback BEFORE changing the feedback recipient.
-  if (current.error === null && current.feedback !== recipient) {
-    await fresh();
-    record.phase = 'preserve-technical-recipient';
-    record.mutationAttempted = true;
-    save();
-    const response = await api(`v10/projects/${PROJECT}/env?upsert=false`, 'POST', {
-      key: 'ERROR_TO_EMAIL',
-      value: current.feedback,
-      type: 'plain',
-      target: ['production'],
-    });
-    assert.deepEqual(response.failed || [], [], 'CREATE_FAILED');
-    const created = Array.isArray(response.created) ? response.created[0] : response.created;
-    assert.ok(created?.id, 'CREATE_AMBIGUOUS');
-    const next = await snapshot(api, expectedId, diagnostic, pull);
-    assert.equal(dedicated(next.rows, 'ERROR_TO_EMAIL').id, created.id, 'CREATE_OWNER');
-    assert.equal(next.error, current.feedback, 'TECHNICAL_RECIPIENT');
-    otherRowsUnchanged(current.rows, next.rows, ['ERROR_TO_EMAIL']);
-    record.technicalRecipientPreserved = true;
-    record.createdErrorRowId = created.id;
-    save();
-    current = next;
-  }
-  if (current.feedback !== recipient) {
-    await fresh();
-    const row = dedicated(current.rows, 'FEEDBACK_TO_EMAIL');
-    record.phase = 'change-feedback-recipient';
-    record.mutationAttempted = true;
-    save();
-    const updated = await api(`v9/projects/${PROJECT}/env/${encodeURIComponent(row.id)}`, 'PATCH', { value: recipient });
-    assert.equal(updated?.id, row.id, 'PATCH_AMBIGUOUS');
-    const next = await snapshot(api, expectedId, diagnostic, pull);
-    assert.equal(dedicated(next.rows, 'FEEDBACK_TO_EMAIL').id, row.id, 'PATCH_OWNER');
-    const beforeMetadata = rowMetadata(row);
-    const afterMetadata = rowMetadata(dedicated(next.rows, 'FEEDBACK_TO_EMAIL'));
-    delete beforeMetadata.updatedAt;
-    delete afterMetadata.updatedAt;
-    assert.deepEqual(afterMetadata, beforeMetadata, 'PATCH_METADATA');
-    assert.equal(next.feedback, recipient, 'PATCH_VALUE');
-    assert.equal(next.error ?? next.feedback, before.error ?? before.feedback, 'TECHNICAL_DRIFT');
-    otherRowsUnchanged(current.rows, next.rows, ['FEEDBACK_TO_EMAIL']);
-    current = next;
-  }
+  const fresh = await snapshot(api, expectedId, diagnostic);
+  assert.equal(fingerprint(inventory(fresh.rows)), fingerprint(inventory(before.rows)), 'FRESH_CAS');
   window();
-  record.phase = 'final-verification';
-  assert.equal(current.feedback, recipient);
+  const row = fresh.recipientRow;
+  record.phase = 'change-feedback-recipient-write-only';
+  record.mutationAttempted = true;
+  save();
+  window();
+  const updated = await api(`v9/projects/${PROJECT}/env/${encodeURIComponent(row.id)}`, 'PATCH', { value: recipient });
+  assert.equal(updated?.id, row.id, 'PATCH_AMBIGUOUS');
+  const after = await snapshot(api, expectedId, diagnostic);
+  assert.equal(after.recipientRow.id, row.id, 'PATCH_OWNER');
+  assert.ok(after.recipientRow.updatedAt > row.updatedAt, 'PATCH_VERSION_NOT_ADVANCED');
+  const oldMeta = rowMetadata(row),
+    newMeta = rowMetadata(after.recipientRow);
+  delete oldMeta.updatedAt;
+  delete newMeta.updatedAt;
+  assert.deepEqual(newMeta, oldMeta, 'PATCH_METADATA');
+  otherRowsUnchanged(before.rows, after.rows, [row.id]);
+  window();
   Object.assign(record, {
-    status: 'feedback-mail-config-updated-redeploy-required',
+    status: 'config-update-acknowledged-redeploy-required',
+    phase: 'final-verification',
     checkedAtUtc: new Date(now()).toISOString(),
-    finalInventorySha256: fingerprint(inventory(current.rows)),
-    feedbackRecipientMatchesRequested: true,
-    technicalRecipientPreserved: true,
+    finalInventorySha256: fingerprint(inventory(after.rows)),
+    providerUpdateAcknowledged: true,
+    selectedRowVersionAdvanced: true,
+    recipientPlaintextReadbackVerified: false,
+    errorToEmailRemainsAbsent: true,
+    errorFallbackUsesFeedback: true,
+    otherOwnerRowsUnchanged: true,
     deploymentPerformed: false,
     emailSent: false,
     mailboxDeliveryVerified: false,
@@ -293,7 +241,7 @@ async function main() {
         status: 'offline-plan',
         modes: ['inspect', 'apply'],
         network: false,
-        target: 'Production FEEDBACK_TO_EMAIL only, preserving technical email fallback; managed redeploy required',
+        target: 'Fixed Production sensitive FEEDBACK_TO_EMAIL write-only; ERROR_TO_EMAIL stays absent; managed redeploy required',
       }),
     );
     return;
@@ -343,8 +291,7 @@ async function main() {
       assert.ok(Buffer.byteLength(raw) <= 2 * 1024 * 1024, 'BODY_LIMIT');
       return JSON.parse(raw);
     };
-    const pull = () => freshProductionPull(token);
-    await operate(mode, api, expectedId, prior, record, save, undefined, process.env.RELEASE_FEEDBACK_RECIPIENT, pull);
+    await operate(mode, api, expectedId, prior, record, save, undefined, process.env.RELEASE_FEEDBACK_RECIPIENT);
   } catch (error) {
     record.status = 'refused-or-incomplete';
     const firstLine = typeof error?.message === 'string' ? error.message.split('\n')[0] : '';
@@ -396,7 +343,12 @@ async function main() {
       'SENSITIVE_PULL_UNREADABLE',
       'OWNER_CHANGED_DURING_PULL',
       'CLI_VERSION',
-      'PRIVATE_PULL_FAILED',
+      'FIXED_RECIPIENT_ID',
+      'FIXED_RECIPIENT_TYPE',
+      'ERROR_TO_EXPECTED_ABSENT',
+      'UNEXPECTED_SENSITIVE_READ',
+      'PRIOR_INVENTORY',
+      'PATCH_VERSION_NOT_ADVANCED',
     ];
     record.category = safeCodes.includes(firstLine) ? firstLine : 'PRIVATE_DETAILS_WITHHELD';
     record.operatorReinspectionRequired = record.mutationAttempted;
@@ -404,43 +356,6 @@ async function main() {
     process.exitCode = 1;
   }
   console.log(JSON.stringify({ status: record.status, phase: record.phase, mutationAttempted: record.mutationAttempted }));
-}
-export function freshProductionPull(token, run = execFileSync) {
-  const previousMask = process.umask(0o077);
-  let directory;
-  try {
-    directory = mkdtempSync(join(tmpdir(), 'trajectory-feedback-pull-'));
-    chmodSync(directory, 0o700);
-    mkdirSync(join(directory, '.vercel'), { mode: 0o700 });
-    writeFileSync(join(directory, '.vercel', 'project.json'), JSON.stringify({ projectId: PROJECT, orgId: TEAM }), { mode: 0o600 });
-    const options = {
-      cwd: directory,
-      encoding: 'utf8',
-      stdio: ['ignore', 'pipe', 'pipe'],
-      timeout: 60_000,
-      maxBuffer: 2 * 1024 * 1024,
-      env: { ...process.env, VERCEL_ORG_ID: TEAM, VERCEL_PROJECT_ID: PROJECT },
-    };
-    const version = run('vercel', ['--version'], options);
-    assert.equal(String(version).trim(), '60.1.3', 'CLI_VERSION');
-    run('vercel', ['pull', '--yes', '--environment=production', '--scope', TEAM, '--token', token], options);
-    const file = join(directory, '.vercel', '.env.production.local');
-    chmodSync(file, 0o600);
-    const parsed = parseEnv(readFileSync(file, 'utf8'));
-    // Do not retain unrelated sensitive values, OIDC token, or raw plaintext.
-    return Object.fromEntries(
-      ['FEEDBACK_TO_EMAIL', 'ERROR_TO_EMAIL'].filter((key) => Object.hasOwn(parsed, key)).map((key) => [key, parsed[key]]),
-    );
-  } catch {
-    throw new Error('PRIVATE_PULL_FAILED');
-  } finally {
-    process.umask(previousMask);
-    if (directory) {
-      assert.equal(dirname(resolve(directory)), resolve(tmpdir()), 'PRIVATE_TMP_OWNER');
-      assert.ok(basename(directory).startsWith('trajectory-feedback-pull-'), 'PRIVATE_TMP_OWNER');
-      rmSync(directory, { recursive: true, force: false });
-    }
-  }
 }
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
   await main();
