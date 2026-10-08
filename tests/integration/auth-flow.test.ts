@@ -39,8 +39,14 @@ describe('authentication', () => {
     });
 
     expect(wrapper.text()).toContain('Создайте аккаунт');
-    expect(wrapper.text()).toContain('Будет создан аккаунт для облачной синхронизации записей');
-    expect(wrapper.text()).toContain('После регистрации нужно подтвердить email');
+    expect(wrapper.text()).not.toContain('Будет создан аккаунт для облачной синхронизации записей.');
+    expect(wrapper.get('#signup-account-hint').text()).toBe('После регистрации нужно подтвердить email по ссылке из письма.');
+    const policyLink = wrapper.get('a.auth-policy-link');
+    expect(policyLink.text()).toBe('Как обрабатываются ваши данные');
+    expect(policyLink.attributes('href')).toBe('/data-policy');
+    expect(policyLink.attributes('target')).toBe('_blank');
+    expect(policyLink.attributes('rel')).toBe('noopener');
+    expect(wrapper.get('input[type="email"]').attributes('aria-describedby')).toBe('signup-account-hint');
     expect(wrapper.findAll('input')).toHaveLength(3);
     expect(wrapper.findAll('button[aria-label="Показать пароль"]')).toHaveLength(2);
     expect(wrapper.get('#auth-password').attributes('autocomplete')).toBe('new-password');
