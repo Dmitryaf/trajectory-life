@@ -487,3 +487,50 @@ test('inspect rejects present production signup managed scopes instead of accept
     assert.equal(a.calls.post, 0);
   }
 });
+
+test('fresh CAS diagnostics expose only valid changed key names and never relax equality', async () => {
+  for (const scenario of ['effective', 'backend', 'inventory', 'invalid-key']) {
+    const before = fixture();
+    before.environment.VERCEL_OIDC_TOKEN = 'private-token-before';
+    let count = 0;
+    const a = actions(before);
+    a.snapshot = async () => {
+      const x = structuredClone(before);
+      if (++count === 2) {
+        if (scenario === 'effective') {
+          x.environment.VERCEL_OIDC_TOKEN = 'private-token-after';
+        }
+        if (scenario === 'backend') {
+          x.environment.SUPABASE_URL = 'private-backend-after';
+        }
+        if (scenario === 'inventory') {
+          x.rows.at(-1).updatedAt++;
+        }
+        if (scenario === 'invalid-key') {
+          x.environment['private-secret-key-name!'] = 'private-invalid-value';
+        }
+      }
+      return x;
+    };
+    const r = await operate('inspect', a, {});
+    assert.equal(r.status, 'failed-stopped-no-deployment');
+    assert.equal(r.phase, 'fresh-owner-cas');
+    assert.equal(a.calls.post, 0);
+    assert.equal(r.ownerRepresentationEqual, scenario !== 'inventory');
+    assert.equal(r.effectiveRepresentationEqual, scenario === 'inventory');
+    const expectedKeys = { effective: ['VERCEL_OIDC_TOKEN'], backend: ['SUPABASE_URL'], inventory: [], 'invalid-key': [] };
+    assert.deepEqual(r.changedEffectiveKeyNames, expectedKeys[scenario]);
+    assert.equal(r.changedInvalidEffectiveKeyCount, scenario === 'invalid-key' ? 1 : 0);
+    assert.equal(r.freshDiagnostics.fourBackendDiagnostic.length, 4);
+    const serialized = JSON.stringify(a.calls.saved);
+    for (const secret of [
+      'private-token-before',
+      'private-token-after',
+      'private-backend-after',
+      'private-secret-key-name!',
+      'private-invalid-value',
+    ]) {
+      assert.ok(!serialized.includes(secret));
+    }
+  }
+});
