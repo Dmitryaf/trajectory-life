@@ -50,6 +50,7 @@ function fixture() {
     value: name.endsWith('_URL') ? 'https://api.trajectory-life.ru' : key,
     updatedAt: 1,
   }));
+  rows.push({ id: 'existing-signup', key: signupKey, type: 'plain', target: ['production'], value: 'false', updatedAt: 3 });
   rows.push({ id: 'unrelated', key: 'PRIVATE_CONFIG', type: 'sensitive', target: ['production'], value: '[SENSITIVE]', updatedAt: 2 });
   const environment = Object.fromEntries(rows.map((row) => [row.key, row.value]));
   Object.assign(environment, { VITE_REQUIRE_AUTH: 'true', VITE_ENABLE_SIGNUP: 'false' });
@@ -344,6 +345,8 @@ test('temporary operator job is manual same-branch with shared concurrency; auto
 test('missing signup is inspected honestly, never treated as false for telemetry creation', async () => {
   const x = fixture();
   delete x.environment[signupKey];
+  x.rows = x.rows.filter((row) => row.key !== signupKey);
+  x.readableRows = x.rows;
   const a = actions(x);
   const r = await operate('inspect', a, {});
   assert.equal(r.status, 'owner-baseline-inspected');
@@ -359,6 +362,8 @@ test('missing signup is inspected honestly, never treated as false for telemetry
 test('signup bootstrap creates only one production false; telemetry remains absent', async () => {
   const x = fixture();
   delete x.environment[signupKey];
+  x.rows = x.rows.filter((row) => row.key !== signupKey);
+  x.readableRows = x.rows;
   const a = actions(x, signupKey);
   const r = await operate('bootstrap-signup-false', a, {});
   assert.equal(r.status, 'production-false-flag-bootstrapped-no-deployment');
@@ -372,6 +377,8 @@ test('signup all-scope existing row and wrong effective value prohibit creation'
   for (const target of [['preview'], ['production'], ['production', 'preview']]) {
     const x = fixture();
     delete x.environment[signupKey];
+    x.rows = x.rows.filter((row) => row.key !== signupKey);
+    x.readableRows = x.rows;
     x.rows.push({ ...flag(signupKey), target });
     const a = actions(x, signupKey);
     assert.equal((await operate('bootstrap-signup-false', a, {})).status, 'failed-stopped-no-deployment');
@@ -387,6 +394,8 @@ test('signup all-scope existing row and wrong effective value prohibit creation'
 test('signup prior proof requires successful inspect and selected-key absence, not old failed receipt', async () => {
   const x = fixture();
   delete x.environment[signupKey];
+  x.rows = x.rows.filter((row) => row.key !== signupKey);
+  x.readableRows = x.rows;
   const proof = await operate('inspect', actions(x), { mode: 'inspect', sourceSha: sha, sourceBranch: pins.branch, sourceRunId: '122' });
   const e = { ...env, absence_inspection_run: '122' };
   assertPriorProof(proof, e, x, Date.now(), signupKey);
@@ -418,6 +427,8 @@ test('finite key allowlist refuses arbitrary keys and cross-key POST response', 
 test('lost signup creation response never retries, compensates, or exposes provider error', async () => {
   const x = fixture();
   delete x.environment[signupKey];
+  x.rows = x.rows.filter((row) => row.key !== signupKey);
+  x.readableRows = x.rows;
   const a = actions(x, signupKey);
   a.create = async () => {
     a.calls.post++;
@@ -427,4 +438,52 @@ test('lost signup creation response never retries, compensates, or exposes provi
   assert.equal(a.calls.post, 1);
   assert.equal(r.failureCategory, 'creation-unverified-operator-inspection-required');
   assert.ok(!JSON.stringify(r).includes('private-secret-error'));
+});
+
+test('telemetry bootstrap requires dedicated signup owner row, not effective false alone', async () => {
+  const changes = [
+    { missing: true },
+    { target: ['production', 'preview'] },
+    { system: true },
+    { configurationId: 'integration' },
+    { gitBranch: 'branch' },
+    { customEnvironmentIds: ['custom'] },
+    { visibility: 'secret' },
+    { type: 'sensitive' },
+    { updatedAt: null },
+  ];
+  for (const change of changes) {
+    const x = fixture();
+    const row = x.rows.find((row) => row.key === signupKey);
+    if (change.missing) {
+      x.rows = x.rows.filter((row) => row.key !== signupKey);
+      x.readableRows = x.rows;
+    } else {
+      Object.assign(row, change);
+    }
+    const a = actions(x);
+    const r = await operate('bootstrap-false', a, {});
+    assert.equal(r.status, 'failed-stopped-no-deployment');
+    assert.equal(a.calls.post, 0);
+  }
+});
+
+test('inspect rejects present production signup managed scopes instead of accepting false', async () => {
+  for (const change of [
+    { target: ['production', 'preview'] },
+    { configurationId: 'integration' },
+    { system: true },
+    { gitBranch: 'x' },
+    { customEnvironmentIds: ['custom'] },
+  ]) {
+    const x = fixture();
+    Object.assign(
+      x.rows.find((row) => row.key === signupKey),
+      change,
+    );
+    const a = actions(x);
+    const r = await operate('inspect', a, {});
+    assert.equal(r.status, 'failed-stopped-no-deployment');
+    assert.equal(a.calls.post, 0);
+  }
 });

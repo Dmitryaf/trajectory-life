@@ -197,16 +197,27 @@ export function assertBackend(rows, environment, canonicalDeployment, customDepl
   }
   assert.equal(environment.VITE_REQUIRE_AUTH, 'true');
   assert.ok([undefined, 'false'].includes(environment.VITE_ENABLE_SIGNUP));
-  const signupRows = rows.filter((row) => row.key === signupKey && row.target?.includes('production'));
-  if (signupRows.length) {
-    assert.equal(signupRows.length, 1);
-    assert.equal(signupRows[0].value, 'false');
-    assert.equal(environment.VITE_ENABLE_SIGNUP, 'false');
-    assert.ok(signupRows[0].type === 'plain' || signupRows[0].decrypted === true);
-  }
+  assertSignupFalse(rows, environment);
   assert.ok([undefined, 'false'].includes(environment[flagKey]));
   assert.ok([undefined, 'false'].includes(environment.PRODUCT_TELEMETRY_ENABLED));
   return evidence;
+}
+
+export function assertSignupFalse(rows, environment, required = false) {
+  const matches = rows.filter((row) => row.key === signupKey && row.target?.includes('production'));
+  if (!required && matches.length === 0) {
+    return;
+  }
+  assert.equal(matches.length, 1);
+  const row = matches[0];
+  assert.deepEqual(row.target, ['production']);
+  assert.ok(typeof row.id === 'string' && row.id && Number.isSafeInteger(row.updatedAt) && row.updatedAt >= 0);
+  assert.ok([undefined, ''].includes(row.gitBranch) && [undefined, null, ''].includes(row.configurationId));
+  assert.ok([undefined, false].includes(row.system) && [undefined, 'config'].includes(row.visibility));
+  assert.ok(row.customEnvironmentIds === undefined || (Array.isArray(row.customEnvironmentIds) && row.customEnvironmentIds.length === 0));
+  assert.ok(row.type === 'plain' || (row.type === 'encrypted' && row.decrypted === true));
+  assert.equal(row.value, 'false');
+  assert.equal(environment[signupKey], 'false');
 }
 
 export function assertCreated(result, observed, key = flagKey) {
@@ -320,7 +331,7 @@ export async function operate(mode, actions, record) {
       await phase('prior-inspection-and-absence', async () => {
         assertAbsent(before.rows, selectedKey);
         if (selectedKey === flagKey) {
-          assert.equal(before.environment[signupKey], 'false');
+          assertSignupFalse(backendRows(before), before.environment, true);
         }
         await actions.assertPrior(before, selectedKey);
       });
@@ -335,7 +346,7 @@ export async function operate(mode, actions, record) {
     } else {
       assertAbsent(fresh.rows, selectedKey);
       if (selectedKey === flagKey) {
-        assert.equal(fresh.environment[signupKey], 'false');
+        assertSignupFalse(backendRows(fresh), fresh.environment, true);
       }
       record.creation = 'attempted-no-retry';
       const result = await phase('create-one-production-false', () =>
