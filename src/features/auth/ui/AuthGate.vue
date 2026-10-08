@@ -199,7 +199,7 @@ async function requestPasswordReset() {
 
       <form v-else class="auth-form" :aria-busy="auth.loading" @submit.prevent="submit">
         <p v-if="mode === 'sign-up'" id="signup-account-hint" class="auth-form__intro">
-          Будет создан аккаунт для облачной синхронизации записей. После регистрации нужно подтвердить email по ссылке из письма.
+          После регистрации нужно подтвердить email по ссылке из письма.
         </p>
         <label class="form-control">
           <FormFieldLabel tag="span">Email</FormFieldLabel>
@@ -241,7 +241,7 @@ async function requestPasswordReset() {
           </div>
         </template>
         <p v-if="mode === 'sign-up'" class="auth-field-hint">
-          <RouterLink to="/data-policy" target="_blank" rel="noopener">Как обрабатываются ваши данные</RouterLink>
+          <RouterLink class="auth-policy-link" to="/data-policy" target="_blank" rel="noopener">Как обрабатываются ваши данные</RouterLink>
         </p>
         <ActionButton variant="primary" type="submit" :disabled="auth.loading">
           <span v-if="auth.loading" class="auth-button-spinner" aria-hidden="true"></span>
