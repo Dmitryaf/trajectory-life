@@ -109,7 +109,7 @@ jobs:
       github.event_name == 'workflow_dispatch' &&
       github.ref == 'refs/heads/codex/feedback-recipient-ops-20261008' &&
       inputs.sha == github.sha &&
-      (inputs.mode == 'inspect' || inputs.mode == 'enable')
+      inputs.mode == 'inspect'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     env:
@@ -124,8 +124,7 @@ jobs:
         with:
           node-version-file: .nvmrc
       - run: mkdir -p qa
-      - if: inputs.mode == 'enable'
-        uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v4
         with:
           name: feedback-mail-config
           path: qa/feedback-mail-config-prior
@@ -137,7 +136,7 @@ jobs:
           RELEASE_FEEDBACK_RECIPIENT: ${{ secrets.RELEASE_FEEDBACK_RECIPIENT }}
           EXPECTED_OPERATOR_SHA: ${{ inputs.sha }}
           EXPECTED_DEPLOYMENT: ${{ inputs.previous_id }}
-          ROOT_MODE: ${{ inputs.mode == 'enable' && 'apply' || 'inspect' }}
+          ROOT_MODE: inspect
           PRIOR_RECEIPT_SHA: ${{ inputs.backend_receipt_sha256 }}
         run: node scripts/operations/configure-feedback-recipient.mjs "$ROOT_MODE" qa/feedback-mail-config-result "$EXPECTED_DEPLOYMENT" qa/feedback-mail-config-prior/result.json "$PRIOR_RECEIPT_SHA"
       - if: ${{ !cancelled() }}
