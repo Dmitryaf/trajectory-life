@@ -1,18 +1,29 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import { useAppStore } from '@/stores/app';
 import { dataCoverageLevel } from '@/features/analytics/coverage';
 import { hasMeaningfulReview } from '@/features/reviews/telemetry';
 import { hasUnsavedSyncEditors, onUnsavedSyncEditorsChange } from '@/features/sync/editing';
+import DialogSurface from '@/shared/ui/overlays/DialogSurface.vue';
+import DialogCloseButton from '@/shared/ui/overlays/DialogCloseButton.vue';
+import { useDialogFocus } from '@/shared/ui/overlays/useDialogFocus';
+import { useBodyScrollLock } from '@/shared/ui/overlays/useBodyScrollLock';
+import { useDialogBackdropClose } from '@/shared/ui/overlays/useDialogBackdropClose';
 import ActionButton from '@/shared/ui/actions/ActionButton.vue';
 import { consentOfferKind } from '../consentEligibility';
 import { productTelemetry, telemetryCollectionEnabled, telemetryState } from '../productTelemetry';
 import ConsentDetails from './ConsentDetails.vue';
 const store = useAppStore();
 const route = useRoute();
-const panel = ref<HTMLElement>();
+const dialogSurface = ref<InstanceType<typeof DialogSurface>>();
+const panel = computed(() => dialogSurface.value?.element);
+const returnFocus = ref<HTMLElement>();
 const visible = ref<'offer' | 'reminder' | null>(null);
+const isOpen = computed(() => visible.value !== null);
+useBodyScrollLock(isOpen);
+const { handleDialogKeydown } = useDialogFocus(isOpen, panel, returnFocus);
+const { startBackdropClose, finishBackdropClose, cancelBackdropClose } = useDialogBackdropClose(() => dismiss(true));
 const interacted = ref(false);
 const dirty = ref(hasUnsavedSyncEditors());
 const attempted = new Set<string>();
@@ -42,10 +53,13 @@ function interaction(event: Event) {
     interacted.value = true;
   }
 }
+function otherDialogOpen() {
+  return document.querySelector('[role="dialog"][aria-modal="true"]') !== null;
+}
 watch(
   () => [safe.value, consentOfferKind(telemetryState, experience.value)],
   async () => {
-    if (!safe.value || !telemetryCollectionEnabled || visible.value) {
+    if (!safe.value || !telemetryCollectionEnabled || visible.value || otherDialogOpen()) {
       return;
     }
     const kind = consentOfferKind(telemetryState, experience.value);
@@ -54,24 +68,22 @@ watch(
     }
     attempted.add(kind);
     const offered = await productTelemetry.offer(kind);
-    if (offered && safe.value) {
+    if (offered && safe.value && !otherDialogOpen()) {
+      const focused = document.activeElement;
+      const heading = document.querySelector<HTMLElement>('.app-main h1, .app-main h2');
+      if (heading) {
+        heading.tabIndex = -1;
+      }
+      returnFocus.value = focused instanceof HTMLElement && focused !== document.body ? focused : (heading ?? undefined);
       visible.value = kind;
     }
   },
   { immediate: true },
 );
-async function close() {
-  const restoreFocus = panel.value?.contains(document.activeElement);
+function close() {
   visible.value = null;
-  if (restoreFocus) {
-    await nextTick();
-    const target = document.querySelector<HTMLElement>('.app-main h1, .app-main h2');
-    if (target) {
-      target.tabIndex = -1;
-      target.focus({ preventScroll: true });
-    }
-  }
 }
+
 watch(
   () => [telemetryState.enabled, telemetryState.decision],
   () => {
@@ -106,38 +118,40 @@ onBeforeUnmount(() => {
 });
 </script>
 <template>
-  <section
-    v-if="visible && !['pending', 'conflict', 'error', 'syncing'].includes(store.cloudSyncStatus)"
-    ref="panel"
-    class="consent-experience"
-    aria-labelledby="consent-offer-title"
-  >
-    <h2 id="consent-offer-title">Помочь улучшать Траекторию?</h2>
-    <p>
-      Можно передавать сведения об открытии разделов и сохранении записей. Без текстов дневника, целей и значений показателей. Это
-      необязательно; решение можно изменить в Настройках.
-    </p>
-    <p v-if="visible === 'offer'">
-      Если выбрать «Не сейчас», предложим ещё один раз не раньше чем через неделю, когда появятся записи или первый обзор.
-    </p>
-    <p v-else>Это последнее автоматическое предложение. Можно продолжить пользоваться приложением без статистики.</p>
-    <div class="consent-experience__actions">
-      <ActionButton variant="secondary" type="button" :disabled="telemetryState.busy" @click="allow">Разрешить</ActionButton>
-      <ActionButton v-if="visible === 'offer'" variant="secondary" type="button" @click="dismiss(true)">Не сейчас</ActionButton>
-      <ActionButton variant="secondary" type="button" @click="dismiss(false)">Не предлагать</ActionButton>
-    </div>
-    <ConsentDetails />
-    <p class="consent-experience__status" role="status">{{ telemetryState.message }}</p>
-  </section>
+  <Teleport to="body">
+    <DialogSurface
+      v-if="isOpen"
+      ref="dialogSurface"
+      labelledby="consent-offer-title"
+      panel-class="consent-experience"
+      @pointerdown="startBackdropClose"
+      @pointerup="finishBackdropClose"
+      @pointercancel="cancelBackdropClose"
+      @keydown="handleDialogKeydown"
+      @keydown.esc.stop.prevent="dismiss(true)"
+    >
+      <div class="dialog-heading">
+        <h2 id="consent-offer-title">Помочь улучшать Траекторию?</h2>
+        <DialogCloseButton label="Не сейчас" @click="dismiss(true)" />
+      </div>
+      <p>
+        Можно передавать сведения об открытии разделов и сохранении записей. Без текстов дневника, целей и значений показателей. Это
+        необязательно; решение можно изменить в Настройках.
+      </p>
+      <p v-if="visible === 'reminder'">
+        Это последнее автоматическое предложение. Можно продолжить пользоваться приложением без статистики.
+      </p>
+      <div class="consent-experience__actions">
+        <ActionButton variant="secondary" type="button" :disabled="telemetryState.busy" @click="allow">Разрешить</ActionButton>
+        <ActionButton variant="secondary" type="button" @click="dismiss(true)">Не сейчас</ActionButton>
+        <ActionButton variant="secondary" type="button" @click="dismiss(false)">Не предлагать</ActionButton>
+      </div>
+      <ConsentDetails />
+      <p class="consent-experience__status" role="status">{{ telemetryState.message }}</p>
+    </DialogSurface>
+  </Teleport>
 </template>
 <style scoped>
-.consent-experience {
-  margin-bottom: 24px;
-  padding: 20px;
-  border: 1px solid var(--line);
-  border-radius: 16px;
-  background: var(--surface);
-}
 h2 {
   margin-top: 0;
   font-size: 20px;
