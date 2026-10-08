@@ -51,6 +51,23 @@ const firstUseOwnsToday = computed(
     router.currentRoute.value.path === '/today' &&
     isFirstUsePrimary(store.settings.firstUse, router.currentRoute.value.query['first-use'] === 'edit'),
 );
+type SyncBanner = { status: 'pending' | 'conflict' | 'error'; message: string };
+const syncBanner = ref<SyncBanner | null>(null);
+watch(
+  () => [auth.session?.user.id ?? '', store.cloudSyncStatus, store.cloudSyncMessage] as const,
+  ([owner, status, message], previous) => {
+    if (!owner || (previous && previous[0] !== owner)) {
+      syncBanner.value = null;
+      return;
+    }
+    if (status === 'pending' || status === 'conflict' || status === 'error') {
+      syncBanner.value = { status, message };
+    } else if (status !== 'syncing') {
+      syncBanner.value = null;
+    }
+  },
+  { immediate: true, flush: 'sync' },
+);
 let appDataLoadPromise: Promise<void> | null = null;
 let stopCloudSubscription: (() => void) | undefined;
 let stopEditingSubscription: (() => void) | undefined;
@@ -326,15 +343,11 @@ function isPrimaryNavigationItemActive(item: PrimaryNavigationItem, path: string
         </div>
       </section>
       <template v-else>
-        <section
-          v-if="store.cloudSyncStatus === 'pending' || store.cloudSyncStatus === 'conflict' || store.cloudSyncStatus === 'error'"
-          class="sync-banner"
-          :class="`sync-banner--${store.cloudSyncStatus}`"
-        >
+        <section v-if="syncBanner" class="sync-banner" :class="`sync-banner--${syncBanner.status}`">
           <span class="sync-banner__mark"><UiIcon name="sync" /></span>
           <div>
             <strong>Облако не обновлено</strong>
-            <p>{{ store.cloudSyncMessage }}</p>
+            <p>{{ syncBanner.message }}</p>
           </div>
           <ActionButton :as="RouterLink" variant="secondary" to="/settings#cloud-settings">Настройки синхронизации</ActionButton>
         </section>
