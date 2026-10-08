@@ -128,6 +128,90 @@ test('effective config or backend row drift refuses before build', () => {
     ),
   );
 });
+
+test('generated OIDC value can rotate only when absent from both all-scope owner inventories', () => {
+  for (const desired of ['true', 'false']) {
+    const before = {
+      ...environment,
+      VITE_PRODUCT_TELEMETRY_ENABLED: desired === 'true' ? 'false' : 'true',
+      VERCEL_OIDC_TOKEN: 'synthetic-generated-before',
+    };
+    const after = { ...before, VITE_PRODUCT_TELEMETRY_ENABLED: desired, VERCEL_OIDC_TOKEN: 'synthetic-generated-after' };
+    assertTelemetryTransition(before, after, rows, rows, desired);
+  }
+  assertTelemetryTransition(environment, { ...environment, VITE_PRODUCT_TELEMETRY_ENABLED: 'true' }, rows, rows, 'true');
+});
+
+for (const target of [['production'], ['preview'], ['development'], []]) {
+  for (const side of ['before', 'after', 'both']) {
+    test(`project-owned OIDC ${JSON.stringify(target)} in ${side} inventory keeps strict value comparison`, () => {
+      const oidc = {
+        id: 'configured-oidc',
+        key: 'VERCEL_OIDC_TOKEN',
+        value: 'synthetic-owner-value',
+        type: 'encrypted',
+        target,
+        customEnvironmentIds: target.length ? [] : ['custom'],
+      };
+      const beforeRows = side === 'after' ? rows : [...rows, oidc];
+      const afterRows = side === 'before' ? rows : [...rows, oidc];
+      const before = { ...environment, VERCEL_OIDC_TOKEN: 'synthetic-generated-before' };
+      const after = { ...before, VITE_PRODUCT_TELEMETRY_ENABLED: 'true', VERCEL_OIDC_TOKEN: 'synthetic-generated-after' };
+      assert.throws(() => assertTelemetryTransition(before, after, beforeRows, afterRows, 'true'));
+      assertTelemetryTransition(before, { ...after, VERCEL_OIDC_TOKEN: before.VERCEL_OIDC_TOKEN }, beforeRows, afterRows, 'true');
+    });
+  }
+}
+
+test('OIDC effective key presence cannot change even without owner rows', () => {
+  const before = { ...environment, VERCEL_OIDC_TOKEN: 'synthetic-generated-before' };
+  const after = { ...environment, VITE_PRODUCT_TELEMETRY_ENABLED: 'true' };
+  assert.throws(() => assertTelemetryTransition(before, after, rows, rows, 'true'));
+  assert.throws(() =>
+    assertTelemetryTransition(environment, { ...after, VERCEL_OIDC_TOKEN: 'synthetic-generated-after' }, rows, rows, 'true'),
+  );
+});
+
+test('OIDC exemption cannot accept empty or non-string replacement values', () => {
+  const before = { ...environment, VERCEL_OIDC_TOKEN: 'synthetic-generated-before' };
+  for (const value of ['', null, undefined, 0, false, {}]) {
+    assert.throws(() =>
+      assertTelemetryTransition(
+        before,
+        { ...before, VITE_PRODUCT_TELEMETRY_ENABLED: 'true', VERCEL_OIDC_TOKEN: value },
+        rows,
+        rows,
+        'true',
+      ),
+    );
+  }
+});
+
+test('generated OIDC rotation does not mask unrelated values, backend owner metadata, or desired flag drift', () => {
+  const before = { ...environment, VERCEL_OIDC_TOKEN: 'synthetic-generated-before' };
+  const after = { ...before, VITE_PRODUCT_TELEMETRY_ENABLED: 'true', VERCEL_OIDC_TOKEN: 'synthetic-generated-after' };
+  for (const change of [{ PRIVATE_SERVER_CONFIG: 'changed' }, { SUPABASE_URL: url + '/' }, { VITE_PRODUCT_TELEMETRY_ENABLED: 'false' }]) {
+    assert.throws(() => assertTelemetryTransition(before, { ...after, ...change }, rows, rows, 'true'));
+  }
+  assert.throws(() =>
+    assertTelemetryTransition(
+      before,
+      after,
+      rows,
+      rows.map((row, i) => (i ? row : { ...row, updatedAt: 2 })),
+      'true',
+    ),
+  );
+});
+
+test('missing owner inventories cannot qualify a generated OIDC exemption', () => {
+  const before = { ...environment, VERCEL_OIDC_TOKEN: 'synthetic-generated-before' };
+  const after = { ...before, VITE_PRODUCT_TELEMETRY_ENABLED: 'true', VERCEL_OIDC_TOKEN: 'synthetic-generated-after' };
+  for (const inventory of [undefined, null, {}]) {
+    assert.throws(() => assertTelemetryTransition(before, after, inventory, rows, 'true'));
+    assert.throws(() => assertTelemetryTransition(before, after, rows, inventory, 'true'));
+  }
+});
 test('inspect evidence exposes only approved flags, identities and digests', () => {
   const record = telemetryInspection({ sha, tree, id: 123 }, previous, previous, environment, flag, rows);
   assert.equal(record.customAliasId, previous.id);
