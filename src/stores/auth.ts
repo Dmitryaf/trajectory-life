@@ -1,6 +1,7 @@
 import { productTelemetry } from '@/features/telemetry/productTelemetry';
 import { defineStore } from 'pinia';
 import type { Session } from '@supabase/supabase-js';
+import type { TermsAcceptance } from '@/model/legalDocuments';
 import {
   clearCloudSyncMeta,
   clearLocalCloudSession,
@@ -73,6 +74,9 @@ function signupErrorMessage(error: unknown): string {
   const details = authErrorDetails(error);
   if (details.code === 'request_timeout') {
     return 'Сервис долго не отвечает. Проверь интернет и почту: аккаунт мог быть создан. Затем попробуй войти или повтори позже.';
+  }
+  if (details.message.includes('актуальные условия использования')) {
+    return 'Обнови приложение и прими актуальные Условия использования при регистрации.';
   }
   if (details.status === 429 || details.code.includes('rate_limit') || details.message.includes('rate limit')) {
     return 'Слишком много попыток. Подожди несколько минут и попробуй ещё раз.';
@@ -229,12 +233,12 @@ export const useAuthStore = defineStore('auth', {
         this.operation = null;
       }
     },
-    async signUp(email: string, password: string) {
+    async signUp(email: string, password: string, acceptance: TermsAcceptance) {
       this.sessionRevision += 1;
       this.operation = 'signing-up';
       this.error = '';
       try {
-        const result = await withAuthRequestTimeout(signUpToCloud(email, password));
+        const result = await withAuthRequestTimeout(signUpToCloud(email, password, acceptance));
         this.session = result.session;
         return result;
       } catch (error) {

@@ -52,7 +52,7 @@ describe('authenticated public entry', () => {
       history: createMemoryHistory(),
       routes: [
         { path: '/', component: { template: '<div>Лендинг</div>' } },
-        { path: '/data-policy', component: { template: '<div>Политика данных</div>' } },
+        { path: '/data-policy', component: { template: '<div>Политика конфиденциальности</div>' } },
         { path: '/today', component: { template: '<div>Сегодня</div>' } },
       ],
     });
