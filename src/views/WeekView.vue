@@ -220,7 +220,7 @@ watch(
   <PageShell class="page--review page--week">
     <ReviewHeading
       title="Неделя"
-      summary="Вспомните события недели, посмотрите записи о сне, самочувствии и занятиях."
+      summary="Вспомните события недели и посмотрите свои записи."
       :action="hasPeriodData ? (reviewAvailable ? 'К обзору' : 'Обзор позже') : undefined"
       href="#week-review"
       period="week"
@@ -270,7 +270,7 @@ watch(
           <div>
             <EyebrowText tag="p">По вашим воспоминаниям</EyebrowText>
             <h2>Ваш обзор недели</h2>
-            <p>Здесь ваши ответы о событиях, делах и самочувствии за неделю.</p>
+            <p>Здесь ваши записи и ответы за неделю.</p>
             <p v-if="recoveredPeriodIsIncomplete" class="restored-week-overview__coverage">
               Ответы собраны по {{ formatDate(savedReview.coveredThrough, { day: 'numeric', month: 'long' }) }}. Остальные дни этой недели
               не считаются пропущенными.
@@ -448,7 +448,7 @@ watch(
         </template>
         <PeriodDetails
           class="review-context-details"
-          :title="reviewHasContext ? 'Дела, события и самочувствие' : 'Добавить дела, события и самочувствие'"
+          :title="reviewHasContext ? 'Дела и события' : 'Добавить дела и события'"
           :open="reviewContextOpen"
           @toggle="updateReviewContextOpen"
         >
@@ -468,8 +468,8 @@ watch(
             type="text"
             :placeholder="`${index + 1}. Что важно запомнить`"
           />
-          <FormFieldLabel>Самочувствие и условия недели</FormFieldLabel>
-          <AutoGrowTextarea v-model="review.stateContext" :rows="2" placeholder="Самочувствие и обстоятельства" />
+          <FormFieldLabel>Обстоятельства недели</FormFieldLabel>
+          <AutoGrowTextarea v-model="review.stateContext" :rows="2" placeholder="Что повлияло на эту неделю" />
           <FormFieldLabel>Что помогало?</FormFieldLabel
           ><AutoGrowTextarea v-model="review.support" :rows="2" placeholder="Например: режим или помощь близких" />
           <FormFieldLabel>Что мешало?</FormFieldLabel><AutoGrowTextarea v-model="review.obstacle" :rows="2" placeholder="Например: шум" />

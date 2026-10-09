@@ -1,6 +1,6 @@
 import type { TelemetryState } from './queue';
 export function consentOfferKind(state: TelemetryState, hasExperience: boolean): 'offer' | 'reminder' | null {
-  if (!state.available || state.enabled || state.pendingWithdrawal || state.busy) {
+  if (!state.available || state.enabled || state.pendingWithdrawal || state.busy || !hasExperience) {
     return null;
   }
   if (state.decision === 'undecided' && !state.firstOfferedAt) {

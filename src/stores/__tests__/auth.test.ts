@@ -88,12 +88,12 @@ describe('auth store lifecycle', () => {
     cloud.signUp.mockResolvedValue({ session: null, confirmationRequired: true });
     const auth = useAuthStore();
 
-    await expect(auth.signUp('friend@example.com', 'safe-password')).resolves.toEqual({
+    await expect(auth.signUp('friend@example.com', 'safe-password', currentTermsAcceptance())).resolves.toEqual({
       session: null,
       confirmationRequired: true,
     });
     expect(auth.session).toBeNull();
-    expect(cloud.signUp).toHaveBeenCalledWith('friend@example.com', 'safe-password');
+    expect(cloud.signUp).toHaveBeenCalledWith('friend@example.com', 'safe-password', currentTermsAcceptance());
   });
 
   it('exposes the current registration operation and clears it after completion', async () => {
@@ -106,7 +106,7 @@ describe('auth store lifecycle', () => {
     );
     const auth = useAuthStore();
 
-    const signup = auth.signUp('friend@example.com', 'safe-password');
+    const signup = auth.signUp('friend@example.com', 'safe-password', currentTermsAcceptance());
     expect(auth.operation).toBe('signing-up');
     expect(auth.loading).toBe(true);
 
@@ -121,7 +121,7 @@ describe('auth store lifecycle', () => {
     cloud.signUp.mockReturnValue(new Promise(() => undefined));
     const auth = useAuthStore();
 
-    const signup = auth.signUp('friend@example.com', 'safe-password');
+    const signup = auth.signUp('friend@example.com', 'safe-password', currentTermsAcceptance());
     const rejection = expect(signup).rejects.toMatchObject({ code: 'request_timeout' });
     await vi.advanceTimersByTimeAsync(20_000);
 
@@ -145,7 +145,7 @@ describe('auth store lifecycle', () => {
     cloud.signUp.mockRejectedValue(error);
     const auth = useAuthStore();
 
-    await expect(auth.signUp('friend@example.com', 'safe-password')).rejects.toBe(error);
+    await expect(auth.signUp('friend@example.com', 'safe-password', currentTermsAcceptance())).rejects.toBe(error);
     expect(auth.error).toBe(message);
     expect(auth.operation).toBeNull();
   });
@@ -237,3 +237,4 @@ describe('auth store lifecycle', () => {
     expect(auth.session).toBeNull();
   });
 });
+import { currentTermsAcceptance } from '@/model/legalDocuments';

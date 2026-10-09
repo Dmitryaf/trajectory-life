@@ -59,6 +59,9 @@
   color: var(--muted);
   font-size: 14px;
 }
+.landing-footer div {
+  flex-wrap: wrap;
+}
 .landing-hero h1 {
   max-width: 650px;
   font-size: clamp(34px, 4.5vw, 56px);

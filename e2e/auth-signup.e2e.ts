@@ -1,6 +1,7 @@
 import { createServer, type ViteDevServer } from 'vite';
 import { expect, test } from './fixtures';
 import { expectPageFitsViewport } from './layout-assertions';
+import { currentTermsAcceptance } from '../src/model/legalDocuments';
 
 let server: ViteDevServer;
 let origin: string;
@@ -29,13 +30,16 @@ test.beforeAll(async () => {
 test.afterAll(async () => server?.close());
 
 test('registers without an invitation and keeps confirmation and retry paths usable', async ({ page }, testInfo) => {
+  let signupRequests = 0;
   await page.route(`${backend}/**`, async (route) => {
     const endpoint = new URL(route.request().url()).pathname;
     if (endpoint === '/auth/v1/signup') {
+      signupRequests += 1;
       const body = route.request().postDataJSON();
       expect(body.email).toBe('synthetic@example.test');
       expect(body.password).toBe('safe-password');
       expect(body.data ?? {}).not.toHaveProperty('beta_invite_code');
+      expect(body.data.terms_acceptance).toEqual(currentTermsAcceptance());
       await route.fulfill({ json: { user: { id: 'synthetic-user', email: body.email }, session: null } });
       return;
     }
@@ -43,26 +47,40 @@ test('registers without an invitation and keeps confirmation and retry paths usa
   });
 
   for (const width of [390, 1280]) {
+    const requestsBefore = signupRequests;
     await page.setViewportSize({ width, height: 900 });
     await page.goto(`${origin}/`);
     await page.getByRole('link', { name: 'Создать аккаунт', exact: true }).first().click();
     await expect(page.getByRole('heading', { name: 'Создайте аккаунт', exact: true })).toBeVisible();
     await expect(page.getByLabel('Код приглашения')).toHaveCount(0);
     await expect(page.getByRole('link', { name: 'Как обрабатываются ваши данные' })).toHaveAttribute('href', '/data-policy');
+    await expect(page.getByRole('checkbox', { name: /Принимаю Условия использования/ })).not.toBeChecked();
     await page.getByRole('textbox', { name: 'Email', exact: true }).fill('synthetic@example.test');
     await page.getByLabel('Пароль', { exact: true }).fill('safe-password');
     const policyPopup = page.waitForEvent('popup');
     await page.getByRole('link', { name: 'Как обрабатываются ваши данные' }).click();
     const policy = await policyPopup;
-    await expect(policy.getByRole('heading', { level: 1, name: 'Политика данных' })).toBeVisible();
+    await expect(policy.getByRole('heading', { level: 1, name: 'Политика конфиденциальности' })).toBeVisible();
     await expect(policy.locator('.app-shell')).toHaveCount(0);
     await policy.close();
+    const termsPopup = page.waitForEvent('popup');
+    await page.getByRole('link', { name: 'Условия использования', exact: true }).click();
+    const terms = await termsPopup;
+    await expect(terms.getByRole('heading', { level: 1, name: 'Условия использования' })).toBeVisible();
+    await expect(terms.locator('.app-shell')).toHaveCount(0);
+    await terms.close();
+    await expect(page.getByRole('checkbox', { name: /Принимаю Условия использования/ })).not.toBeChecked();
     await expect(page.getByRole('textbox', { name: 'Email', exact: true })).toHaveValue('synthetic@example.test');
     await expect(page.getByLabel('Пароль', { exact: true })).toHaveValue('safe-password');
     await page.getByLabel('Повтори пароль', { exact: true }).fill('different-password');
     await page.getByRole('button', { name: 'Создать аккаунт', exact: true }).last().click();
     await expect(page.getByRole('alert')).toHaveText('Пароли не совпадают.');
     await page.getByLabel('Повтори пароль', { exact: true }).fill('safe-password');
+    await page.getByRole('button', { name: 'Создать аккаунт', exact: true }).last().click();
+    await expect(page.getByRole('alert')).toContainText('примите Условия использования');
+    expect(signupRequests).toBe(requestsBefore);
+    await page.getByRole('checkbox', { name: /Принимаю Условия использования/ }).check();
+    await expect(page.getByRole('alert')).toHaveCount(0);
     await expectPageFitsViewport(page, `signup at ${width}px`);
     await page.screenshot({ path: testInfo.outputPath(`signup-${width}.png`), fullPage: true });
     await page.getByRole('button', { name: 'Создать аккаунт', exact: true }).last().click();
@@ -101,6 +119,7 @@ test('shows server rate limiting and allows returning to sign-in', async ({ page
   await page.getByRole('textbox', { name: 'Email', exact: true }).fill('synthetic@example.test');
   await page.getByLabel('Пароль', { exact: true }).fill('safe-password');
   await page.getByLabel('Повтори пароль', { exact: true }).fill('safe-password');
+  await page.getByRole('checkbox', { name: /Принимаю Условия использования/ }).check();
   await page.getByRole('button', { name: 'Создать аккаунт', exact: true }).last().click();
   await expect(page.getByRole('alert')).toContainText('Слишком много попыток');
   await expect(page.getByLabel('Пароль', { exact: true })).toHaveValue('');

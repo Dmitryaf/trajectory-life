@@ -7,6 +7,7 @@ import { describe, expect, it, vi } from 'vitest';
 import AuthGate from '@/features/auth/ui/AuthGate.vue';
 import { useAuthStore } from '@/stores/auth';
 import PasswordResetView from '@/views/PasswordResetView.vue';
+import { currentTermsAcceptance } from '@/model/legalDocuments';
 
 function authRouter() {
   return createRouter({ history: createMemoryHistory(), routes: [{ path: '/', component: { template: '<div>Policy</div>' } }] });
@@ -41,13 +42,14 @@ describe('authentication', () => {
     expect(wrapper.text()).toContain('Создайте аккаунт');
     expect(wrapper.text()).not.toContain('Будет создан аккаунт для облачной синхронизации записей.');
     expect(wrapper.get('#signup-account-hint').text()).toBe('После регистрации нужно подтвердить email по ссылке из письма.');
-    const policyLink = wrapper.get('a.auth-policy-link');
+    const policyLink = wrapper.get('a[href="/data-policy"]');
     expect(policyLink.text()).toBe('Как обрабатываются ваши данные');
     expect(policyLink.attributes('href')).toBe('/data-policy');
     expect(policyLink.attributes('target')).toBe('_blank');
     expect(policyLink.attributes('rel')).toBe('noopener');
     expect(wrapper.get('input[type="email"]').attributes('aria-describedby')).toBe('signup-account-hint');
-    expect(wrapper.findAll('input')).toHaveLength(3);
+    expect(wrapper.findAll('input')).toHaveLength(4);
+    expect(wrapper.get('#auth-terms').element).toHaveProperty('checked', false);
     expect(wrapper.findAll('button[aria-label="Показать пароль"]')).toHaveLength(2);
     expect(wrapper.get('#auth-password').attributes('autocomplete')).toBe('new-password');
     expect(wrapper.get('#auth-password-confirmation').attributes('autocomplete')).toBe('new-password');
@@ -104,7 +106,7 @@ describe('authentication', () => {
     const wrapper = mount(AuthGate, { props: { initialMode: 'sign-up' }, global: { plugins: [pinia, authRouter()] } });
 
     expect(wrapper.get('.auth-card__brand h2').text()).toBe('Создайте аккаунт');
-    expect(wrapper.findAll('.auth-form input')).toHaveLength(3);
+    expect(wrapper.findAll('.auth-form input')).toHaveLength(4);
   });
 
   it('registers with matching passwords and no invitation code', async () => {
@@ -122,8 +124,13 @@ describe('authentication', () => {
     await inputs[1].setValue('safe-password');
     await inputs[2].setValue('safe-password');
     await wrapper.get('form').trigger('submit');
+    expect(auth.signUp).not.toHaveBeenCalled();
+    expect(wrapper.get('[role="alert"]').text()).toContain('примите Условия использования');
+    await wrapper.get('#auth-terms').setValue(true);
+    expect(wrapper.find('[role="alert"]').exists()).toBe(false);
+    await wrapper.get('form').trigger('submit');
 
-    expect(auth.signUp).toHaveBeenCalledWith('friend@example.com', 'safe-password');
+    expect(auth.signUp).toHaveBeenCalledWith('friend@example.com', 'safe-password', currentTermsAcceptance());
     expect(wrapper.find('form').exists()).toBe(false);
     expect(wrapper.text()).toContain('Аккаунт создан');
     expect(wrapper.text()).toContain('friend@example.com');
@@ -149,6 +156,7 @@ describe('authentication', () => {
     await inputs[0].setValue('friend@example.com');
     await inputs[1].setValue('safe-password');
     await inputs[2].setValue('safe-password');
+    await wrapper.get('#auth-terms').setValue(true);
     await wrapper.get('form').trigger('submit');
     await flushPromises();
 
@@ -185,6 +193,7 @@ describe('authentication', () => {
     await inputs[0].setValue('friend@example.com');
     await inputs[1].setValue('safe-password');
     await inputs[2].setValue('safe-password');
+    await wrapper.get('#auth-terms').setValue(true);
     await wrapper.get('form').trigger('submit');
 
     expect(wrapper.get('form').attributes('aria-busy')).toBe('true');
@@ -207,6 +216,7 @@ describe('authentication', () => {
     await inputs[0].setValue('friend@example.com');
     await inputs[1].setValue('safe-password');
     await inputs[2].setValue('safe-password');
+    await wrapper.get('#auth-terms').setValue(true);
     await wrapper.get('form').trigger('submit');
     await flushPromises();
 
