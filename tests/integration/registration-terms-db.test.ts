@@ -20,6 +20,44 @@ beforeAll(async () => {
 afterAll(async () => db.close());
 
 describe('registration terms audit', () => {
+  it('supports a preserved non-superuser hook owner when another operator installs the validator', async () => {
+    const separateOwnerDb = new PGlite();
+    try {
+      await separateOwnerDb.exec(`create role anon; create role authenticated; create role supabase_auth_admin;
+        create role supabase_admin superuser;
+        create role existing_auth_hook_owner;
+        create schema auth;
+        create schema private authorization existing_auth_hook_owner;
+        create table auth.users (id uuid primary key, raw_user_meta_data jsonb default '{}'::jsonb);
+        create function public.hook_require_beta_invite(event jsonb) returns jsonb language sql as $$ select '{}'::jsonb $$;
+        alter function public.hook_require_beta_invite(jsonb) owner to existing_auth_hook_owner;
+        set role supabase_admin;`);
+      await separateOwnerDb.exec(
+        readFileSync(new URL('../../supabase/migrations/20261009000000_registration_terms.sql', import.meta.url), 'utf8'),
+      );
+      await separateOwnerDb.exec('set role supabase_auth_admin');
+      await expect(separateOwnerDb.query("select public.hook_require_beta_invite('{}'::jsonb)")).rejects.toThrow(/permission denied/);
+      await separateOwnerDb.exec('reset role');
+      await separateOwnerDb.exec(
+        readFileSync(new URL('../../supabase/migrations/20261009020000_registration_terms_hook_permissions.sql', import.meta.url), 'utf8'),
+      );
+      await separateOwnerDb.exec('set role supabase_auth_admin');
+      const rejected = await separateOwnerDb.query<{ result: { error: { http_code: number } } }>(
+        "select public.hook_require_beta_invite('{}'::jsonb) as result",
+      );
+      expect(rejected.rows[0].result.error.http_code).toBe(400);
+      const accepted = await separateOwnerDb.query<{ result: unknown }>('select public.hook_require_beta_invite($1::jsonb) as result', [
+        JSON.stringify({ user: { user_metadata: { terms_acceptance: currentTermsAcceptance() } } }),
+      ]);
+      expect(accepted.rows[0].result).toEqual({});
+      await separateOwnerDb.exec('reset role; set role anon');
+      await expect(separateOwnerDb.query("select private.valid_registration_terms('{}'::jsonb)")).rejects.toThrow(/permission denied/);
+      await expect(separateOwnerDb.query('select * from private.registration_terms_acceptance')).rejects.toThrow(/permission denied/);
+    } finally {
+      await separateOwnerDb.close();
+    }
+  });
+
   it('does not invent acceptance for existing accounts', async () => {
     expect((await db.query('select * from private.registration_terms_acceptance')).rows).toEqual([]);
     expect((await db.query('select * from auth.users')).rows).toHaveLength(1);
