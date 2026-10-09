@@ -24,7 +24,7 @@ const isOpen = computed(() => visible.value !== null);
 useBodyScrollLock(isOpen);
 const { handleDialogKeydown } = useDialogFocus(isOpen, panel, returnFocus);
 const { startBackdropClose, finishBackdropClose, cancelBackdropClose } = useDialogBackdropClose(() => dismiss(true));
-const interacted = ref(false);
+const editing = ref(false);
 const dirty = ref(hasUnsavedSyncEditors());
 const attempted = new Set<string>();
 const stopEditing = onUnsavedSyncEditorsChange((value) => {
@@ -32,26 +32,24 @@ const stopEditing = onUnsavedSyncEditorsChange((value) => {
 });
 const safe = computed(
   () =>
-    !interacted.value &&
+    !editing.value &&
     !dirty.value &&
     ['idle', 'synced', 'disabled'].includes(store.cloudSyncStatus) &&
     ['/today', '/week'].includes(route.path) &&
     store.settings.firstUse.status !== 'in_progress',
 );
 const experience = computed(
-  () =>
-    store.dailyEntries.some((entry) => dataCoverageLevel(entry) > 0) ||
-    store.weeklyReviews.some(hasMeaningfulReview) ||
-    store.settings.firstUse.status === 'completed',
+  () => store.dailyEntries.some((entry) => dataCoverageLevel(entry) > 0) || store.weeklyReviews.some(hasMeaningfulReview),
 );
+function isEditor(target: EventTarget | null): boolean {
+  return (
+    target instanceof Element &&
+    !panel.value?.contains(target) &&
+    Boolean(target.closest('input, textarea, select, [contenteditable="true"]'))
+  );
+}
 function interaction(event: Event) {
-  if (
-    event.target instanceof Element &&
-    !panel.value?.contains(event.target) &&
-    event.target.closest('input, textarea, select, button, a, [contenteditable="true"]')
-  ) {
-    interacted.value = true;
-  }
+  editing.value = isEditor(event instanceof FocusEvent && event.type === 'focusout' ? event.relatedTarget : event.target);
 }
 function otherDialogOpen() {
   return document.querySelector('[role="dialog"][aria-modal="true"]') !== null;
@@ -104,15 +102,15 @@ function dismiss(later: boolean) {
 }
 onMounted(() => {
   if (document.activeElement?.matches('input, textarea, select, [contenteditable=true]')) {
-    interacted.value = true;
+    editing.value = true;
   }
-  for (const event of ['pointerdown', 'keydown', 'input']) {
+  for (const event of ['focusin', 'focusout', 'input']) {
     document.addEventListener(event, interaction, true);
   }
 });
 onBeforeUnmount(() => {
   stopEditing();
-  for (const event of ['pointerdown', 'keydown', 'input']) {
+  for (const event of ['focusin', 'focusout', 'input']) {
     document.removeEventListener(event, interaction, true);
   }
 });
