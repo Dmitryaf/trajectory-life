@@ -10,14 +10,14 @@ const signupAvailable = Boolean(
 const signInLocation = { path: '/access', query: { mode: 'sign-in' } };
 const signUpLocation = { path: '/access', query: { mode: 'sign-up' } };
 const features = [
-  { title: 'Записи дня', text: 'Заметки, сон, самочувствие, занятия и условия дня. Состав разделов можно настроить.' },
+  { title: 'Записи дня', text: 'Записывайте то, что важно для вас. Состав разделов можно настроить.' },
   { title: 'Неделя и месяц', text: 'Записи и итоги за период, ваши выводы и планы. Обзор можно заполнить и по памяти.' },
   { title: 'История изменений', text: 'События, решения и графики за 3–12 месяцев. Можно выбрать период для сравнения.' },
   {
     title: 'Цель и личный эксперимент',
-    text: 'Сохраните цель и отмечайте шаги к ней. Можно проверить одно изменение, например прогулку перед сном, и описать свои наблюдения.',
+    text: 'Сохраните цель и отмечайте шаги к ней.',
   },
-  { title: 'Журнал', text: 'Отдельные итоги, события и мысли. Найдите прежнюю запись по словам, категории или датам.' },
+  { title: 'Журнал', text: 'Отдельные итоги, события и мысли.' },
   {
     title: 'Копии и внешний анализ',
     text: 'Скачайте резервную копию или восстановите записи из неё. Для разбора в выбранной нейросети можно отдельно подготовить данные и текст с вопросами.',
@@ -38,7 +38,7 @@ const features = [
       <section class="landing-hero" aria-labelledby="landing-title">
         <div>
           <p class="landing-kicker">Траектория</p>
-          <h1 id="landing-title">Дневник дел, событий и самочувствия</h1>
+          <h1 id="landing-title">Личный дневник</h1>
           <p class="landing-hero__lead">Сохраняйте важное за день и возвращайтесь к нему в обзорах недели и месяца.</p>
           <div class="landing-actions">
             <ActionButton as="a" variant="primary" href="#product">Посмотреть примеры</ActionButton
@@ -57,7 +57,6 @@ const features = [
       <section id="features" class="landing-section" aria-labelledby="features-title">
         <div class="landing-section__heading">
           <h2 id="features-title">Что можно делать</h2>
-          <p>Работает в браузере. Можно добавить на домашний экран телефона.</p>
         </div>
         <div class="landing-features">
           <article v-for="feature in features" :key="feature.title">
@@ -85,10 +84,7 @@ const features = [
           </article>
           <article>
             <h3>Копия и удаление</h3>
-            <p>
-              В настройках можно скачать резервную копию, очистить записи или удалить аккаунт. Скачанные файлы и недоступные копии на других
-              устройствах удаляются отдельно.
-            </p>
+            <p>В настройках можно скачать резервную копию, очистить записи или удалить аккаунт.</p>
           </article>
         </div>
       </section>
@@ -100,7 +96,7 @@ const features = [
     <footer class="landing-footer">
       <strong>Траектория</strong>
       <div>
-        <RouterLink to="/data-policy">Политика данных</RouterLink
+        <RouterLink to="/data-policy">Политика конфиденциальности</RouterLink><RouterLink to="/terms">Условия использования</RouterLink
         ><a href="https://github.com/Dmitryaf/trajectory-life" rel="noreferrer">GitHub</a>
       </div>
     </footer>

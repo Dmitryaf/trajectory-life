@@ -35,6 +35,7 @@
 .data-policy-content h1 {
   margin: 0 0 24px;
   color: var(--navy);
+  overflow-wrap: anywhere;
   font-size: clamp(30px, 4vw, 40px);
   line-height: 1.2;
   letter-spacing: -0.02em;
@@ -42,6 +43,12 @@
 .data-policy-body {
   max-width: 780px;
   line-height: 1.7;
+}
+.data-policy-date {
+  margin: -10px 0 24px;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.5;
 }
 .data-policy-body h2 {
   margin: 28px 0 12px;
@@ -51,6 +58,9 @@
 }
 .data-policy-body p {
   margin: 0;
+}
+.data-policy-body p + p {
+  margin-top: 12px;
 }
 @media (max-width: 720px) {
   .data-policy-header,
@@ -64,5 +74,10 @@
   }
   .data-policy-content {
     padding-block: 28px 40px;
+  }
+}
+@media (max-width: 360px) {
+  .data-policy-content h1 {
+    font-size: 26px;
   }
 }

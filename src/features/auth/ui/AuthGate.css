@@ -86,6 +86,23 @@
   min-height: 50px;
   margin-top: 4px;
 }
+.auth-terms {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 14px;
+  line-height: 1.5;
+}
+.auth-terms input {
+  flex: 0 0 auto;
+  width: 20px;
+  height: 20px;
+  margin: 3px 0 0;
+  accent-color: var(--accent);
+}
+.auth-terms label {
+  min-width: 0;
+}
 .auth-button-spinner {
   width: 16px;
   height: 16px;
