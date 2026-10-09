@@ -1,5 +1,6 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { currentTermsAcceptance } from '@/model/legalDocuments';
 
 const signUp = vi.hoisted(() => vi.fn());
 vi.mock('@supabase/supabase-js', () => ({ createClient: () => ({ auth: { signUp } }) }));
@@ -19,14 +20,14 @@ describe('open signup', () => {
     const cloud = await import('../cloudSync');
 
     expect(cloud.isSignupConfigured()).toBe(true);
-    await expect(cloud.signUpToCloud('friend@example.com', 'safe-password')).resolves.toEqual({
+    await expect(cloud.signUpToCloud('friend@example.com', 'safe-password', currentTermsAcceptance())).resolves.toEqual({
       session: null,
       confirmationRequired: true,
     });
     expect(signUp).toHaveBeenCalledWith({
       email: 'friend@example.com',
       password: 'safe-password',
-      options: { emailRedirectTo: `${window.location.origin}/access?mode=sign-in` },
+      options: { emailRedirectTo: `${window.location.origin}/access?mode=sign-in`, data: { terms_acceptance: currentTermsAcceptance() } },
     });
   });
 
@@ -40,6 +41,16 @@ describe('open signup', () => {
     const error = { status: 429, code: 'over_email_send_rate_limit' };
     signUp.mockResolvedValue({ data: { session: null }, error });
     const cloud = await import('../cloudSync');
-    await expect(cloud.signUpToCloud('friend@example.com', 'safe-password')).rejects.toBe(error);
+    await expect(cloud.signUpToCloud('friend@example.com', 'safe-password', currentTermsAcceptance())).rejects.toBe(error);
   });
+  it.each([undefined, { ...currentTermsAcceptance(), accepted: false }, { ...currentTermsAcceptance(), terms_version: 'old' }])(
+    'does not submit registration without current acceptance %j',
+    async (acceptance) => {
+      const cloud = await import('../cloudSync');
+      await expect(
+        cloud.signUpToCloud('friend@example.test', 'safe-password', acceptance as ReturnType<typeof currentTermsAcceptance>),
+      ).rejects.toThrow('актуальные Условия');
+      expect(signUp).not.toHaveBeenCalled();
+    },
+  );
 });

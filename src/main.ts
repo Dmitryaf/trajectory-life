@@ -38,7 +38,16 @@ const router = createRouter({
   },
   routes: [
     { path: '/', component: () => import('./views/LandingView.vue'), meta: { title: 'Личная картина времени', publicLanding: true } },
-    { path: '/data-policy', component: () => import('./views/DataPolicyView.vue'), meta: { title: 'Политика данных', publicPage: true } },
+    {
+      path: '/data-policy',
+      component: () => import('./views/DataPolicyView.vue'),
+      meta: { title: 'Политика конфиденциальности', publicPage: true },
+    },
+    {
+      path: '/terms',
+      component: () => import('./views/TermsOfUseView.vue'),
+      meta: { title: 'Условия использования', publicPage: true },
+    },
     { path: '/access', component: () => import('./views/AccessView.vue'), meta: { title: 'Вход' } },
     { path: '/today', component: () => import('./views/TodayView.vue'), meta: { title: 'Сегодня' } },
     { path: '/results', component: () => import('./views/ResultsView.vue'), meta: { title: 'Итоги' } },

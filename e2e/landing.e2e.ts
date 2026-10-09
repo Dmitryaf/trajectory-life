@@ -9,7 +9,7 @@ const axeSource = readFileSync(require.resolve('axe-core/axe.min.js'), 'utf8');
 test('keeps the public landing independent from authentication and product storage', async ({ page }) => {
   await page.goto('/');
   await expect(page).toHaveURL(/\/$/);
-  await expect(page.getByRole('heading', { level: 1, name: 'Дневник дел, событий и самочувствия' })).toBeVisible();
+  await expect(page.getByRole('heading', { level: 1, name: 'Личный дневник' })).toBeVisible();
   await expect(page.locator('.app-shell')).toHaveCount(0);
   await expect(page.locator('a[href="/access?mode=sign-in"]')).toHaveCount(2);
   await expect(page.getByRole('link', { name: 'Посмотреть примеры' })).toHaveAttribute('href', '#product');
@@ -25,7 +25,8 @@ test('keeps the public landing independent from authentication and product stora
   ]) {
     await expect(page.locator('#features').getByRole('heading', { name, exact: true })).toBeVisible();
   }
-  await expect(page.getByRole('link', { name: 'Политика данных', exact: true })).toHaveAttribute('href', '/data-policy');
+  await expect(page.getByRole('link', { name: 'Политика конфиденциальности', exact: true })).toHaveAttribute('href', '/data-policy');
+  await expect(page.getByRole('link', { name: 'Условия использования', exact: true })).toHaveAttribute('href', '/terms');
   await expect(page).toHaveTitle('Траектория — личная картина времени');
   await expect(page.locator('meta[name="description"]')).toHaveAttribute('content', /недели и месяцы целиком/);
 
@@ -42,17 +43,16 @@ test('keeps the public landing independent from authentication and product stora
 
 test('opens the policy directly without authentication and preserves the legacy link', async ({ page }) => {
   await page.goto('/');
-  await page.getByRole('link', { name: 'Политика данных', exact: true }).click();
+  await page.getByRole('link', { name: 'Политика конфиденциальности', exact: true }).click();
   await expect(page).toHaveURL(/\/data-policy$/);
-  await expect(page.getByRole('heading', { name: 'Политика данных', level: 1 })).toBeVisible();
-  await expect(page).toHaveTitle('Политика данных · Траектория');
-  await expect(page.locator('#data-policy')).toContainText('Траектория — приложение для личных записей');
+  await expect(page.getByRole('heading', { name: 'Политика конфиденциальности', level: 1 })).toBeVisible();
+  await expect(page).toHaveTitle('Политика конфиденциальности · Траектория');
+  await expect(page.locator('#data-policy')).toContainText('Траектория — личный дневник');
   await expect(page.locator('#data-policy')).not.toContainText('Афонасенко');
-  await expect(page.locator('#data-policy')).toContainText('Пользование приложением не ограничивает');
   await expect(page.locator('.app-shell')).toHaveCount(0);
   await expect(page.locator('main details')).toHaveCount(0);
   await page.reload();
-  await expect(page.getByRole('heading', { name: 'Политика данных', level: 1 })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Политика конфиденциальности', level: 1 })).toBeVisible();
   for (const width of [320, 390, 768, 1440]) {
     await page.setViewportSize({ width, height: 900 });
     await expectPageFitsViewport(page, `data policy at ${width}px`);
@@ -66,6 +66,26 @@ test('opens the policy directly without authentication and preserves the legacy 
   await page.getByRole('link', { name: 'На главную', exact: false }).click();
   await expect(page).toHaveURL(/\/$/);
   await page.goto('/#data-policy');
+  await expect(page).toHaveURL(/\/data-policy$/);
+});
+
+test('opens the terms without authentication or product storage at supported widths', async ({ page, browserName }, testInfo) => {
+  await page.goto('/terms');
+  await expect(page.getByRole('heading', { level: 1, name: 'Условия использования' })).toBeVisible();
+  await expect(page).toHaveTitle('Условия использования · Траектория');
+  await expect(page.locator('main')).toContainText('Редакция от 9 октября 2026 года');
+  await expect(page.locator('main')).not.toContainText('Афонасенко');
+  await expect(page.locator('.app-shell')).toHaveCount(0);
+  for (const width of [320, 390, 768, 1440]) {
+    await page.setViewportSize({ width, height: 900 });
+    await expectPageFitsViewport(page, `terms at ${width}px`);
+    if (browserName === 'chromium' && (width === 320 || width === 1440)) {
+      await page.screenshot({ path: testInfo.outputPath(`terms-${width}.png`), fullPage: true, animations: 'disabled' });
+    }
+  }
+  const loadedScripts = await page.evaluate(() => performance.getEntriesByType('resource').map((entry) => entry.name));
+  expect(loadedScripts.some((url) => /ProductShell|cloudSync|installation/.test(url))).toBe(false);
+  await page.getByRole('link', { name: 'Политике конфиденциальности' }).click();
   await expect(page).toHaveURL(/\/data-policy$/);
 });
 
