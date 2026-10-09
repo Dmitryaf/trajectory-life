@@ -352,7 +352,7 @@ async function completeRecovery() {
   <section v-else-if="availablePromptVisible" class="first-use-card first-use-card--available" aria-label="Первый обзор недели">
     <div>
       <strong>Вспомнить недавнюю неделю?</strong>
-      <p>Выберите неделю и ответьте на несколько вопросов о событиях, делах и самочувствии.</p>
+      <p>Выберите неделю и ответьте на несколько вопросов о её событиях и делах.</p>
       <div class="first-use-periods first-use-periods--compact" role="radiogroup" aria-label="Период первого обзора">
         <button
           v-for="option in periodOptions"
@@ -406,14 +406,14 @@ async function completeRecovery() {
     </div>
 
     <div v-else-if="currentStep === 'state_context'" class="first-use-recovery__step">
-      <h2 id="first-use-step-title">Как вы себя чувствовали?</h2>
-      <p>Можно коротко написать про силы, настроение и обстоятельства недели.</p>
-      <FormFieldLabel for="first-use-state">Самочувствие и обстоятельства недели</FormFieldLabel>
+      <h2 id="first-use-step-title">Какие обстоятельства повлияли на неделю?</h2>
+      <p>Запишите то, что важно для обзора. Этот шаг можно пропустить.</p>
+      <FormFieldLabel for="first-use-state">Обстоятельства недели</FormFieldLabel>
       <textarea
         id="first-use-state"
         v-model="stateContext"
         rows="5"
-        placeholder="Например: в середине недели мало спал и быстро уставал"
+        placeholder="Например: несколько дней работал над одним большим проектом"
       ></textarea>
     </div>
 
@@ -467,7 +467,7 @@ async function completeRecovery() {
       <WeeklyReviewJournalLinks :review="review" />
 
       <p v-if="meaningfulAnswerCount < 2" class="first-use-overview__empty">
-        При желании добавьте, что ещё произошло за неделю или как вы себя чувствовали.
+        При желании добавьте события или обстоятельства, которые хочется запомнить.
       </p>
     </div>
 
