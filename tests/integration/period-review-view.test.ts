@@ -462,7 +462,7 @@ describe('period review navigation', () => {
     expect(wrapper.findAll('.review-cue-grid--primary .review-cue')).toHaveLength(3);
     expect(wrapper.find('.review-cue-grid--additional').exists()).toBe(false);
     expect((reviewContext.element as HTMLDetailsElement).open).toBe(false);
-    expect(reviewContext.get('summary').text()).toBe('Добавить дела, события и самочувствие');
+    expect(reviewContext.get('summary').text()).toBe('Добавить дела и события');
     expect(
       (review.get('textarea[placeholder="Можно продолжить как есть или пока ничего не решать"]').element as HTMLTextAreaElement).value,
     ).toBe('');
@@ -734,7 +734,7 @@ describe('period review navigation', () => {
     const reviewForm = wrapper.get('#week-review');
     const reviewContext = reviewForm.get('details.review-context-details');
     expect((reviewContext.element as HTMLDetailsElement).open).toBe(true);
-    expect(reviewContext.get('summary').text()).toBe('Дела, события и самочувствие');
+    expect(reviewContext.get('summary').text()).toBe('Дела и события');
     expect(reviewForm.findAll('input')).toHaveLength(6);
     expect(reviewForm.text()).toContain('До трёх событий, решений или мыслей');
     expect((reviewForm.findAll('textarea')[0]!.element as HTMLTextAreaElement).value).toBe('К середине недели было мало сил');
