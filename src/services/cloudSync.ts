@@ -8,6 +8,7 @@ import {
   type SupabaseClient,
 } from '@supabase/supabase-js';
 import { CloudOperationCancelledError, type CloudOperationScope } from './cloudOperation';
+import { isCurrentTermsAcceptance, type TermsAcceptance } from '@/model/legalDocuments';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
@@ -290,12 +291,20 @@ export async function signInToCloud(email: string, password: string): Promise<Se
   return data.session;
 }
 
-export async function signUpToCloud(email: string, password: string): Promise<{ session: Session | null; confirmationRequired: boolean }> {
+export async function signUpToCloud(
+  email: string,
+  password: string,
+  acceptance: TermsAcceptance,
+): Promise<{ session: Session | null; confirmationRequired: boolean }> {
+  if (!isCurrentTermsAcceptance(acceptance)) {
+    throw new Error('Чтобы создать аккаунт, примите актуальные Условия использования.');
+  }
   const { data, error } = await getSupabaseClient().auth.signUp({
     email,
     password,
     options: {
       emailRedirectTo: `${window.location.origin}/access?mode=sign-in`,
+      data: { terms_acceptance: acceptance },
     },
   });
   if (error) {

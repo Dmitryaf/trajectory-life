@@ -80,10 +80,26 @@ const { auth, changePassword, deleteAccount, newPassword, newPasswordConfirmatio
       <strong>Сессия не найдена</strong>
       <p>Обновите страницу и войдите снова, чтобы управлять аккаунтом.</p>
     </div>
+    <nav class="account-documents" aria-label="Документы приложения">
+      <a href="/data-policy" target="_blank" rel="noopener">Политика конфиденциальности</a>
+      <a href="/terms" target="_blank" rel="noopener">Условия использования</a>
+    </nav>
   </SettingsCard>
 </template>
 
 <style scoped>
+.account-documents {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+  margin-top: 20px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.account-documents a {
+  padding-block: 8px;
+  color: var(--brand-strong);
+}
 .settings-field-stack {
   display: grid;
   gap: 8px;

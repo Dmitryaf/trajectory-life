@@ -22,7 +22,7 @@ const highlights = computed(() => props.review.highlights.filter((item) => item.
       </ul>
     </div>
     <div v-if="review.stateContext" class="weekly-review-overview__group">
-      <strong>Как вы себя чувствовали</strong>
+      <strong>Обстоятельства недели</strong>
       <p>{{ review.stateContext }}</p>
     </div>
     <div v-if="review.support" class="weekly-review-overview__group">
