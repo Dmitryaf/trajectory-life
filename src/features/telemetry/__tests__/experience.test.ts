@@ -6,8 +6,15 @@ import ConsentExperience from '../ui/ConsentExperience.vue';
 import { consentOfferKind } from '../consentEligibility';
 import { telemetryState, productTelemetry } from '../productTelemetry';
 import type { TelemetryState } from '../queue';
+import { emptyDailyEntry, type DailyEntry } from '@/types';
+import { setSyncEditorDirty } from '@/features/sync/editing';
 const { store, route } = vi.hoisted(() => ({
-  store: { cloudSyncStatus: 'idle', settings: { firstUse: { status: 'not_started' } }, dailyEntries: [], weeklyReviews: [] },
+  store: {
+    cloudSyncStatus: 'idle',
+    settings: { firstUse: { status: 'not_started' } },
+    dailyEntries: [] as DailyEntry[],
+    weeklyReviews: [],
+  },
   route: { path: '/today' },
 }));
 vi.mock('@/stores/app', () => ({ useAppStore: () => reactive(store) }));
@@ -32,6 +39,7 @@ afterEach(() => {
     wrapper.unmount();
   }
   document.body.innerHTML = '';
+  setSyncEditorDirty('first-record-test', false);
 });
 describe('modal consent presentation', () => {
   it('keeps essential information and removes only the requested explanation', async () => {
@@ -180,10 +188,35 @@ beforeEach(() => {
   Object.assign(telemetryState, fresh());
   store.cloudSyncStatus = 'idle';
   store.settings.firstUse.status = 'not_started';
+  store.dailyEntries = [{ ...emptyDailyEntry('2026-10-09'), importantFact: 'Синтетическая запись' }];
+  store.weeklyReviews = [];
   route.path = '/today';
   vi.mocked(productTelemetry.offer).mockResolvedValue(true);
 });
 describe('first contact and reminder eligibility', () => {
+  it('waits for the first saved record even after first-use is completed, then waits until editing and sync finish', async () => {
+    testStore.dailyEntries = [];
+    testStore.settings.firstUse.status = 'completed';
+    const input = document.createElement('textarea');
+    document.body.append(input);
+    input.focus();
+    setSyncEditorDirty('first-record-test', true);
+    const wrapper = mountExperience();
+    await flushPromises();
+    expect(productTelemetry.offer).not.toHaveBeenCalled();
+    expect(consentOfferKind(fresh(), false)).toBeNull();
+    testStore.dailyEntries = [{ ...emptyDailyEntry('2026-10-09'), importantFact: 'Первая сохранённая запись' }];
+    testStore.cloudSyncStatus = 'syncing';
+    setSyncEditorDirty('first-record-test', false);
+    input.blur();
+    await flushPromises();
+    expect(productTelemetry.offer).not.toHaveBeenCalled();
+    testStore.cloudSyncStatus = 'synced';
+    await flushPromises();
+    expect(productTelemetry.offer).toHaveBeenCalledOnce();
+    expect(wrapper.find('[role="dialog"]').exists()).toBe(true);
+    expect(productTelemetry.grant).not.toHaveBeenCalled();
+  });
   it('shows equal opt-in/later choices without enabling collection', async () => {
     const wrapper = mountExperience();
     await flushPromises();

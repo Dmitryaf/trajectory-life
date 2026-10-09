@@ -145,7 +145,15 @@ for (const width of [1440, 390]) {
         )
         .toEqual({ decision: expected, busy: false, pending: false });
     }
-    await mountExperience();
+    await mountExperience('ConsentExperience', false);
+    await expect(page.getByRole('dialog', { name: 'Помочь улучшать Траекторию?' })).toHaveCount(0);
+    expect(operations).not.toContain('offer');
+    await page.evaluate(async () => {
+      const storePath = '/src/stores/app.ts';
+      const typesPath = '/src/types.ts';
+      const [{ useAppStore }, { emptyDailyEntry }] = await Promise.all([import(storePath), import(typesPath)]);
+      await useAppStore().saveEntry({ ...emptyDailyEntry('2026-10-09'), importantFact: 'Первая синтетическая запись' });
+    });
     const host = page.locator('#telemetry-experience-test');
     const dialog = page.getByRole('dialog', { name: 'Помочь улучшать Траекторию?' });
     await expect(dialog).toBeVisible();

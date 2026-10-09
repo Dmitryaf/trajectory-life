@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import ActionButton from '@/shared/ui/actions/ActionButton.vue';
-import { computed, nextTick, ref } from 'vue';
+import { computed, nextTick, ref, watch } from 'vue';
 import { RouterLink } from 'vue-router';
 import PasswordField from '@/shared/ui/forms/PasswordField.vue';
 import UiIcon from '@/shared/ui/icons/UiIcon.vue';
@@ -9,6 +9,7 @@ import PwaInstallGuide from '@/features/pwa/ui/PwaInstallGuide.vue';
 import { useAuthStore } from '@/stores/auth';
 import BrandMark from '@/shared/ui/branding/BrandMark.vue';
 import EyebrowText from '@/shared/ui/typography/EyebrowText.vue';
+import { currentTermsAcceptance } from '@/model/legalDocuments';
 
 const props = withDefaults(defineProps<{ initialMode?: 'sign-in' | 'sign-up' }>(), { initialMode: 'sign-in' });
 
@@ -18,6 +19,7 @@ const email = ref('');
 const emailInput = ref<HTMLInputElement | null>(null);
 const password = ref('');
 const passwordConfirmation = ref('');
+const termsAccepted = ref(false);
 const status = ref('');
 const confirmationEmail = ref('');
 const statusIsError = ref(false);
@@ -38,7 +40,7 @@ const canSubmit = computed(() => {
   if (mode.value === 'sign-in') {
     return password.value.length >= 6;
   }
-  return password.value.length >= 8 && password.value === passwordConfirmation.value;
+  return password.value.length >= 8 && password.value === passwordConfirmation.value && termsAccepted.value;
 });
 
 const submitIssue = computed(() => {
@@ -52,7 +54,17 @@ const submitIssue = computed(() => {
   if (mode.value === 'sign-up' && password.value !== passwordConfirmation.value) {
     return 'Пароли не совпадают.';
   }
+  if (mode.value === 'sign-up' && !termsAccepted.value) {
+    return 'Чтобы создать аккаунт, примите Условия использования.';
+  }
   return '';
+});
+
+watch(submitIssue, (_issue, previousIssue) => {
+  if (previousIssue && statusIsError.value && status.value === previousIssue) {
+    status.value = '';
+    statusIsError.value = false;
+  }
 });
 
 async function selectMode(nextMode: 'sign-in' | 'sign-up') {
@@ -62,6 +74,7 @@ async function selectMode(nextMode: 'sign-in' | 'sign-up') {
   mode.value = nextMode;
   password.value = '';
   passwordConfirmation.value = '';
+  termsAccepted.value = false;
   status.value = '';
   statusIsError.value = false;
   confirmationEmail.value = '';
@@ -81,7 +94,7 @@ async function submit() {
   statusIsError.value = false;
   try {
     if (mode.value === 'sign-up') {
-      const result = await auth.signUp(email.value.trim(), password.value);
+      const result = await auth.signUp(email.value.trim(), password.value, currentTermsAcceptance());
       confirmationEmail.value = result.confirmationRequired ? email.value.trim() : '';
       status.value = result.confirmationRequired ? '' : 'Аккаунт создан.';
     } else {
@@ -115,6 +128,7 @@ async function resendConfirmation() {
 
 async function editConfirmationEmail() {
   confirmationEmail.value = '';
+  termsAccepted.value = false;
   status.value = '';
   statusIsError.value = false;
   await nextTick();
@@ -240,6 +254,13 @@ async function requestPasswordReset() {
             />
           </div>
         </template>
+        <div v-if="mode === 'sign-up'" class="auth-terms">
+          <input id="auth-terms" v-model="termsAccepted" type="checkbox" :disabled="auth.loading" aria-labelledby="auth-terms-label" />
+          <label id="auth-terms-label" for="auth-terms"
+            >Принимаю
+            <RouterLink class="auth-policy-link" to="/terms" target="_blank" rel="noopener">Условия использования</RouterLink>.</label
+          >
+        </div>
         <p v-if="mode === 'sign-up'" class="auth-field-hint">
           <RouterLink class="auth-policy-link" to="/data-policy" target="_blank" rel="noopener">Как обрабатываются ваши данные</RouterLink>
         </p>
