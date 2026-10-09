@@ -296,7 +296,7 @@ function isPrimaryNavigationItemActive(item: PrimaryNavigationItem, path: string
     <header class="app-header">
       <RouterLink to="/today" class="brand" aria-label="Траектория — сегодня">
         <BrandMark />
-        <span><strong>Траектория</strong><small>дневник дел и самочувствия</small></span>
+        <span><strong>Траектория</strong><small>личный дневник</small></span>
       </RouterLink>
       <div v-if="canOpenApp && appDataReady && store.loaded && !effectiveLoadError" class="header-actions">
         <HowItWorksDialog />

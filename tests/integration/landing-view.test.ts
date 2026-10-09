@@ -27,13 +27,13 @@ describe('public landing', () => {
     const wrapper = mount(App, { global: { plugins: [router] } });
     await flushPromises();
 
-    expect(wrapper.get('h1').text()).toBe('Дневник дел, событий и самочувствия');
+    expect(wrapper.get('h1').text()).toBe('Личный дневник');
     expect(wrapper.text()).not.toContain('Пример: от записи к своему выводу');
     expect(wrapper.text()).not.toContain('Пропуски остаются пропусками');
     expect(wrapper.text()).toContain('Траектория сама не отправляет ваши записи в нейросети');
     expect(wrapper.findAll('[role="tab"]')).toHaveLength(6);
     expect(wrapper.find('.data-policy-page').exists()).toBe(false);
-    expect(wrapper.get('a[href="/data-policy"]').text()).toBe('Политика данных');
+    expect(wrapper.get('a[href="/data-policy"]').text()).toBe('Политика конфиденциальности');
     expect(wrapper.text()).not.toMatch(/Supabase|Vercel|Resend|Шифрование содержимого на стороне клиента/);
     expect(wrapper.find('.app-shell').exists()).toBe(false);
     expect(wrapper.findAll('a[href="/access?mode=sign-in"]')).toHaveLength(2);
@@ -47,19 +47,16 @@ describe('public landing', () => {
     const wrapper = mount(App, { global: { plugins: [router] } });
     await flushPromises();
 
-    expect(wrapper.get('h1').text()).toBe('Политика данных');
-    expect(wrapper.findAll('h2')).toHaveLength(6);
+    expect(wrapper.get('h1').text()).toBe('Политика конфиденциальности');
+    expect(wrapper.findAll('h2')).toHaveLength(7);
     expect(wrapper.text()).toContain('Статистика использования');
     expect(wrapper.text()).toContain('старше 90 дней');
-    expect(wrapper.text()).toContain('удаление через 30 дней');
-    expect(wrapper.text()).toContain('для переноса и восстановления хранятся до очистки администратором');
-    expect(wrapper.text()).toContain('Единый срок хранения технических записей пока не установлен');
+    expect(wrapper.text()).toContain('Регулярные резервные копии хранятся 30 дней');
     expect(wrapper.text()).not.toContain('Без сети запрос на удаление');
     expect(wrapper.text()).not.toContain('Скачанные файлы и записи на других устройствах');
     expect(wrapper.text()).not.toContain('очищаются по расписанию сервиса и его подрядчиков');
     expect(wrapper.find('details').exists()).toBe(false);
     expect(wrapper.find('.app-shell').exists()).toBe(false);
-    expect(wrapper.text()).toContain('Администратор приложения и компании');
     expect(wrapper.text()).not.toMatch(/бесплат|Афонасенко|Дмитри|авторск/i);
     expect(wrapper.text()).not.toMatch(/Supabase|Vercel|Resend/);
     expect(wrapper.get('a[aria-label="Траектория — главная страница"]').attributes('href')).toBe('/');

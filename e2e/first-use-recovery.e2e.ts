@@ -27,8 +27,8 @@ test('saves and resumes the first week recovery on a small screen', async ({ pag
 
   await page.getByLabel('По одному пункту в строке').fill('Состоялся важный разговор');
   await page.getByRole('button', { name: 'Продолжить', exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'Как вы себя чувствовали?' })).toBeVisible();
-  await page.getByLabel('Самочувствие и обстоятельства недели').fill('К середине недели было мало сил');
+  await expect(page.getByRole('heading', { name: 'Какие обстоятельства повлияли на неделю?' })).toBeVisible();
+  await page.getByLabel('Обстоятельства недели').fill('К середине недели было мало сил');
   await page.getByRole('button', { name: 'Продолжить', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Что помогало, а что мешало?' })).toBeVisible();
   await page.getByRole('button', { name: 'Пропустить' }).click();
