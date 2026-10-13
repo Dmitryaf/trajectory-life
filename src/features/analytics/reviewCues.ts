@@ -10,7 +10,24 @@ export type ReviewCue = {
   title: string;
   text: string;
   tone: 'good' | 'warning' | 'neutral';
+  detailOnly?: boolean;
 };
+
+export function selectPrimaryReviewCues(cues: ReviewCue[]): ReviewCue[] {
+  const priority = [
+    'factor',
+    'direction-preparation',
+    'direction-external',
+    'direction-drift',
+    'sleep-regularity',
+    'short-sleep',
+    'nutrition',
+  ];
+  return cues
+    .filter((cue) => !cue.detailOnly && priority.includes(cue.id))
+    .sort((a, b) => priority.indexOf(a.id) - priority.indexOf(b.id))
+    .slice(0, 3);
+}
 
 export function buildReviewCues(
   period: 'week' | 'month',
@@ -41,14 +58,15 @@ export function buildReviewCues(
 
   appendSleepCues(cues, entries, summary);
 
-  const leadingFactor = factors[0];
+  const leadingFactor = preferredFactor(factors);
   if (leadingFactor && leadingFactor.count >= 2) {
     const comparison = factorComparisonText(leadingFactor);
     cues.push({
       id: 'factor',
       title: 'Повторяющееся условие',
       text: `Отметка «${leadingFactor.label}» встречалась ${leadingFactor.count} ${plural(leadingFactor.count, 'раз', 'раза', 'раз')}.${comparison ? ` ${comparison}` : ' Для сравнения пока мало записей.'}`,
-      tone: 'warning',
+      tone: 'neutral',
+      detailOnly: !comparison,
     });
   }
 
@@ -180,7 +198,8 @@ export function buildRangeReviewCues(
     tone: enoughEntries ? 'good' : 'warning',
   });
 
-  const factor = factorSummaries(entries, factorOptions).find((item) => item.count >= Math.max(3, rangeMonths));
+  const factors = factorSummaries(entries, factorOptions).filter((item) => item.count >= Math.max(3, rangeMonths));
+  const factor = preferredFactor(factors);
   if (factor) {
     const comparison = factorComparisonText(factor);
     cues.push({
@@ -188,6 +207,7 @@ export function buildRangeReviewCues(
       title: 'Повторяющееся условие',
       text: `Отметка «${factor.label}» встречалась ${factor.count} ${plural(factor.count, 'раз', 'раза', 'раз')}.${comparison ? ` ${comparison}` : ' Для сравнения пока мало записей.'}`,
       tone: 'neutral',
+      detailOnly: !comparison,
     });
   }
 
@@ -245,8 +265,13 @@ export function ratioPercent(value: number, total: number): number | null {
   return total > 0 ? Math.round((value / total) * 100) : null;
 }
 
+function preferredFactor(factors: ReturnType<typeof factorSummaries>) {
+  return factors.find((factor) => factorComparisonText(factor)) ?? factors[0];
+}
+
 function limitCues(cues: ReviewCue[], requiredIds: string[]): ReviewCue[] {
-  const selected = cues.slice(0, 6);
+  const primary = selectPrimaryReviewCues(cues);
+  const selected = [...primary, ...cues.filter((cue) => !primary.includes(cue))].slice(0, 6);
   for (const id of requiredIds) {
     const required = cues.find((cue) => cue.id === id);
     if (!required || selected.some((cue) => cue.id === id)) {
@@ -254,7 +279,7 @@ function limitCues(cues: ReviewCue[], requiredIds: string[]): ReviewCue[] {
     }
     let replaceIndex = -1;
     for (let index = selected.length - 1; index >= 0; index -= 1) {
-      if (!requiredIds.includes(selected[index].id)) {
+      if (!requiredIds.includes(selected[index].id) && !primary.includes(selected[index])) {
         replaceIndex = index;
         break;
       }

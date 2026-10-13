@@ -1,11 +1,14 @@
 <script setup lang="ts">
-import { nextTick } from 'vue';
+import { nextTick, ref } from 'vue';
 import ActionButton from '@/shared/ui/actions/ActionButton.vue';
 const props = defineProps<{
   page: number;
   pageCount: number;
   contextLabel: string;
+  preserveControlPosition?: boolean;
 }>();
+
+const navigation = ref<HTMLElement>();
 
 const emit = defineEmits<{
   'update:page': [value: number];
@@ -13,14 +16,17 @@ const emit = defineEmits<{
 
 async function changePage(nextPage: number) {
   const scrollPosition = { left: window.scrollX, top: window.scrollY };
+  const previousTop = navigation.value?.getBoundingClientRect().top ?? 0;
   emit('update:page', Math.min(Math.max(1, nextPage), props.pageCount));
   await nextTick();
-  window.scrollTo({ ...scrollPosition, behavior: 'auto' });
+  const offset = props.preserveControlPosition ? (navigation.value?.getBoundingClientRect().top ?? previousTop) - previousTop : 0;
+  const top = props.preserveControlPosition ? window.scrollY + offset : scrollPosition.top;
+  window.scrollTo({ left: scrollPosition.left, top, behavior: 'auto' });
 }
 </script>
 
 <template>
-  <nav v-if="pageCount > 1" class="archive-pagination" :aria-label="`Страницы ${contextLabel}`">
+  <nav v-if="pageCount > 1" ref="navigation" class="archive-pagination" :aria-label="`Страницы ${contextLabel}`">
     <ActionButton variant="secondary" type="button" :disabled="page === 1" @click="changePage(page - 1)">Назад</ActionButton>
     <span>{{ page }} из {{ pageCount }}</span>
     <ActionButton variant="secondary" type="button" :disabled="page === pageCount" @click="changePage(page + 1)">Дальше</ActionButton>
