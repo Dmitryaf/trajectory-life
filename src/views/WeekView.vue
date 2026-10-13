@@ -30,6 +30,7 @@ import EyebrowText from '../shared/ui/typography/EyebrowText.vue';
 import {
   actionDirectionLabel,
   buildReviewCues,
+  selectPrimaryReviewCues,
   contextFactorLabel,
   entriesForWeek,
   hasArea,
@@ -120,10 +121,11 @@ const experimentCards = computed(() =>
     experimentHistory: store.settings.experimentHistory,
   }),
 );
-const reviewCues = computed(() =>
-  buildReviewCues('week', entries.value, results.value, lifeEvents.value, externalCareerIds.value, contextFactorItems.value),
+const primaryReviewCues = computed(() =>
+  selectPrimaryReviewCues(
+    buildReviewCues('week', entries.value, results.value, lifeEvents.value, externalCareerIds.value, contextFactorItems.value),
+  ),
 );
-const primaryReviewCues = computed(() => reviewCues.value.slice(0, 3));
 const {
   navigation,
   copyPrompt,

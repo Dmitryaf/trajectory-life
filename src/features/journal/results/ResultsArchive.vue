@@ -168,9 +168,6 @@ function resultKey(result: ResultRecord) {
           @keydown.enter.prevent="saveResult"
         />
         <DateInput v-model="date" required aria-label="Дата итога" />
-        <ActionButton variant="primary" type="button" :disabled="!title.trim() || !date || saving" @click="saveResult">
-          {{ editingId === null ? 'Добавить итог' : 'Сохранить итог' }}
-        </ActionButton>
       </div>
       <AutoGrowTextarea
         v-model="note"
@@ -178,9 +175,14 @@ function resultKey(result: ResultRecord) {
         :max-length="2000"
         placeholder="Что произошло, почему это важно и какие подробности хочется запомнить"
       />
-      <ActionButton v-if="editingId !== null" variant="secondary" class="composer-cancel" type="button" @click="resetForm">
-        Отменить редактирование
-      </ActionButton>
+      <div class="composer-actions">
+        <ActionButton variant="primary" type="button" :disabled="!title.trim() || !date || saving" @click="saveResult">
+          {{ editingId === null ? 'Добавить итог' : 'Сохранить итог' }}
+        </ActionButton>
+        <ActionButton v-if="editingId !== null" variant="secondary" class="composer-cancel" type="button" @click="resetForm">
+          Отменить редактирование
+        </ActionButton>
+      </div>
     </template>
     <template #filters>
       <label class="archive-filter-field">
@@ -230,7 +232,7 @@ function resultKey(result: ResultRecord) {
 <style scoped>
 .result-composer__fields {
   display: grid;
-  grid-template-columns: 1fr 155px auto;
+  grid-template-columns: minmax(0, 1fr) 155px;
   gap: 10px;
   margin: 14px 0 10px;
 }

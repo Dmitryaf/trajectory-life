@@ -489,6 +489,34 @@ describe('settings scenarios', () => {
     expect(saveSettings).toHaveBeenLastCalledWith(expect.objectContaining({ hiddenContextFactorIds: [] }));
   });
 
+  it('lets users add retired default labels as their own options', async () => {
+    const { pinia, store } = createStore();
+    store.settings.hiddenContextFactorIds = ['series_video'];
+    const saveSettings = vi.spyOn(store, 'saveSettings').mockResolvedValue(undefined);
+    const wrapper = mount(SettingsView, { global: { plugins: [pinia] } });
+    const contextCard = wrapper.get('.settings-card--context');
+    const careerCard = wrapper.get('.settings-card--career');
+    expect(contextCard.text()).not.toContain('Видео и сериалы');
+    expect(careerCard.text()).not.toContain('Рабочий день');
+
+    await contextCard.get('input[type="text"]').setValue('Видео и сериалы');
+    await contextCard.get('.inline-add button').trigger('click');
+    await flushPromises();
+    expect(saveSettings).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        customContextFactorOptions: [expect.objectContaining({ label: 'Видео и сериалы' })],
+        hiddenContextFactorIds: ['series_video'],
+      }),
+    );
+
+    await careerCard.get('input[type="text"]').setValue('Рабочий день');
+    await careerCard.get('.inline-add button').trigger('click');
+    await flushPromises();
+    expect(saveSettings).toHaveBeenLastCalledWith(
+      expect.objectContaining({ customCareerOptions: [expect.objectContaining({ label: 'Рабочий день' })] }),
+    );
+  });
+
   it('adds a personal activity and can hide and restore it', async () => {
     const { pinia, store } = createStore();
     const saveSettings = vi.spyOn(store, 'saveSettings').mockResolvedValue(undefined);

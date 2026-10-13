@@ -239,13 +239,6 @@
   --account-settings-danger-divider: #f0d6d1;
 
   /* First use */
-  --how-it-works-text: #51625d;
-  --how-it-works-step-surface: #f5f7f4;
-  --how-it-works-number-surface: #ddf4ea;
-  --how-it-works-number-text: #17634e;
-  --how-it-works-muted: #687570;
-  --how-it-works-note-border: #79cfad;
-  --how-it-works-note-surface: #f0faf6;
   --first-use-glow: rgba(73, 201, 155, 0.16);
   --first-use-gradient: #f3faf7;
   --first-use-shadow: rgba(16, 45, 44, 0.1);

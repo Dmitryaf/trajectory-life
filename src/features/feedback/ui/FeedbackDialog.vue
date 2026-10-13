@@ -89,7 +89,7 @@ async function submit() {
     >
       <div class="dialog-heading feedback-dialog__heading">
         <div>
-          <h2 id="feedback-title">Написать разработчику</h2>
+          <h2 id="feedback-title">Написать в поддержку</h2>
         </div>
         <DialogCloseButton label="Закрыть форму" :disabled="isSending" @click="close" />
       </div>
