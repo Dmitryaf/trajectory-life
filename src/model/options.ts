@@ -30,6 +30,9 @@ export const legacyCareerOptions: Option<CareerState>[] = [
   { id: 'result', label: 'Итог', icon: '✓' },
 ];
 
+// Keep the full catalogs for historical labels, analytics and exports.
+export const careerEntryOptions = careerOptions.filter((option) => option.id !== 'workday' && option.id !== 'work_result');
+
 export const activityOptions: Option<ActivityId>[] = [
   { id: 'walk', label: 'Прогулка', icon: '→' },
   { id: 'workout', label: 'Тренировка', icon: '△' },
@@ -91,6 +94,10 @@ export const legacyContextFactorOptions: Option<BaseContextFactorId>[] = [
   { id: 'other', label: 'Другое (старая отметка)', icon: '…' },
   { id: 'porn', label: 'Другое (старая отметка)', icon: '…' },
 ];
+
+export const contextFactorEntryOptions = contextFactorOptions.filter(
+  (option) => option.id !== 'series_video' && option.id !== 'work_code' && option.id !== 'late_food',
+);
 
 export const lifeAreaOptions: Option<BaseLifeAreaId>[] = [
   { id: 'family', label: 'Семья', icon: '⌂' },

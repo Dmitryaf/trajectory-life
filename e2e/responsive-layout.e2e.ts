@@ -599,8 +599,6 @@ test('keeps change history visible and one metric behind a compact mobile disclo
 });
 
 for (const scenario of [
-  { route: '/trends', list: '.history-timeline__list', pagination: '.history-timeline .archive-pagination', width: 390 },
-  { route: '/trends', list: '.history-timeline__list', pagination: '.history-timeline .archive-pagination', width: 1280 },
   { route: '/results', list: '.results-list', pagination: '.archive-panel .archive-pagination', width: 390 },
   { route: '/events', list: '.timeline-list', pagination: '.archive-panel .archive-pagination', width: 390 },
 ]) {
@@ -698,7 +696,7 @@ test('keeps the document position within its scroll range while paging the chang
       top: window.scrollY,
       maximum: Math.max(0, document.documentElement.scrollHeight - window.innerHeight),
     }));
-    expect(beforeNext, 'The shorter page must exercise the browser scroll boundary').toBeGreaterThan(afterNext.maximum);
+    expect(afterNext.maximum, 'The shorter page should retain the space occupied by the previous page').toBeGreaterThanOrEqual(beforeNext);
     expect(afterNext.top).toBeGreaterThanOrEqual(0);
     expect(afterNext.top).toBeLessThanOrEqual(afterNext.maximum);
     // Releasing a fractional list height can settle the scroll position by one CSS pixel.
@@ -717,6 +715,72 @@ test('keeps the document position within its scroll range while paging the chang
     expect(Math.abs(afterPrevious.top - Math.min(beforePrevious, afterPrevious.maximum))).toBeLessThanOrEqual(1);
   }
 });
+
+for (const width of [390, 1280]) {
+  for (const reducedMotion of ['no-preference', 'reduce'] as const) {
+    test(`keeps history paging controls still through short and tall pages at ${width}px with ${reducedMotion}`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 844 });
+      await page.emulateMedia({ reducedMotion });
+      const anchor = '2026-10-02';
+      await page.clock.setFixedTime(new Date(`${anchor}T12:00:00.000Z`));
+      const payload = buildDemoPayload(anchor);
+      payload.dailyEntries = [];
+      payload.results = [];
+      payload.weeklyReviews = [];
+      payload.monthlyReviews = [];
+      payload.settings.experimentHistory = [];
+      payload.lifeEvents = Array.from({ length: 23 }, (_, index) => ({
+        ...payload.lifeEvents[0],
+        id: index + 1,
+        date: [anchor, '2026-10-01', '2026-09-30'][Math.floor(index / 10)]!,
+        title: `Событие ${index + 1}`,
+        note: index >= 10 && index < 20 ? 'Длинная заметка для проверки устойчивого перелистывания. '.repeat(15) : '',
+        createdAt: `${anchor}T12:${String(index).padStart(2, '0')}:00.000Z`,
+      }));
+      await page.locator('input[type="file"]').setInputFiles({
+        name: 'history-tall-page.json',
+        mimeType: 'application/json',
+        buffer: Buffer.from(JSON.stringify(payload)),
+      });
+      await expect(page.locator('input[type="file"]')).toHaveValue('');
+      await page.goto('/trends');
+      const history = page.locator('.history-timeline');
+      const pagination = history.locator('.archive-pagination');
+      await pagination.scrollIntoViewIfNeeded();
+      const before = await readLayoutBox(pagination, 'history controls before paging');
+      for (const step of [
+        { button: 'Дальше', page: 2, count: 10 },
+        { button: 'Дальше', page: 3, count: 3 },
+        { button: 'Назад', page: 2, count: 10 },
+        { button: 'Назад', page: 1, count: 10 },
+      ]) {
+        const positionsPromise = pagination.evaluate(
+          (element) =>
+            new Promise<number[]>((resolve) => {
+              const positions: number[] = [];
+              const start = performance.now();
+              function sample() {
+                positions.push(element.getBoundingClientRect().top);
+                if (performance.now() - start < 300) {
+                  requestAnimationFrame(sample);
+                } else {
+                  resolve(positions);
+                }
+              }
+              sample();
+            }),
+        );
+        await pagination.getByRole('button', { name: step.button }).click();
+        const positions = await positionsPromise;
+        expect(Math.max(...positions) - Math.min(...positions), 'Paging controls must remain still in every frame').toBeLessThanOrEqual(1);
+        await expect(pagination.locator('span')).toHaveText(`${step.page} из 3`);
+        await expect(history.locator('.history-timeline__list > article')).toHaveCount(step.count);
+        await expect(history.locator('.history-timeline__list')).toHaveCSS('transition-duration', '0s');
+        expectSamePosition(before, await readLayoutBox(pagination, 'history controls after paging'), 'history paging controls');
+      }
+    });
+  }
+}
 
 test('reserves header space while the feedback action loads', async ({ browser }) => {
   for (const viewport of [
@@ -743,14 +807,14 @@ test('reserves header space while the feedback action loads', async ({ browser }
     try {
       await isolatedPage.goto('/today');
       await feedbackModuleRequested;
-      const help = isolatedPage.getByRole('button', { name: 'Как работает приложение' });
-      await expect(help).toBeVisible();
-      const before = await readLayoutBox(help, `help before feedback at ${viewport.width}px`);
+      const settings = isolatedPage.getByRole('link', { name: 'Открыть настройки' });
+      await expect(settings).toBeVisible();
+      const before = await readLayoutBox(settings, `settings before feedback at ${viewport.width}px`);
 
       releaseFeedbackModule();
       await expect(isolatedPage.getByRole('button', { name: 'Обратная связь' })).toBeVisible();
-      const after = await readLayoutBox(help, `help after feedback at ${viewport.width}px`);
-      expectSamePosition(before, after, `help while feedback loads at ${viewport.width}px`);
+      const after = await readLayoutBox(settings, `settings after feedback at ${viewport.width}px`);
+      expectSamePosition(before, after, `settings while feedback loads at ${viewport.width}px`);
     } finally {
       releaseFeedbackModule();
       await context.close();
@@ -942,38 +1006,34 @@ test('keeps result details editable when Backspace clears the field', async ({ p
   await expect(page.locator('.result-composer textarea')).toHaveAttribute('rows', '4');
 });
 
-test('explains the app from the permanent help button', async ({ page }) => {
-  await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto('/today');
-  await page.evaluate(() => window.scrollTo(0, 320));
-  const scrollBeforeOpen = await page.evaluate(() => window.scrollY);
-  await page.getByRole('button', { name: 'Как работает приложение' }).click();
-  const dialog = page.getByRole('dialog', { name: 'Зачем нужна «Траектория»' });
+test('keeps general help removed and limits the mint highlight to archive disclosure triggers', async ({ page }, testInfo) => {
+  for (const width of [390, 1440]) {
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto('/today');
+    await expect(page.getByRole('button', { name: /Как пользоваться|Зачем это заполнять/ })).toHaveCount(0);
+    await expect(page.locator('.header-actions > *')).toHaveCount(2);
+    const settings = page.locator('.daily-layout-settings');
+    await expect(settings).toHaveCSS('background-color', 'rgb(233, 238, 234)');
+    await expect(settings).toHaveCSS('border-top-width', '0px');
+    await page.locator('.page-heading').screenshot({ path: testInfo.outputPath(`home-settings-original-${width}.png`) });
 
-  await expect(dialog.locator('.help-steps > li')).toHaveCount(3);
-  await expect(dialog).toContainText('Записать важное');
-  await expect(dialog).toContainText('Вернуться к записям');
-  await expect(dialog).toContainText('Записать мысли и планы');
-  await expect(page.locator('body')).toHaveCSS('position', 'fixed');
-  const dialogActions = dialog.locator(':scope > .help-dialog__actions > a');
-  const analysisLink = dialog.getByRole('link', { name: 'Подготовить текст для нейросети' });
-  await expect(analysisLink).toHaveCSS('display', 'flex');
-  await expect(analysisLink).toHaveCSS('background-color', 'rgb(233, 238, 234)');
-  await expect(dialogActions).toHaveCount(2);
-  await expect(dialogActions.nth(0)).toHaveCSS('text-align', 'center');
-  await expect(dialogActions.nth(1)).toHaveCSS('text-align', 'center');
-  await page.getByRole('button', { name: 'Закрыть объяснение' }).click();
-  await expect(page.getByRole('button', { name: 'Как работает приложение' })).toBeFocused();
-  await expect(page.locator('body')).not.toHaveCSS('position', 'fixed');
-  await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(scrollBeforeOpen);
-
-  await page.getByRole('button', { name: 'Как работает приложение' }).click();
-  await dialog.getByRole('link', { name: 'Настроить записи' }).click();
-  await expect(page).toHaveURL(/\/settings#daily-settings$/);
-  await expect(page.getByRole('button', { name: 'Ежедневная запись' })).toHaveAttribute('aria-pressed', 'true');
-  await expect(page.locator('#daily-settings')).toBeVisible();
+    for (const route of ['/results', '/events']) {
+      await page.goto(route);
+      const trigger = page.locator('.archive-add > summary');
+      await expect(trigger).toHaveCSS('background-color', 'rgb(223, 247, 238)');
+      await expect(trigger).toHaveCSS('border-top-width', '1px');
+      await expect(page.locator('.archive-add')).not.toHaveAttribute('open', '');
+      await trigger.focus();
+      await page.keyboard.press('Enter');
+      await expect(page.locator('.archive-add')).toHaveAttribute('open', '');
+      await expect(page.locator('.archive-composer')).toBeVisible();
+      await page.keyboard.press('Enter');
+      await expect(page.locator('.archive-add')).not.toHaveAttribute('open', '');
+      await expect(trigger).toBeFocused();
+      await page.locator('.archive-add').screenshot({ path: testInfo.outputPath(`archive-disclosure-${route.slice(1)}-${width}.png`) });
+    }
+  }
 });
-
 test('opens the exact settings section from a daily card', async ({ page }) => {
   await page.goto('/today');
   await page.locator('.daily-additional-blocks > summary').click();
@@ -1028,12 +1088,14 @@ for (const width of [320, 390, 768, 980, 1440]) {
     await page.setViewportSize({ width, height: 900 });
     await page.goto('/today');
     const feedback = page.getByRole('button', { name: 'Обратная связь' });
-    const help = page.getByRole('button', { name: 'Как работает приложение' });
-    const [feedbackBox, helpBox] = await Promise.all([readLayoutBox(feedback, 'feedback action'), readLayoutBox(help, 'help action')]);
-    expect(feedbackBox.width).toBeCloseTo(helpBox.width, 0);
-    expect(feedbackBox.height).toBeCloseTo(helpBox.height, 0);
+    const settings = page.getByRole('link', { name: 'Открыть настройки' });
+    const [feedbackBox, settingsBox] = await Promise.all([
+      readLayoutBox(feedback, 'feedback action'),
+      readLayoutBox(settings, 'settings action'),
+    ]);
     expect(feedbackBox.width).toBeCloseTo(feedbackBox.height, 0);
-    expectHorizontalSeparation(helpBox, feedbackBox, 8, 'header utility actions');
+    expect(feedbackBox.width).toBeGreaterThanOrEqual(36);
+    expectHorizontalSeparation(feedbackBox, settingsBox, 8, 'header utility actions');
     await expect(feedback).toHaveAttribute('title', 'Обратная связь');
     await expect(feedback.locator('strong')).toBeHidden();
     await expect(feedback.locator('use')).toHaveAttribute('href', '/icons/ui-icons.svg#feedback');
@@ -1045,11 +1107,11 @@ for (const width of [320, 390, 768, 980, 1440]) {
     await expectPageFitsViewport(page, `compact header at ${width}px`);
     await page.locator('.app-header').screenshot({ path: testInfo.outputPath(`feedback-header-${width}.png`) });
 
-    await help.focus();
-    await page.keyboard.press('Tab');
+    await settings.focus();
+    await page.keyboard.press('Shift+Tab');
     await expect(feedback).toBeFocused();
     await page.keyboard.press('Enter');
-    const dialog = page.getByRole('dialog', { name: 'Написать разработчику' });
+    const dialog = page.getByRole('dialog', { name: 'Написать в поддержку' });
     await expect(dialog).toBeVisible();
     await expect(dialog).not.toContainText(/закрыт.{0,20}бет/i);
     await expect(dialog.getByLabel('Предложение, проблема или ошибка')).toBeFocused();
@@ -1069,7 +1131,7 @@ test('sends feedback from the built-in form without asking for recipient details
   await page.goto('/today');
 
   await page.getByRole('button', { name: 'Обратная связь' }).click();
-  const dialog = page.getByRole('dialog', { name: 'Написать разработчику' });
+  const dialog = page.getByRole('dialog', { name: 'Написать в поддержку' });
   await expect(dialog).toBeVisible();
   await dialog.getByLabel('Предложение, проблема или ошибка').fill('Добавьте короткую подсказку к недельному обзору.');
   await dialog.getByRole('button', { name: 'Отправить', exact: true }).click();

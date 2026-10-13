@@ -8,7 +8,7 @@ import type { ReviewCue } from '@/features/analytics/reviewCues';
 import PeriodActions from '@/features/reviews/ui/PeriodActions.vue';
 import ReviewCueGrid from '@/features/reviews/ui/ReviewCueGrid.vue';
 
-defineProps<{ cues: ReviewCue[]; coveredEntries: number; ordinaryEntries: number }>();
+defineProps<{ cues: ReviewCue[]; coveredEntries: number }>();
 defineEmits<{ copy: []; download: [] }>();
 </script>
 
@@ -22,9 +22,7 @@ defineEmits<{ copy: []; download: [] }>();
     </SectionHeading>
 
     <ReviewCueGrid :cues="cues" />
-    <DataNote class="history-coverage-note">
-      Основа разбора: {{ coveredEntries }} дней с записями, {{ ordinaryEntries }} обычных дней с основными полями. Пропуски не заполняются.
-    </DataNote>
+    <DataNote class="history-coverage-note"> Дней с записями за период: {{ coveredEntries }}. Пропуски не заполняются. </DataNote>
     <details class="history-external-analysis">
       <summary>Экспорт для разбора в нейросети</summary>
       <AiAnalysisSteps />

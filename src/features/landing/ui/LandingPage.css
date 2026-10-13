@@ -73,6 +73,10 @@
   font-size: 20px;
   line-height: 1.5;
 }
+.landing-hero__note {
+  max-width: 640px;
+  color: var(--muted);
+}
 .landing-actions {
   flex-wrap: wrap;
   gap: 18px;
@@ -100,6 +104,40 @@
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 28px 32px;
+}
+.landing-example__steps {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.landing-example__steps li {
+  padding: 24px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--surface);
+}
+.landing-example__period {
+  color: var(--brand-strong);
+  font-size: 13px;
+  font-weight: 700;
+}
+.landing-example__steps h3 {
+  margin: 8px 0 20px;
+  font-size: 18px;
+  line-height: 1.35;
+}
+.landing-example__steps blockquote {
+  margin: 0;
+  padding-left: 14px;
+  border-left: 3px solid var(--line-success);
+}
+.landing-example__steps p {
+  margin: 20px 0 0;
+  color: var(--muted);
+  font-size: 14px;
 }
 .landing-features h3 {
   margin: 0 0 8px;
@@ -154,7 +192,8 @@
   .landing-section {
     padding-block: 32px;
   }
-  .landing-features {
+  .landing-features,
+  .landing-example__steps {
     grid-template-columns: 1fr;
     gap: 22px;
   }

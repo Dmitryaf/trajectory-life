@@ -9,7 +9,7 @@ const axeSource = readFileSync(require.resolve('axe-core/axe.min.js'), 'utf8');
 test('keeps the public landing independent from authentication and product storage', async ({ page }) => {
   await page.goto('/');
   await expect(page).toHaveURL(/\/$/);
-  await expect(page.getByRole('heading', { level: 1, name: 'Личный дневник' })).toBeVisible();
+  await expect(page.getByRole('heading', { level: 1, name: 'Из чего складываются ваши дни' })).toBeVisible();
   await expect(page.locator('.app-shell')).toHaveCount(0);
   await expect(page.locator('a[href="/access?mode=sign-in"]')).toHaveCount(2);
   await expect(page.getByRole('link', { name: 'Посмотреть примеры' })).toHaveAttribute('href', '#product');
@@ -117,7 +117,8 @@ test('keeps the landing readable and accessible across supported widths', async 
     await page.goto('/');
     await expectPageFitsViewport(page, `landing at ${width}px`);
     await expect(page.locator('.landing-header').getByRole('link', { name: 'Войти', exact: true })).toBeVisible();
-    await expect(page.locator('.landing-example')).toHaveCount(0);
+    await expect(page.locator('.landing-example__steps > li')).toHaveCount(3);
+    await expect(page.locator('.landing-example')).toContainText('Вымышленный пример записей');
     await expect(page.getByRole('tab')).toHaveCount(6);
     const productLayout = await page.locator('#product').evaluate((section) => {
       const caption = section.querySelector('.landing-gallery__caption')!.getBoundingClientRect();

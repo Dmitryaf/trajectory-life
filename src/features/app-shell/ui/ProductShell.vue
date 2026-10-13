@@ -9,7 +9,6 @@ import type { UiIconName } from '@/shared/ui/icons/icons';
 import 'vue-sonner/style.css';
 import AccountMenu from '@/features/auth/ui/AccountMenu.vue';
 import AuthGate from '@/features/auth/ui/AuthGate.vue';
-import HowItWorksDialog from '@/features/first-use/ui/HowItWorksDialog.vue';
 import EyebrowText from '@/shared/ui/typography/EyebrowText.vue';
 import { clearFirstUseFunnel } from '@/features/first-use/funnel';
 import { useProductTelemetry } from '@/features/telemetry/useProductTelemetry';
@@ -299,7 +298,6 @@ function isPrimaryNavigationItemActive(item: PrimaryNavigationItem, path: string
         <span><strong>Траектория</strong><small>личный дневник</small></span>
       </RouterLink>
       <div v-if="canOpenApp && appDataReady && store.loaded && !effectiveLoadError" class="header-actions">
-        <HowItWorksDialog />
         <div v-if="feedbackEnabled" class="header-feedback-slot">
           <FeedbackDialog :access-token="auth.session?.access_token ?? ''" />
         </div>

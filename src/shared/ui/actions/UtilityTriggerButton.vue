@@ -4,14 +4,14 @@ import UiIcon from '@/shared/ui/icons/UiIcon.vue';
 import type { UiIconName } from '@/shared/ui/icons/icons';
 
 defineOptions({ inheritAttrs: false });
-withDefaults(defineProps<{ icon: UiIconName; variant?: 'feedback' | 'help' | 'inline' }>(), { variant: 'feedback' });
+defineProps<{ icon: UiIconName }>();
 
 const element = ref<HTMLButtonElement>();
 defineExpose({ element });
 </script>
 
 <template>
-  <button ref="element" class="utility-trigger" :class="`utility-trigger--${variant}`" type="button" v-bind="$attrs">
+  <button ref="element" class="utility-trigger utility-trigger--feedback" type="button" v-bind="$attrs">
     <span><UiIcon :name="icon" /></span>
     <strong><slot /></strong>
   </button>
@@ -44,7 +44,6 @@ defineExpose({ element });
 .utility-trigger strong {
   font-weight: 850;
 }
-.utility-trigger--help,
 .utility-trigger--feedback {
   width: 38px;
   min-height: 38px;
@@ -52,16 +51,8 @@ defineExpose({ element });
   justify-content: center;
   padding: 0;
 }
-.utility-trigger--help strong,
 .utility-trigger--feedback strong {
   display: none;
-}
-.utility-trigger--inline {
-  width: auto;
-  min-height: 42px;
-  justify-content: center;
-  padding: 9px 13px;
-  background: var(--surface);
 }
 .utility-trigger:hover {
   border-color: var(--utility-action-hover-border);
@@ -69,7 +60,6 @@ defineExpose({ element });
   transform: translateY(-2px);
 }
 @media (max-width: 720px) {
-  .utility-trigger--help,
   .utility-trigger--feedback {
     width: 36px;
     min-height: 36px;

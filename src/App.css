@@ -452,7 +452,7 @@
       transform var(--motion-fast) var(--motion-ease);
   }
 
-  .app-shell:has(input:focus, textarea:focus, select:focus) .bottom-nav {
+  .app-shell:has(input:focus, textarea:focus, select:focus, .archive-composer:focus-within) .bottom-nav {
     pointer-events: none;
     opacity: 0;
     transform: translateY(calc(100% + 24px + var(--safe-bottom)));

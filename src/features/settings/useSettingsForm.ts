@@ -10,7 +10,8 @@ import { confirmBackupImport, downloadBackup } from '../backup/browser';
 import {
   activityOptions,
   careerOptions,
-  contextFactorOptions,
+  careerEntryOptions,
+  contextFactorEntryOptions,
   createCustomOption,
   dailyBlockOptions,
   legacyActivityOptions,
@@ -52,19 +53,18 @@ export function useSettingsForm() {
   const savingActions = reactive(new Set<string>());
   const auth = useAuthStore();
   const allCareerOptions = computed(() => {
-    const usedIds = new Set([
-      ...store.dailyEntries.flatMap((entry) => entry.careerStates),
-      ...store.dailyEntries.flatMap((entry) => (entry.careerState ? [entry.careerState] : [])),
-    ]);
-    return Array.from(
-      new Map(
+    const usedIds = new Set(
+      store.dailyEntries.flatMap((entry) => [...entry.careerStates, ...(entry.careerState ? [entry.careerState] : [])]),
+    );
+    return [
+      ...new Map(
         [
-          ...careerOptions,
+          ...careerEntryOptions,
           ...settings.customCareerOptions.filter((option) => !option.archived),
-          ...legacyCareerOptions.filter((option) => usedIds.has(option.id)),
+          ...[...careerOptions, ...legacyCareerOptions].filter((option) => usedIds.has(option.id)),
         ].map((option) => [option.id, option]),
       ).values(),
-    );
+    ];
   });
   const activeActivityOptions = computed(() => [
     ...activityOptions.filter((option) => !settings.hiddenActivityIds.includes(option.id)),
@@ -76,11 +76,11 @@ export function useSettingsForm() {
   ]);
   const allLifeAreaOptions = computed(() => [...lifeAreaOptions, ...settings.customLifeAreaOptions.filter((option) => !option.archived)]);
   const activeContextFactorOptions = computed(() => [
-    ...contextFactorOptions.filter((option) => !settings.hiddenContextFactorIds.includes(option.id)),
+    ...contextFactorEntryOptions.filter((option) => !settings.hiddenContextFactorIds.includes(option.id)),
     ...settings.customContextFactorOptions.filter((option) => !option.archived),
   ]);
   const hiddenContextFactorOptions = computed(() => [
-    ...contextFactorOptions.filter((option) => settings.hiddenContextFactorIds.includes(option.id)),
+    ...contextFactorEntryOptions.filter((option) => settings.hiddenContextFactorIds.includes(option.id)),
     ...settings.customContextFactorOptions.filter((option) => option.archived),
   ]);
   const cloudSession = computed(() => auth.session);
@@ -143,7 +143,7 @@ export function useSettingsForm() {
       return;
     }
     const label = newCareerLabel.value.trim();
-    if (!label || hasOption(careerOptions, label)) {
+    if (!label || hasOption(careerEntryOptions, label)) {
       return;
     }
     const archived = findArchived(settings.customCareerOptions, label);
@@ -275,7 +275,7 @@ export function useSettingsForm() {
     if (!label) {
       return;
     }
-    const hiddenBuiltIn = contextFactorOptions.find(
+    const hiddenBuiltIn = contextFactorEntryOptions.find(
       (option) => settings.hiddenContextFactorIds.includes(option.id) && sameLabel(option.label, label),
     );
     if (hiddenBuiltIn) {
@@ -284,7 +284,7 @@ export function useSettingsForm() {
       await save('Фактор дня возвращён', 'context');
       return;
     }
-    if (hasOption(contextFactorOptions, label)) {
+    if (hasOption(contextFactorEntryOptions, label)) {
       return;
     }
     const archived = findArchived(settings.customContextFactorOptions, label);

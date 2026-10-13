@@ -5,7 +5,11 @@ defineProps<{ cues: ReviewCue[] }>();
 </script>
 
 <template>
-  <div class="review-cue-grid review-cue-grid--primary">
+  <p v-if="!cues.length" class="review-cue-empty">
+    Здесь пока нет отдельных наблюдений по показателям. Можно вернуться к записям и сохранить собственные выводы — измерения для этого не
+    нужны.
+  </p>
+  <div v-else class="review-cue-grid review-cue-grid--primary">
     <article v-for="cue in cues" :key="cue.id" class="review-cue" :class="`review-cue--${cue.tone}`">
       <strong>{{ cue.title }}</strong>
       <p>{{ cue.text }}</p>
@@ -16,8 +20,13 @@ defineProps<{ cues: ReviewCue[] }>();
 <style scoped>
 .review-cue-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
   gap: 10px;
+}
+.review-cue-empty {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.5;
 }
 .review-cue {
   position: relative;

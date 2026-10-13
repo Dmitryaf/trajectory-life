@@ -48,7 +48,6 @@ async function setup() {
       stubs: {
         FeedbackDialog: true,
         ConsentExperience: { template: '<div data-testid="consent" />' },
-        HowItWorksDialog: true,
         AccountMenu: true,
         Toaster: true,
       },
