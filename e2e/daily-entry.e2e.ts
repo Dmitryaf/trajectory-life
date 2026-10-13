@@ -493,14 +493,14 @@ test('keeps navigation, fixed actions and dialogs inside safe areas and a reduce
 
   await page.setViewportSize({ width: 844, height: 390 });
   await emulateSafeViewport(page, { top: 0, right: 44, bottom: 21, left: 44 }, 390);
-  await page.locator('.app-header').getByRole('button', { name: 'Как работает приложение' }).click();
-  const helpDialog = page.getByRole('dialog', { name: 'Зачем нужна «Траектория»' });
-  const helpBox = await helpDialog.boundingBox();
-  expect(helpBox).not.toBeNull();
-  expect(helpBox!.x).toBeGreaterThanOrEqual(44);
-  expect(helpBox!.x + helpBox!.width).toBeLessThanOrEqual(844 - 44);
-  expect(helpBox!.y + helpBox!.height).toBeLessThanOrEqual(390 - 21);
-  await expect(page.getByRole('button', { name: 'Закрыть объяснение' })).toBeVisible();
+  await page.locator('.app-header').getByRole('button', { name: 'Обратная связь' }).click();
+  const feedbackDialog = page.getByRole('dialog', { name: 'Написать в поддержку' });
+  const feedbackBox = await feedbackDialog.boundingBox();
+  expect(feedbackBox).not.toBeNull();
+  expect(feedbackBox!.x).toBeGreaterThanOrEqual(44);
+  expect(feedbackBox!.x + feedbackBox!.width).toBeLessThanOrEqual(844 - 44);
+  expect(feedbackBox!.y + feedbackBox!.height).toBeLessThanOrEqual(390 - 21);
+  await expect(page.getByRole('button', { name: 'Закрыть форму' })).toBeVisible();
 
   const widths = await page.evaluate(() => ({
     content: document.documentElement.scrollWidth,

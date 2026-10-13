@@ -73,7 +73,10 @@ describe('trends scenarios', () => {
     expect(wrapper.get('h1').text()).toBe('История изменений');
     expect(wrapper.html().indexOf('dashboard-card--insights')).toBeLessThan(wrapper.html().indexOf('history-timeline--featured'));
     expect(wrapper.html().indexOf('history-timeline--featured')).toBeLessThan(wrapper.html().indexOf('trends-metric-details'));
-    expect(wrapper.findAll('.review-cue-grid--primary .review-cue')).toHaveLength(3);
+    expect(wrapper.findAll('.review-cue-grid--primary .review-cue strong').map((item) => item.text())).toEqual([
+      'Повторяющееся условие',
+      'Вы отмечали шаги к цели',
+    ]);
     expect(wrapper.get('.trends-metric-details').attributes('open')).toBeUndefined();
     expect(wrapper.get('.trends-event-details').attributes('open')).toBeUndefined();
     expect(wrapper.find('.trends-quality-details').exists()).toBe(false);
@@ -104,7 +107,8 @@ describe('trends scenarios', () => {
     store.dailyEntries = [{ ...emptyDailyEntry('2026-07-21'), importantFact: 'Одна запись' }];
     const wrapper = mount(TrendsView, { global: { plugins: [pinia], stubs: { EChartPanel: true, RouterLink: routerLinkStub } } });
 
-    expect(wrapper.findAll('.review-cue-grid--primary .review-cue').length).toBeGreaterThan(0);
+    expect(wrapper.findAll('.review-cue-grid--primary .review-cue')).toHaveLength(0);
+    expect(wrapper.get('.review-cue-empty').text()).toContain('измерения для этого не нужны');
     expect(wrapper.get('.trends-metric-details').attributes('open')).toBeUndefined();
     expect(wrapper.get('.trends-chart-guide').text()).toContain('Для графика пока мало записей');
     expect(wrapper.findAll('e-chart-panel-stub')).toHaveLength(0);

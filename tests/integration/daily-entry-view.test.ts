@@ -72,7 +72,7 @@ describe('daily entry scenario', () => {
     expect(wrapper.text()).toContain('Отметьте несколько деталей сегодняшнего дня');
     expect(wrapper.text()).toContain('Разделы на главной можно добавить или убрать в настройках');
     expect(wrapper.text()).toContain('Настроить блоки');
-    expect(wrapper.text()).toContain('Зачем это заполнять?');
+    expect(wrapper.text()).not.toContain('Зачем это заполнять?');
     expect(wrapper.text()).not.toContain('Вчера без записи');
     expect(wrapper.find('.quick-capture').exists()).toBe(false);
     expect(wrapper.text()).toContain('Цель необязательна. Выберите её, если хотите записывать шаги к ней.');
@@ -200,7 +200,9 @@ describe('daily entry scenario', () => {
       ...emptyDailyEntry(addDays(todayKey(), offset)),
       importantFact: `Запись ${offset}`,
     }));
-    store.weeklyReviews = [{ ...emptyWeeklyReview(startOfWeek(todayKey())), ifThenPlan: 'Если устану, сокращу необязательную задачу' }];
+    store.weeklyReviews = [
+      { ...emptyWeeklyReview(addDays(startOfWeek(todayKey()), -7)), ifThenPlan: 'Если устану, сокращу необязательную задачу' },
+    ];
     const wrapper = mount(TodayView, {
       global: { plugins: [pinia], stubs: { RouterLink: routerLinkStub } },
     });
@@ -222,7 +224,7 @@ describe('daily entry scenario', () => {
   it('shows only one current cue and keeps a weekly plan visible without daily tracking', () => {
     const { pinia, store } = createStore();
     store.dailyEntries = [{ ...emptyDailyEntry('2026-07-20'), importantFact: 'Обычная запись' }];
-    store.weeklyReviews = [{ ...emptyWeeklyReview('2026-07-20'), ifThenPlan: 'Если застряну, выйду на короткую прогулку' }];
+    store.weeklyReviews = [{ ...emptyWeeklyReview('2026-07-13'), ifThenPlan: 'Если застряну, выйду на короткую прогулку' }];
     const wrapper = mount(TodayView, {
       global: { plugins: [pinia], stubs: { RouterLink: routerLinkStub } },
     });
@@ -423,13 +425,7 @@ describe('daily entry scenario', () => {
     });
 
     const workCard = wrapper.get('#career');
-    expect(workCard.findAll('.chip').map((chip) => chip.text())).toEqual([
-      '▤ Рабочий день',
-      '◫ Обучение',
-      '◉ Общение по работе',
-      '◇ Свой проект',
-      '✓ Завершённый результат',
-    ]);
+    expect(workCard.findAll('.chip').map((chip) => chip.text())).toEqual(['◫ Обучение', '◉ Общение по работе', '◇ Свой проект']);
 
     const careerNone = workCard.findAll('button').find((button) => button.text() === 'Ничего из списка');
     const actionNone = wrapper.findAll('button').find((button) => button.text() === 'Шага по цели не было');
@@ -469,7 +465,51 @@ describe('daily entry scenario', () => {
 
     expect(labels).toContain('↗ Отклик/контакт');
     expect(labels).not.toContain('◉ Собеседование');
-    expect(labels).toContain('▤ Рабочий день');
+    expect(labels).not.toContain('▤ Рабочий день');
+  });
+
+  it('omits retired defaults on a new day while preserving them when a historical day is edited', async () => {
+    const { pinia, store } = createStore();
+    store.settings.activeDailyBlocks.push('career');
+    store.dailyEntries = [
+      {
+        ...emptyDailyEntry('2026-07-20'),
+        careerState: 'external',
+        careerStates: ['external', 'workday', 'work_result'],
+        contextFactors: ['series_video', 'work_code', 'late_food'],
+        recordedFields: ['careerStates', 'contextFactors'],
+        contextFactorsRecorded: true,
+      },
+    ];
+    const saveEntry = vi.spyOn(store, 'saveEntry').mockImplementation(async (entry) => entry);
+    const wrapper = mount(TodayView, {
+      global: { plugins: [pinia], stubs: { RouterLink: routerLinkStub } },
+    });
+    const retiredLabels = [
+      'Отклик/контакт',
+      'Рабочий день',
+      'Завершённый результат',
+      'Видео и сериалы',
+      'Рабочая нагрузка',
+      'Поздний приём пищи',
+    ];
+    for (const label of retiredLabels) {
+      expect(wrapper.findAll('.chip').some((chip) => chip.text().includes(label))).toBe(false);
+    }
+
+    await wrapper.get('[aria-label="Дата записи"]').setValue('2026-07-20');
+    for (const label of retiredLabels) {
+      const chip = wrapper.findAll('.chip').find((item) => item.text().includes(label));
+      expect(chip?.attributes('aria-pressed')).toBe('true');
+    }
+    await wrapper.get('form').trigger('submit');
+    await flushPromises();
+    expect(saveEntry).toHaveBeenCalledWith(
+      expect.objectContaining({
+        careerStates: ['external', 'workday', 'work_result'],
+        contextFactors: ['series_video', 'work_code', 'late_food'],
+      }),
+    );
   });
 
   it('keeps archived custom values visible while editing a historical day', () => {

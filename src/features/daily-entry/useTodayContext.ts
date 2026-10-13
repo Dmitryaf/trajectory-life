@@ -1,7 +1,7 @@
 import { computed, type ComputedRef } from 'vue';
 import { shouldShowAiAnalysisNudge } from '@/features/analysis/discovery';
 import { entriesForPeriod, entriesForWeek, summarize } from '@/features/analytics/periodSummary';
-import { addDays, endOfMonth, endOfWeek, startOfMonth, startOfWeek, todayKey } from '@/services/dates';
+import { addDays, endOfMonth, endOfWeek, formatDate, startOfMonth, startOfWeek, todayKey } from '@/services/dates';
 import { externalCareerIdsForOptions } from '@/types';
 import type { useAppStore } from '@/stores/app';
 
@@ -17,26 +17,20 @@ export function useTodayContext(store: AppStore, isToday: ComputedRef<boolean>) 
   const isMonthReviewWindow = computed(() => isToday.value && todayKey() >= addDays(endOfMonth(todayKey()), -2));
   const reviewReminders = computed(() =>
     [
-      isWeekReviewWindow.value &&
-      currentWeekSummary.value.ordinaryCoveredEntriesCount >= 4 &&
-      currentWeekSummary.value.ordinaryCoreEntriesCount >= 2 &&
-      !store.reviewByWeek(startOfWeek(todayKey()))
+      isWeekReviewWindow.value && currentWeekSummary.value.coveredEntriesCount > 0 && !store.reviewByWeek(startOfWeek(todayKey()))
         ? {
             id: 'week',
-            title: 'Неделя готова к разбору',
-            text: `${currentWeekSummary.value.ordinaryCoveredEntriesCount} заполненных дней уже достаточно для короткого обзора.`,
+            title: 'Можно вспомнить неделю',
+            text: 'Вернитесь к записям и при желании сохраните то, что заметили. Заполнять все поля не нужно.',
             to: '/week',
             label: 'Открыть неделю',
           }
         : null,
-      isMonthReviewWindow.value &&
-      currentMonthSummary.value.ordinaryCoveredEntriesCount >= 12 &&
-      currentMonthSummary.value.ordinaryCoreEntriesCount >= 6 &&
-      !store.reviewByMonth(startOfMonth(todayKey()))
+      isMonthReviewWindow.value && currentMonthSummary.value.coveredEntriesCount > 0 && !store.reviewByMonth(startOfMonth(todayKey()))
         ? {
             id: 'month',
-            title: 'Месяц готов к разбору',
-            text: `${currentMonthSummary.value.ordinaryCoveredEntriesCount} заполненных дней дают материал для месячного обзора.`,
+            title: 'Можно вспомнить месяц',
+            text: 'Записи помогут вспомнить важное. При желании сохраните свои выводы.',
             to: '/month',
             label: 'Открыть месяц',
           }
@@ -44,7 +38,14 @@ export function useTodayContext(store: AppStore, isToday: ComputedRef<boolean>) 
     ].filter((item): item is { id: string; title: string; text: string; to: string; label: string } => item !== null),
   );
   const activeReviewReminder = computed(() => reviewReminders.value[0] ?? null);
-  const currentWeeklyPlan = computed(() => store.reviewByWeek(startOfWeek(todayKey()))?.ifThenPlan.trim() ?? '');
+  const currentWeeklyPlan = computed(() => {
+    const sourceWeek = addDays(startOfWeek(todayKey()), -7);
+    return {
+      plan: store.reviewByWeek(sourceWeek)?.ifThenPlan.trim() ?? '',
+      period: `${formatDate(startOfWeek(todayKey()), { day: 'numeric', month: 'short' })}–${formatDate(endOfWeek(todayKey()), { day: 'numeric', month: 'short' })}`,
+      source: `/week?week=${sourceWeek}#week-review`,
+    };
+  });
   const yesterday = computed(() => addDays(todayKey(), -1));
   const yesterdayMissing = computed(
     () => isToday.value && store.loaded && store.dailyEntries.length > 0 && !store.entryByDate(yesterday.value),

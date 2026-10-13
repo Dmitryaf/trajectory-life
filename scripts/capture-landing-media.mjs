@@ -42,7 +42,7 @@ try {
   const captures = [
     { route: '/today', selector: '.page--today', file: 'today.webp' },
     { route: '/week?week=2026-08-24', selector: '.page--week', file: 'week.webp' },
-    { route: '/month?month=2026-08', selector: '.page--month', file: 'month.webp' },
+    { route: '/month?month=2026-08', selector: '.page--month', file: 'month.webp', scroll: '.month-week-reviews' },
     {
       route: '/trends',
       selector: '.page--trends',
