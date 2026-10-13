@@ -17,6 +17,7 @@ defineEmits<{ 'update:page': [value: number] }>();
 const list = ref<HTMLElement>();
 const reservedHeight = ref(0);
 let resizeObserver: ResizeObserver | null = null;
+let resizeFrame = 0;
 
 // Keep the space occupied by visited pages so shorter pages cannot move the controls or clamp scroll.
 watch(
@@ -36,14 +37,21 @@ onMounted(() => {
   resizeObserver = new ResizeObserver(([entry]) => {
     if (entry && Math.abs(entry.contentRect.width - previousWidth) > 1) {
       previousWidth = entry.contentRect.width;
-      reservedHeight.value = 0;
+      cancelAnimationFrame(resizeFrame);
+      // Reset outside observer delivery: changing the observed height here can loop in WebKit.
+      resizeFrame = requestAnimationFrame(() => {
+        reservedHeight.value = 0;
+      });
     }
   });
   if (list.value) {
     resizeObserver.observe(list.value);
   }
 });
-onBeforeUnmount(() => resizeObserver?.disconnect());
+onBeforeUnmount(() => {
+  resizeObserver?.disconnect();
+  cancelAnimationFrame(resizeFrame);
+});
 </script>
 
 <template>
