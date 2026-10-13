@@ -27,8 +27,11 @@ describe('public landing', () => {
     const wrapper = mount(App, { global: { plugins: [router] } });
     await flushPromises();
 
-    expect(wrapper.get('h1').text()).toBe('Личный дневник');
-    expect(wrapper.text()).not.toContain('Пример: от записи к своему выводу');
+    expect(wrapper.get('h1').text()).toBe('Из чего складываются ваши дни');
+    expect(wrapper.get('.landing-example').text()).toContain('Вымышленный пример записей');
+    expect(wrapper.findAll('.landing-example__steps > li')).toHaveLength(3);
+    expect(wrapper.text()).toContain('Сохранённые выводы недель соберутся в месяце');
+    expect(wrapper.text()).toContain('Заполнять дневник каждый день, следить за показателями или ставить цель необязательно');
     expect(wrapper.text()).not.toContain('Пропуски остаются пропусками');
     expect(wrapper.text()).toContain('Траектория сама не отправляет ваши записи в нейросети');
     expect(wrapper.findAll('[role="tab"]')).toHaveLength(6);

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import TodayWeeklyPlan from '@/features/daily-entry/ui/TodayWeeklyPlan.vue';
 import ActionButton from '@/shared/ui/actions/ActionButton.vue';
 import { RouterLink } from 'vue-router';
 import SurfaceCard from '@/shared/ui/layout/SurfaceCard.vue';
@@ -14,7 +15,6 @@ import { useCurrentGoalDialog } from '../features/daily-entry/useCurrentGoalDial
 import { useTodayContext } from '../features/daily-entry/useTodayContext';
 import FirstUseRecovery from '../features/first-use/ui/FirstUseRecovery.vue';
 import { isFirstUsePrimary } from '../features/first-use/priority';
-import HowItWorksDialog from '../features/first-use/ui/HowItWorksDialog.vue';
 import PwaInstallNudge from '../features/pwa/ui/PwaInstallNudge.vue';
 import JournalQuickCapture from '../features/journal/ui/JournalQuickCapture.vue';
 import AutoGrowTextarea from '../shared/ui/forms/AutoGrowTextarea.vue';
@@ -44,8 +44,10 @@ import {
   actionDirectionEntryOptions,
   activityOptions,
   careerOptions,
+  careerEntryOptions,
   experimentAppliesToDate,
   contextFactorOptions,
+  contextFactorEntryOptions,
   legacyContextFactorOptions,
   legacyActivityOptions,
   legacyCareerOptions,
@@ -91,20 +93,15 @@ const { additionalBlocksOpen, syncAdditionalBlocksOpen } = useDailyBlocksDisclos
 const selectedDateLabel = computed(() => selectedDate.value.split('-').reverse().join('.'));
 
 const careerItems = computed(() => {
-  const usedIds = new Set([
-    ...store.dailyEntries.flatMap((entry) => entry.careerStates),
-    ...store.dailyEntries.flatMap((entry) => (entry.careerState ? [entry.careerState] : [])),
-    ...form.careerStates,
-  ]);
-  return Array.from(
-    new Map(
+  return [
+    ...new Map(
       [
-        ...careerOptions,
+        ...careerEntryOptions,
         ...store.settings.customCareerOptions.filter((option) => !option.archived || form.careerStates.includes(option.id)),
-        ...legacyCareerOptions.filter((option) => usedIds.has(option.id)),
+        ...[...careerOptions, ...legacyCareerOptions].filter((option) => form.careerStates.includes(option.id)),
       ].map((option) => [option.id, option]),
     ).values(),
-  );
+  ];
 });
 const activityItems = computed(() => {
   const configured = [
@@ -121,7 +118,7 @@ const activityItems = computed(() => {
 });
 const contextFactorItems = computed(() => {
   const configured = [
-    ...contextFactorOptions.filter((option) => !store.settings.hiddenContextFactorIds.includes(option.id)),
+    ...contextFactorEntryOptions.filter((option) => !store.settings.hiddenContextFactorIds.includes(option.id)),
     ...store.settings.customContextFactorOptions.filter((option) => !option.archived),
   ];
   const configuredIds = new Set(configured.map((option) => option.id));
@@ -203,7 +200,7 @@ const activeContextCue = computed(() =>
       isToday.value && store.settings.firstUse.status === 'available' && store.dailyEntries.length > 0 && !firstUsePromptHidden.value,
     review: Boolean(activeReviewReminder.value),
     recovery: yesterdayMissing.value,
-    plan: isToday.value && Boolean(currentWeeklyPlan.value),
+    plan: isToday.value && Boolean(currentWeeklyPlan.value.plan),
     pwa: isToday.value && pwaNudgeAvailable.value,
     ai: showAiAnalysisNudge.value,
     pulse: isToday.value && currentWeekSummary.value.coveredEntriesCount > 0,
@@ -339,7 +336,6 @@ function openEntryDatePicker() {
       </div>
       <div class="first-entry-guide__actions">
         <ActionButton :as="RouterLink" variant="secondary" class="context-action" to="/settings#daily-blocks">Настроить блоки</ActionButton>
-        <HowItWorksDialog button-label="Зачем это заполнять?" inline />
       </div>
     </section>
 
@@ -365,12 +361,7 @@ function openEntryDatePicker() {
       }}</ActionButton>
     </ReviewNudge>
 
-    <section v-else-if="!firstUseTakesPriority && activeContextCue === 'plan'" class="today-pulse" aria-label="Текущий план недели">
-      <div>
-        <EyebrowText>План недели</EyebrowText>
-        <p>{{ currentWeeklyPlan }}</p>
-      </div>
-    </section>
+    <TodayWeeklyPlan v-else-if="!firstUseTakesPriority && activeContextCue === 'plan'" v-bind="currentWeeklyPlan" />
 
     <section v-else-if="!firstUseTakesPriority && activeContextCue === 'pulse'" class="today-pulse" aria-label="Пульс недели">
       <div>

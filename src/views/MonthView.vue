@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import PeriodReviewActions from '@/features/reviews/ui/PeriodReviewActions.vue';
+import MonthWeekReviews from '@/features/reviews/ui/MonthWeekReviews.vue';
+import { monthWeekReviews, monthWeekSummariesForPeriod } from '@/features/reviews/monthWeeks';
 import ActionButton from '@/shared/ui/actions/ActionButton.vue';
 import SurfaceCard from '@/shared/ui/layout/SurfaceCard.vue';
 import SectionHeading from '@/shared/ui/layout/SectionHeading.vue';
@@ -27,12 +29,13 @@ import {
   actionDirectionLabel,
   buildObservations,
   buildReviewCues,
+  selectPrimaryReviewCues,
   entriesForMonth,
   resultsForPeriod,
   specialDayLabel,
   summarize,
 } from '@/features/analytics';
-import { addDays, dateRange, endOfMonth, formatDate, startOfMonth, startOfWeek, todayKey } from '@/services/dates';
+import { dateRange, endOfMonth, formatDate, startOfMonth, todayKey } from '@/services/dates';
 import { buildWeightSeries } from '@/features/analytics/weightSeries';
 import { pageCount, pageItems } from '@/services/pagination';
 import { useAppStore } from '@/stores/app';
@@ -61,35 +64,22 @@ const results = computed(() => resultsForPeriod(store.results, start.value, end.
 const lifeEvents = computed(() =>
   store.lifeEvents.filter((event) => event.date >= start.value && event.date <= end.value).sort((a, b) => b.date.localeCompare(a.date)),
 );
-const reviewCues = computed(() =>
-  buildReviewCues('month', entries.value, results.value, lifeEvents.value, externalCareerIds.value, contextFactorItems.value),
+const primaryReviewCues = computed(() =>
+  selectPrimaryReviewCues(
+    buildReviewCues('month', entries.value, results.value, lifeEvents.value, externalCareerIds.value, contextFactorItems.value),
+  ),
 );
-const primaryReviewCues = computed(() => reviewCues.value.slice(0, 3));
 const additionalObservations = computed(() =>
   observations.value.filter((observation) => !['special-days', 'context-factor'].includes(observation.id)),
 );
 const hasDailyData = computed(() => summary.value.coveredEntriesCount > 0);
 const hasJournal = computed(() => results.value.length > 0 || lifeEvents.value.length > 0);
-const hasPeriodData = computed(() => hasDailyData.value || hasJournal.value || hasSavedReview.value);
+const savedWeeks = computed(() => monthWeekReviews(store.weeklyReviews, start.value, archiveEnd.value));
+const hasPeriodData = computed(() => hasDailyData.value || hasJournal.value || hasSavedReview.value || savedWeeks.value.length > 0);
 const monthDates = computed(() => dateRange(start.value, end.value));
 const chartDates = computed(() => monthDates.value.filter((date) => date <= todayKey()));
 const monthWeekSummaries = computed(() =>
-  [...new Set(chartDates.value.map((date) => startOfWeek(date)))]
-    .map((weekStart) => {
-      const rangeStart = weekStart < start.value ? start.value : weekStart;
-      const naturalEnd = addDays(weekStart, 6);
-      const rangeEnd = naturalEnd > archiveEnd.value ? archiveEnd.value : naturalEnd;
-      const weekEntries = entries.value.filter((entry) => entry.date >= rangeStart && entry.date <= rangeEnd);
-      const weekSummary = summarize(weekEntries, externalCareerIds.value);
-      return {
-        rangeStart,
-        rangeEnd,
-        summary: weekSummary,
-        resultsCount: results.value.filter((result) => result.date >= rangeStart && result.date <= rangeEnd).length,
-        eventsCount: lifeEvents.value.filter((event) => event.date >= rangeStart && event.date <= rangeEnd).length,
-      };
-    })
-    .filter((week) => week.summary.coveredEntriesCount > 0),
+  monthWeekSummariesForPeriod(entries.value, results.value, lifeEvents.value, start.value, archiveEnd.value, externalCareerIds.value),
 );
 const entriesByDate = computed(() => new Map(entries.value.map((entry) => [entry.date, entry])));
 const sleepEntries = computed(() =>
@@ -375,7 +365,7 @@ function minutesToHours(value: number | null): number | null {
     <template v-else>
       <ReviewNotice v-if="!hasDailyData" tag="section" class="period-data-guide">
         <strong>За этот месяц нет дневных записей</strong>
-        <p>Итоги, события и сохранённый обзор показаны ниже. Данных для сравнения дней и построения графиков пока нет.</p>
+        <p>Сохранённые обзоры, итоги и события показаны ниже. Для воспоминаний о месяце дневные измерения не обязательны.</p>
       </ReviewNotice>
 
       <SurfaceCard v-if="hasDailyData" kind="dashboard" class="month-week-overview">
@@ -425,6 +415,8 @@ function minutesToHours(value: number | null): number | null {
           pagination-label="событий месяца"
         />
       </section>
+
+      <MonthWeekReviews :weeks="savedWeeks" />
 
       <SurfaceCard v-if="reviewAvailable" id="month-review" kind="review">
         <SectionHeading>

@@ -162,12 +162,14 @@ function eventKey(event: LifeEventRecord) {
         <DateInput v-model="date" required aria-label="Дата события" />
       </div>
       <AutoGrowTextarea v-model="note" :rows="4" :max-length="2000" placeholder="Что произошло или что вы поняли и почему это важно" />
-      <ActionButton variant="primary" type="button" :disabled="!title.trim() || !date || saving" @click="saveEvent">
-        {{ editingId === null ? 'Добавить запись' : 'Сохранить запись' }}
-      </ActionButton>
-      <ActionButton v-if="editingId !== null" variant="secondary" class="composer-cancel" type="button" @click="resetForm">
-        Отменить редактирование
-      </ActionButton>
+      <div class="composer-actions">
+        <ActionButton variant="primary" type="button" :disabled="!title.trim() || !date || saving" @click="saveEvent">
+          {{ editingId === null ? 'Добавить запись' : 'Сохранить запись' }}
+        </ActionButton>
+        <ActionButton v-if="editingId !== null" variant="secondary" class="composer-cancel" type="button" @click="resetForm">
+          Отменить редактирование
+        </ActionButton>
+      </div>
     </template>
     <template #filters>
       <label class="archive-filter-field">
@@ -217,7 +219,7 @@ function eventKey(event: LifeEventRecord) {
 <style scoped>
 .event-composer__fields {
   display: grid;
-  grid-template-columns: 1fr 155px;
+  grid-template-columns: minmax(0, 1fr) 155px;
   gap: 10px;
   margin: 14px 0 10px;
 }
