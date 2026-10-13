@@ -426,8 +426,7 @@
     flex-direction: column;
   }
 
-  .first-entry-guide__actions .secondary-button,
-  .first-entry-guide__actions .help-link--inline {
+  .first-entry-guide__actions .secondary-button {
     width: 100%;
   }
 

@@ -1,6 +1,6 @@
 import { expect, test, type Page } from './fixtures';
 import { demoFilePath } from './demo-data';
-import { expectPageFitsViewport } from './layout-assertions';
+import { expectPageFitsViewport, expectVerticalSeparation, readLayoutBox } from './layout-assertions';
 
 async function openComposer(page: Page) {
   if ((await page.locator('.archive-add').getAttribute('open')) === null) {
@@ -51,6 +51,42 @@ test('adds both journal entry types through their direct section links', async (
   await page.locator('.result-composer .primary-button').click();
   await expect(page.getByText('Событие добавлено', { exact: true })).toBeVisible();
   await expect(page.locator('.timeline-item').filter({ hasText: 'Заметил прямой путь к новой записи' })).toBeVisible();
+});
+
+test('places both composer actions below focused notes with the same spacing', async ({ page }) => {
+  for (const width of [390, 720, 721, 1440]) {
+    await page.setViewportSize({ width, height: 844 });
+    const layouts = [];
+    for (const route of ['/results', '/events']) {
+      await page.goto(route);
+      await openComposer(page);
+      const composer = page.locator('.archive-composer');
+      const input = composer.locator('input[type="text"]');
+      const note = composer.locator('textarea');
+      const submit = composer.locator('.primary-button');
+      await expect(submit).toBeDisabled();
+      await input.fill('Проверка расположения действия');
+      await note.fill('Длинная заметка для проверки роста поля и доступности кнопки. '.repeat(25));
+      await note.focus();
+      await expect(note).toBeFocused();
+      const noteBox = await readLayoutBox(note, `${route} note at ${width}px`);
+      const buttonBox = await readLayoutBox(submit, `${route} action at ${width}px`);
+      expectVerticalSeparation(noteBox, buttonBox, 12, `${route} focus clearance at ${width}px`);
+      expect(buttonBox.x).toBeCloseTo(noteBox.x, 0);
+      layouts.push(buttonBox.y - noteBox.y - noteBox.height);
+      await page.keyboard.press('Tab');
+      await expect(submit).toBeFocused();
+      await expect(submit).toBeEnabled();
+      if (width <= 720) {
+        await expect(page.locator('.bottom-nav')).toHaveCSS('pointer-events', 'none');
+      }
+      await expectPageFitsViewport(page, `${route} composer at ${width}px`);
+      if (width === 390 || width === 1440) {
+        await composer.screenshot({ path: `qa/ui-polish-20261012/${route.slice(1)}-${width}.png` });
+      }
+    }
+    expect(layouts[0]).toBeCloseTo(layouts[1]!, 0);
+  }
 });
 
 test('does not revive the removed journal modal or composer return from legacy queries', async ({ page }) => {

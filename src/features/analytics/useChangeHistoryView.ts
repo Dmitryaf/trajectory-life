@@ -2,7 +2,7 @@ import { computed, ref, watch } from 'vue';
 import type { EChartsCoreOption } from 'echarts/core';
 import { buildEventComparison, type EventComparisonMetric } from './eventComparison';
 import { entriesForPeriod, resultsForPeriod, summarize } from './periodSummary';
-import { buildRangeReviewCues } from './reviewCues';
+import { buildRangeReviewCues, selectPrimaryReviewCues } from './reviewCues';
 import {
   addMonths,
   endOfMonth,
@@ -62,7 +62,7 @@ export function useChangeHistoryView() {
   const cues = computed(() =>
     buildRangeReviewCues(range.value, entries.value, results.value, lifeEvents.value, externalCareerIds.value, contextFactorItems.value),
   );
-  const primaryCues = computed(() => cues.value.slice(0, 3));
+  const primaryCues = computed(() => selectPrimaryReviewCues(cues.value));
 
   const monthRows = computed(() =>
     monthsBetween(start.value, end.value).map((monthStart) => {

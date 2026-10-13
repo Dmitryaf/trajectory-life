@@ -1,18 +1,57 @@
 <script setup lang="ts">
+import { onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import SurfaceCard from '@/shared/ui/layout/SurfaceCard.vue';
 import SectionHeading from '@/shared/ui/layout/SectionHeading.vue';
 import EyebrowText from '@/shared/ui/typography/EyebrowText.vue';
 import ArchivePagination from '@/features/journal/ui/ArchivePagination.vue';
 import CountBadge from '@/shared/ui/data-display/CountBadge.vue';
-import StableHeightTransitionGroup from '@/shared/ui/layout/StableHeightTransitionGroup.vue';
 import { formatDate } from '@/services/dates';
 import type { TimelineTone } from '@/features/analytics/useChangeHistoryView';
 
 type TimelineItem = { key: string; date: string; type: string; tone: TimelineTone; title: string; detail: string };
 type TimelineSummary = { tone: TimelineTone; label: string; count: number };
 
-defineProps<{ items: TimelineItem[]; summary: TimelineSummary[]; total: number; page: number; pageCount: number }>();
+const props = defineProps<{ items: TimelineItem[]; summary: TimelineSummary[]; total: number; page: number; pageCount: number }>();
 defineEmits<{ 'update:page': [value: number] }>();
+
+const list = ref<HTMLElement>();
+const reservedHeight = ref(0);
+let resizeObserver: ResizeObserver | null = null;
+let resizeFrame = 0;
+
+// Keep the space occupied by visited pages so shorter pages cannot move the controls or clamp scroll.
+watch(
+  () => props.page,
+  () => {
+    reservedHeight.value = Math.max(reservedHeight.value, list.value?.getBoundingClientRect().height ?? 0);
+  },
+  { flush: 'sync' },
+);
+watch(
+  () => props.total,
+  () => (reservedHeight.value = 0),
+);
+
+onMounted(() => {
+  let previousWidth = list.value?.getBoundingClientRect().width ?? 0;
+  resizeObserver = new ResizeObserver(([entry]) => {
+    if (entry && Math.abs(entry.contentRect.width - previousWidth) > 1) {
+      previousWidth = entry.contentRect.width;
+      cancelAnimationFrame(resizeFrame);
+      // Reset outside observer delivery: changing the observed height here can loop in WebKit.
+      resizeFrame = requestAnimationFrame(() => {
+        reservedHeight.value = 0;
+      });
+    }
+  });
+  if (list.value) {
+    resizeObserver.observe(list.value);
+  }
+});
+onBeforeUnmount(() => {
+  resizeObserver?.disconnect();
+  cancelAnimationFrame(resizeFrame);
+});
 </script>
 
 <template>
@@ -29,7 +68,7 @@ defineEmits<{ 'update:page': [value: number] }>();
         <i></i>{{ item.label }} <strong>{{ item.count }}</strong>
       </span>
     </div>
-    <StableHeightTransitionGroup name="reveal-list" :change-key="page" tag="div" class="history-timeline__list">
+    <div ref="list" class="history-timeline__list" :style="{ minHeight: reservedHeight ? `${reservedHeight}px` : undefined }">
       <article v-for="item in items" :key="item.key" class="decision-timeline__item" :class="`history-timeline__item--${item.tone}`">
         <time>{{ formatDate(item.date, { day: 'numeric', month: 'short', year: 'numeric' }) }}</time>
         <span>{{ item.type }}</span>
@@ -38,8 +77,14 @@ defineEmits<{ 'update:page': [value: number] }>();
           <p v-if="item.detail">{{ item.detail }}</p>
         </div>
       </article>
-    </StableHeightTransitionGroup>
-    <ArchivePagination :page="page" :page-count="pageCount" context-label="истории изменений" @update:page="$emit('update:page', $event)" />
+    </div>
+    <ArchivePagination
+      :page="page"
+      :page-count="pageCount"
+      context-label="истории изменений"
+      preserve-control-position
+      @update:page="$emit('update:page', $event)"
+    />
   </SurfaceCard>
 </template>
 
@@ -68,6 +113,7 @@ defineEmits<{ 'update:page': [value: number] }>();
 .history-timeline__list {
   position: relative;
   display: grid;
+  align-content: start;
   gap: 7px;
 }
 .history-timeline__summary {
@@ -163,21 +209,6 @@ defineEmits<{ 'update:page': [value: number] }>();
   color: var(--history-timeline-text);
   font-size: 12px;
   line-height: 1.45;
-}
-.reveal-list-enter-active,
-.reveal-list-leave-active {
-  transition:
-    opacity var(--motion-base) var(--motion-ease),
-    transform var(--motion-base) var(--motion-ease);
-}
-.history-timeline__list > .reveal-list-leave-active {
-  position: absolute;
-  width: calc(100% - 5px);
-}
-.reveal-list-enter-from,
-.reveal-list-leave-to {
-  opacity: 0;
-  transform: translateY(-5px);
 }
 @media (max-width: 720px) {
   .history-timeline__list > article {
