@@ -98,19 +98,23 @@ export async function keyboardNavigation(client) {
   await reachWithTab(page, month);
   await page.keyboard.press('Enter');
   await expect(page).toHaveURL(/\/month$/);
-  const help = page.getByRole('button', { name: 'Как работает приложение' });
-  await reachWithTab(page, help);
+  const feedback = page.getByRole('button', { name: 'Обратная связь' });
+  await reachWithTab(page, feedback);
   await page.keyboard.press('Enter');
-  const dialog = page.getByRole('dialog', { name: 'Зачем нужна «Траектория»' });
-  const first = dialog.getByRole('button', { name: 'Закрыть объяснение' });
-  const last = dialog.getByRole('link', { name: 'Начать запись' });
+  const dialog = page.getByRole('dialog', { name: 'Написать в поддержку' });
+  const message = dialog.getByLabel('Предложение, проблема или ошибка');
+  await expect(message).toBeFocused();
+  await message.fill('Проверка клавиатуры без отправки сообщения');
+  await page.keyboard.press('Shift+Tab');
+  const first = dialog.getByRole('button', { name: 'Закрыть форму' });
+  const last = dialog.getByRole('button', { name: 'Отправить', exact: true });
   await expect(first).toBeFocused();
   await page.keyboard.press('Shift+Tab');
   await expect(last).toBeFocused();
   await page.keyboard.press('Tab');
   await expect(first).toBeFocused();
   await page.keyboard.press('Escape');
-  await expect(help).toBeFocused();
+  await expect(feedback).toBeFocused();
   return { nativeKeyboard: true, dialogFocusTrap: true };
 }
 

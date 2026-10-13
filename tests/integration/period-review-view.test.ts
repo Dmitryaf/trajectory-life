@@ -30,6 +30,46 @@ vi.mock('@/features/export/browser', async (importOriginal) => ({
 }));
 
 describe('period review navigation', () => {
+  it('shows saved weekly reflections in a month even without daily entries and links to the source review', async () => {
+    const { pinia, store } = createStore();
+    store.weeklyReviews = [
+      { ...emptyWeeklyReview('2026-06-29'), support: 'Помогал разговор с другом' },
+      { ...emptyWeeklyReview('2026-07-13'), nextLever: 'Пока без решения', previousPlanOutcome: 'Стало проще отдыхать' },
+      emptyWeeklyReview('2026-07-06'),
+    ];
+    const wrapper = mount(MonthView, { global: { plugins: [pinia], stubs: { EChartPanel: true, RouterLink: routerLinkStub } } });
+    await flushPromises();
+    expect(wrapper.find('.period-empty-guide').exists()).toBe(false);
+    const weeks = wrapper.get('.month-week-reviews');
+    expect(weeks.findAll('article')).toHaveLength(2);
+    expect(weeks.text()).toContain('Помогал разговор с другом');
+    expect(weeks.text()).toContain('Пока без решения');
+    expect(weeks.text()).toContain('Стало проще отдыхать');
+    expect(weeks.text()).toContain('включая дни соседнего месяца');
+    const target = '/week?week=2026-07-13#week-review';
+    expect(weeks.findAll('a').map((link) => link.attributes('href'))).toContain(target);
+    const source = mount(WeekView, {
+      props: { initialWeek: '2026-07-13' },
+      global: { plugins: [pinia], stubs: { EChartPanel: true, RouterLink: routerLinkStub } },
+    });
+    expect(
+      (source.get('textarea[placeholder="Можно продолжить как есть или пока ничего не решать"]').element as HTMLTextAreaElement).value,
+    ).toBe('Пока без решения');
+  });
+
+  it('does not present text-only periods as insufficient for reflection', () => {
+    const { pinia, store } = createStore();
+    store.dailyEntries = [{ ...emptyDailyEntry('2026-07-21'), importantFact: 'Важный разговор' }];
+    const global = { plugins: [pinia], stubs: { EChartPanel: true, RouterLink: routerLinkStub } };
+    for (const view of [WeekView, MonthView, TrendsView]) {
+      const wrapper = mount(view, { global });
+      expect(wrapper.findAll('.review-cue')).toHaveLength(0);
+      expect(wrapper.get('.review-cue-empty').text()).toContain('измерения для этого не нужны');
+      expect(wrapper.text()).not.toContain('Данных пока мало');
+      expect(wrapper.text()).not.toContain('Записей для сравнения пока мало');
+    }
+  });
+
   it.each(['week', 'month'] as const)('refreshes a clean %s review and preserves a dirty form after a remote change', async (period) => {
     const { pinia, store } = createStore();
     const weekReview = { ...emptyWeeklyReview('2026-07-20'), nextLever: 'original' };
@@ -459,7 +499,10 @@ describe('period review navigation', () => {
     expect(details.element.compareDocumentPosition(review.element) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(observations.find('.period-actions').exists()).toBe(false);
     expect(externalAnalysis.find('.review-cue-grid').exists()).toBe(false);
-    expect(wrapper.findAll('.review-cue-grid--primary .review-cue')).toHaveLength(3);
+    expect(wrapper.findAll('.review-cue-grid--primary .review-cue strong').map((item) => item.text())).toEqual([
+      'Подготовка и шаги к цели',
+      'Были дни со сном меньше 7 часов',
+    ]);
     expect(wrapper.find('.review-cue-grid--additional').exists()).toBe(false);
     expect((reviewContext.element as HTMLDetailsElement).open).toBe(false);
     expect(reviewContext.get('summary').text()).toBe('Добавить дела и события');
@@ -523,7 +566,10 @@ describe('period review navigation', () => {
     expect(review.element.compareDocumentPosition(analysis.element) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(records.element.compareDocumentPosition(review.element) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(wrapper.findAll('.month-week-overview .month-week-story > article').length).toBeGreaterThanOrEqual(2);
-    expect(wrapper.findAll('.review-cue-grid--primary .review-cue')).toHaveLength(3);
+    expect(wrapper.findAll('.review-cue-grid--primary .review-cue strong').map((item) => item.text())).toEqual([
+      'Были конкретные действия по цели',
+      'Были дни со сном меньше 7 часов',
+    ]);
     expect(wrapper.find('.month-featured-events').exists()).toBe(false);
     expect(records.text()).toContain('Событие, которое изменило месяц');
     expect((reviewContext.element as HTMLDetailsElement).open).toBe(false);

@@ -12,11 +12,12 @@ const reportThresholds = new Map([
   ['.css', 500],
 ]);
 const hotspotContentBudgets = new Map([
-  ['src/views/TodayView.vue', 25540],
+  ['src/views/TodayView.vue', 25288],
   ['src/views/SettingsView.vue', 13395],
-  ['src/views/WeekView.vue', 17313],
-  ['src/views/MonthView.vue', 20537],
-  ['src/features/settings/useSettingsForm.ts', 11771],
+  ['src/views/WeekView.vue', 17305],
+  ['src/views/MonthView.vue', 20260],
+  // Separate entry defaults from historical catalogs; the settings responsibilities remain unchanged.
+  ['src/features/settings/useSettingsForm.ts', 11803],
 ]);
 const allowedDbOwners = new Set(['src/stores/app.ts', 'src/features/sync/base.ts']);
 const allowedServiceFeatureEdges = new Set();
