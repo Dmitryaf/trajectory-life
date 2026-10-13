@@ -62,12 +62,12 @@ const {
         v-if="summary.coveredEntriesCount"
         :cues="primaryCues"
         :covered-entries="summary.coveredEntriesCount"
-        :ordinary-entries="summary.ordinaryCoreEntriesCount"
         @copy="copyPrompt"
         @download="downloadJson"
       />
       <HistoryTimeline
         v-if="decisionTimeline.length"
+        :key="range"
         v-model:page="timelinePage"
         :items="displayedDecisionTimeline"
         :summary="timelineSummary"

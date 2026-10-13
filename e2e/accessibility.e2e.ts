@@ -79,19 +79,23 @@ test('keeps the critical path keyboard-visible and traps focus in dialogs', asyn
   await monthLink.press('Enter');
   await expect(page).toHaveURL(/\/month/);
 
-  const helpButton = page.getByRole('button', { name: 'Как работает приложение' });
-  await reachWithTab(helpButton);
+  const feedbackButton = page.getByRole('button', { name: 'Обратная связь' });
+  await reachWithTab(feedbackButton);
   await page.keyboard.press('Enter');
-  const dialog = page.getByRole('dialog', { name: 'Зачем нужна «Траектория»' });
-  const first = dialog.getByRole('button', { name: 'Закрыть объяснение' });
-  const last = dialog.getByRole('link', { name: 'Начать запись' });
+  const dialog = page.getByRole('dialog', { name: 'Написать в поддержку' });
+  const message = dialog.getByLabel('Предложение, проблема или ошибка');
+  await expect(message).toBeFocused();
+  await message.fill('Проверка клавиатуры без отправки сообщения');
+  await message.press('Shift+Tab');
+  const first = dialog.getByRole('button', { name: 'Закрыть форму' });
+  const last = dialog.getByRole('button', { name: 'Отправить', exact: true });
   await expect(first).toBeFocused();
   await first.press('Shift+Tab');
   await expect(last).toBeFocused();
   await last.press('Tab');
   await expect(first).toBeFocused();
   await first.press('Escape');
-  await expect(page.getByRole('button', { name: 'Как работает приложение' })).toBeFocused();
+  await expect(feedbackButton).toBeFocused();
 });
 
 for (const route of criticalRoutes) {

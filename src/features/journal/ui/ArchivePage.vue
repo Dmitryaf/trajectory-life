@@ -149,11 +149,23 @@ watch(
   margin-bottom: 16px;
 }
 .archive-add > summary {
+  width: fit-content;
   min-height: 44px;
-  padding-block: 10px;
-  color: var(--brand-strong);
+  margin-bottom: 12px;
+  padding: 12px 16px;
+  border: 1px solid var(--utility-action-hover-border);
+  border-radius: 14px;
+  background: var(--chip-selected-surface);
+  color: var(--action-secondary-text);
   cursor: pointer;
-  font-weight: 650;
+  font-weight: 750;
+}
+.archive-add > summary:hover {
+  background: var(--action-secondary-hover-surface);
+}
+.archive-add > summary:focus-visible {
+  outline: 3px solid var(--focus-ring);
+  outline-offset: 2px;
 }
 .archive-composer {
   position: relative;
@@ -173,8 +185,12 @@ watch(
 .archive-composer--events::before {
   background: var(--amber);
 }
-:deep(.composer-cancel) {
-  margin-top: 10px;
+:deep(.composer-actions) {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-top: 16px;
 }
 :deep(.archive-composer .form-card__heading) {
   margin-bottom: 16px;
