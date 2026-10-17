@@ -4,7 +4,7 @@
   "files": {
     "package-lock.json": "6fa67865227333d6f6867dbb2b1a83f41b403e165571447aa79ece03063c06da",
     "stylelint.config.js": "7767a1f7bf2159f6f4a8f2272791bea09cbe3a5c282a3fe37f585f811d7b0604",
-    "scripts/check-style-boundaries.mjs": "5bc194a3d27c1a739ec65279b434d14e2de5fddd2cae5a2e9b7683deb6b87f12"
+    "scripts/check-style-boundaries.mjs": "dd7af31539b4ef92caccbeb8a3959d53802d6835d4ac900a0e05e64c6c3200d7"
   },
   "lintCommand": "stylelint \"src/**/*.css\" && node scripts/check-style-colors.mjs && node scripts/check-style-boundaries.mjs",
   "findings": {
