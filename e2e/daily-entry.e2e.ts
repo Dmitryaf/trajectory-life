@@ -121,7 +121,7 @@ async function emulateSafeViewport(
 }
 
 for (const width of [390, 1440]) {
-  test(`keeps weekly context and home settings above the form without losing a draft at ${width}px`, async ({ page }, testInfo) => {
+  test(`keeps compact home controls and the daily note prominent without losing a draft at ${width}px`, async ({ page }, testInfo) => {
     await page.clock.setFixedTime(new Date('2026-07-21T12:00:00.000Z'));
     await page.setViewportSize({ width, height: 900 });
     await openDailyEntry(page);
@@ -135,21 +135,24 @@ for (const width of [390, 1440]) {
     await page.getByRole('button', { name: 'Больше не показывать', exact: true }).click();
 
     const settings = page.getByRole('link', { name: 'Настроить главную' });
-    const pulse = page.getByLabel('Пульс недели', { exact: true });
     await expect(settings).toBeVisible();
-    await expect(pulse).toBeVisible();
+    await expect(page.getByLabel('Пульс недели', { exact: true })).toHaveCount(0);
     const headerBox = await readLayoutBox(page.locator('.page--today > .page-heading'), 'today heading');
     const settingsBox = await readLayoutBox(settings, 'home settings action');
     const dateBox = await readLayoutBox(page.locator('.entry-date-control'), 'date action');
-    const pulseBox = await readLayoutBox(pulse, 'weekly pulse');
+    const quickBox = await readLayoutBox(page.locator('.quick-capture'), 'quick journal actions');
     const noteBox = await readLayoutBox(page.locator('.form-card--daily-summary'), 'daily note');
     expect(settingsBox.height).toBeGreaterThanOrEqual(44);
     expect(settingsBox.y).toBeGreaterThanOrEqual(headerBox.y);
     expect(settingsBox.y + settingsBox.height).toBeLessThanOrEqual(headerBox.y + headerBox.height);
-    expect(Math.abs(settingsBox.y - dateBox.y)).toBeLessThanOrEqual(20);
-    expect(headerBox.height).toBeLessThan(180);
-    expect(pulseBox.y + pulseBox.height).toBeLessThanOrEqual(noteBox.y);
-    expect(pulseBox.y + pulseBox.height).toBeLessThan(650);
+    expect(settingsBox.y).toBeGreaterThanOrEqual(dateBox.y + dateBox.height);
+    expect(headerBox.height).toBeLessThan(140);
+    expect(quickBox.y + quickBox.height).toBeLessThanOrEqual(noteBox.y);
+    expect(noteBox.y + noteBox.height).toBeLessThan(650);
+    const quickLinks = page.locator('.quick-capture a');
+    const firstQuick = await readLayoutBox(quickLinks.nth(0), 'first quick action');
+    const secondQuick = await readLayoutBox(quickLinks.nth(1), 'second quick action');
+    expect(Math.abs(firstQuick.y - secondQuick.y)).toBeLessThanOrEqual(1);
     expect(await settings.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     const screenshotPath = testInfo.outputPath(`today-context-${width}px.png`);
