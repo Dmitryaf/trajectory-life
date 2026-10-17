@@ -319,10 +319,19 @@
 }
 
 .bottom-nav__item > span {
+  position: relative;
   height: 18px;
   font-size: 16px;
   font-weight: 800;
   line-height: 18px;
+}
+
+.bottom-nav__item .review-reminder-dot {
+  box-shadow: 0 0 0 2px var(--bottom-nav-surface);
+}
+
+.bottom-nav__item.router-link-active .review-reminder-dot {
+  box-shadow: 0 0 0 2px var(--mint);
 }
 
 .bottom-nav__item small {

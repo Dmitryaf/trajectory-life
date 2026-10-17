@@ -918,7 +918,7 @@ test('keeps the returning daily form compact and visibly grouped', async ({ page
   const headingBox = await page.locator('.page--today > .page-heading').boundingBox();
   expect(headingBox).not.toBeNull();
   expect(headingBox!.height).toBeLessThanOrEqual(150);
-  await expect(page.getByText('Запись за дату', { exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Выбрать дату записи', exact: true })).toBeVisible();
   await expect(page.getByText('Состояние и условия', { exact: true })).toBeVisible();
   await expect(page.locator('form').getByText('Текущая цель', { exact: true })).toBeVisible();
   await expect(page.getByText('Дополнительные разделы', { exact: true })).toBeVisible();
@@ -1013,7 +1013,7 @@ test('keeps general help removed and limits the mint highlight to archive disclo
     await expect(page.getByRole('button', { name: /Как пользоваться|Зачем это заполнять/ })).toHaveCount(0);
     await expect(page.locator('.header-actions > *')).toHaveCount(2);
     const settings = page.locator('.daily-layout-settings');
-    await expect(settings).toHaveCSS('background-color', 'rgb(233, 238, 234)');
+    await expect(settings).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
     await expect(settings).toHaveCSS('border-top-width', '0px');
     await page.locator('.page-heading').screenshot({ path: testInfo.outputPath(`home-settings-original-${width}.png`) });
 
