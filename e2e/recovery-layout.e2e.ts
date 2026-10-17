@@ -68,7 +68,7 @@ test('shows yesterday recovery and journal shortcuts before the daily note', asy
   await page.getByRole('textbox', { name: 'Заметка дня' }).fill('Сохранил первую заметку.');
   await page.getByRole('button', { name: 'Сохранить день', exact: true }).click();
   await page.getByRole('region', { name: 'Первый обзор недели' }).getByRole('button', { name: 'Больше не показывать' }).click();
-  const recovery = page.getByRole('region', { name: 'Вчера без записи' });
+  const recovery = page.getByRole('button', { name: 'Добавить запись за вчера' });
   const shortcuts = page.getByRole('navigation', { name: 'Быстрые записи' });
   await expect(recovery).toBeVisible();
   for (const width of [390, 768, 980, 1440]) {
@@ -77,13 +77,14 @@ test('shows yesterday recovery and journal shortcuts before the daily note', asy
     const headingBox = await readLayoutBox(page.locator('.page--today > .page-heading'), 'Today heading');
     const shortcutsBox = await readLayoutBox(shortcuts, 'journal shortcuts');
     const noteBox = await readLayoutBox(page.locator('.form-card--daily-summary'), 'daily note');
-    expectVerticalSeparation(headingBox, recoveryBox, 8, 'heading before recovery');
-    expectVerticalSeparation(recoveryBox, shortcutsBox, 8, 'recovery before journal');
+    expect(recoveryBox.y).toBeGreaterThanOrEqual(headingBox.y);
+    expect(recoveryBox.y + recoveryBox.height).toBeLessThanOrEqual(headingBox.y + headingBox.height);
+    expectVerticalSeparation(headingBox, shortcutsBox, 12, 'heading before journal');
     expectVerticalSeparation(shortcutsBox, noteBox, 12, 'journal before daily note');
     await expectPageFitsViewport(page, `restored Today order at ${width}px`);
   }
   await expect(shortcuts.getByRole('link', { name: 'Записать итог' })).toHaveAttribute('href', '/results');
   await expect(shortcuts.getByRole('link', { name: 'Записать мысль или событие' })).toHaveAttribute('href', '/events');
-  await recovery.getByRole('button', { name: 'Добавить запись' }).click();
+  await recovery.click();
   await expect(page.getByLabel('Дата записи', { exact: true })).toHaveValue('2026-10-04');
 });

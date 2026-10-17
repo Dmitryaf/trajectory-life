@@ -2,71 +2,63 @@
   position: relative;
   min-height: 0;
   align-items: center;
-  overflow: hidden;
-  margin-top: 4px;
-  padding: 18px 22px;
-  border: 1px solid var(--today-heading-border);
-  border-radius: 30px;
-  background: linear-gradient(135deg, var(--navy) 0%, var(--today-heading-middle) 60%, var(--today-heading-end) 100%);
+  gap: 12px;
+  margin: 4px 0 14px;
+  padding: 0 2px;
   box-shadow: none;
 }
 
 .page--today > .page-heading > * {
+  min-width: 0;
   position: relative;
   z-index: 1;
 }
 
 .page--today > .page-heading h1 {
-  color: var(--text-inverse);
-  font-size: clamp(32px, 5vw, 42px);
+  color: var(--navy);
+  font-size: clamp(28px, 4vw, 36px);
 }
 
 .page--today > .page-heading .eyebrow {
-  color: var(--today-heading-eyebrow);
+  color: var(--muted);
 }
 
 .entry-date-picker {
-  grid-template-columns: minmax(0, auto) auto;
+  grid-template-columns: minmax(0, auto);
   align-items: center;
   display: grid;
   justify-items: end;
-  gap: 4px 10px;
-  color: var(--today-date-text);
+  gap: 0;
+  flex: 0 0 auto;
+  color: var(--navy);
   font-size: 12px;
   font-weight: 800;
 }
 
-.entry-date-picker small {
-  color: var(--today-date-muted);
-  font-size: 11px;
-  font-weight: 650;
-}
-
 .entry-date-control {
   position: relative;
-  min-width: 145px;
-  min-height: 46px;
+  min-width: 132px;
+  min-height: 44px;
   display: inline-flex;
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  border: 1px solid var(--today-date-border);
-  border-radius: 13px;
-  background: var(--today-date-surface);
-  color: var(--text-inverse);
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  background: var(--surface);
+  color: var(--navy);
   font-weight: 750;
-  backdrop-filter: blur(12px);
 }
 
 .entry-date-control__trigger {
   width: calc(100% + 2px);
-  min-height: 46px;
+  min-height: 44px;
   display: inline-flex;
   align-items: center;
   justify-content: space-between;
   gap: 10px;
   margin: -1px;
-  padding: 10px 13px;
+  padding: 8px 10px;
   border: 0;
   background: transparent;
   color: inherit;
@@ -91,8 +83,6 @@
   }
 }
 
-.today-pulse,
-.recovery-nudge,
 .entry-change-notice {
   display: flex;
   justify-content: space-between;
@@ -100,9 +90,9 @@
   gap: 16px;
   margin: 16px 0 14px;
   padding: 16px 18px;
-  border: 1px solid var(--line);
+  border: 1px solid var(--entry-change-border);
   border-radius: 18px;
-  background: var(--today-summary-surface);
+  background: var(--entry-change-surface);
 }
 
 .first-entry-guide {
@@ -137,35 +127,14 @@
   gap: 10px;
 }
 
-.today-pulse {
-  align-items: flex-start;
-  border-color: var(--today-pulse-border);
-  background: linear-gradient(135deg, var(--today-pulse-surface), var(--surface));
-}
-
-.today-pulse .eyebrow {
-  margin-bottom: 5px;
-}
-
-.today-pulse p {
-  margin: 0;
-  color: var(--today-pulse-text);
-  font-size: 13px;
-}
-
-.today-pulse > p {
-  max-width: 360px;
-  color: var(--today-pulse-secondary);
-}
-
-.recovery-nudge {
-  border-color: var(--recovery-nudge-border);
-  background: var(--recovery-nudge-surface);
-}
-
-.entry-change-notice {
-  border-color: var(--entry-change-border);
-  background: var(--entry-change-surface);
+.yesterday-recovery {
+  min-height: 44px;
+  padding: 6px 2px;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: 12px;
+  cursor: pointer;
 }
 
 .page--today:has(input:is([type='date'], [type='time']):focus) .entry-change-notice {
@@ -177,17 +146,11 @@
   pointer-events: none;
 }
 
-.recovery-nudge strong,
 .entry-change-notice strong {
   display: block;
-  color: var(--recovery-nudge-title);
-}
-
-.entry-change-notice strong {
   color: var(--entry-change-title);
 }
 
-.recovery-nudge p,
 .entry-change-notice p {
   margin: 3px 0 0;
   color: var(--sync-banner-text);
@@ -196,7 +159,7 @@
 
 .checkin-grid {
   display: grid;
-  gap: 20px;
+  gap: 16px;
 }
 
 .checkin-grid--dirty {
@@ -275,13 +238,19 @@
   overflow-wrap: anywhere;
 }
 
-.form-card--direction-empty {
-  padding-top: 18px;
-  padding-bottom: 18px;
+.optional-goal {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+  padding: 0 4px;
+  color: var(--muted);
+  font-size: 12px;
 }
 
-.goal-empty-action {
-  margin-top: -8px;
+.optional-goal .card-settings-link {
+  min-height: 44px;
 }
 
 .form-card--nutrition {
@@ -435,11 +404,9 @@
   }
 
   .page--today > .page-heading {
-    min-height: 132px;
-    gap: clamp(8px, 3vw, 24px);
-    margin: 4px 0 0;
-    padding: 20px 18px 30px;
-    border-radius: 24px;
+    min-height: 0;
+    align-items: flex-start;
+    gap: 8px;
   }
 
   .page--today > .page-heading > :first-child {
@@ -447,32 +414,21 @@
   }
 
   .page--today > .page-heading h1 {
-    font-size: clamp(38px, 12vw, 44px);
+    font-size: 28px;
   }
 
   .entry-date-picker {
-    gap: 3px;
-  }
-
-  .entry-date-picker__label,
-  .entry-date-picker > small {
-    display: none;
+    gap: 0;
   }
 
   .entry-date-control {
-    min-width: clamp(120px, 37.5vw, 132px);
+    min-width: 132px;
   }
 
-  .today-pulse,
-  .recovery-nudge,
   .entry-change-notice {
     align-items: stretch;
     flex-direction: column;
     padding: 15px;
-  }
-
-  .today-pulse > p {
-    max-width: none;
   }
 
   .checkin-grid--dirty {
@@ -521,6 +477,11 @@
     width: 100%;
     flex-basis: 100%;
   }
+
+  .sleep-field-grid > .sleep-timing-field {
+    width: calc((100% - 14px) / 2);
+    flex-basis: calc((100% - 14px) / 2);
+  }
 }
 
 @media (min-width: 721px) and (max-width: 979px) {
@@ -551,6 +512,11 @@
 }
 
 @media (max-width: 390px) {
+  .page--today > .page-heading--historical {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
   .binary-choice {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -579,34 +545,4 @@
 .experiment-period {
   margin-bottom: 7px;
   font-weight: 750;
-}
-
-@media (max-width: 720px) {
-  .page--today > .page-heading {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 12px;
-    padding-bottom: 20px;
-  }
-  .page--today > .page-heading h1 {
-    font-size: 34px;
-  }
-  .entry-date-picker {
-    justify-items: start;
-  }
-}
-
-.entry-date-picker > span,
-.entry-date-picker > small {
-  grid-column: 1;
-}
-@media (max-width: 380px) {
-  .entry-date-picker {
-    column-gap: 6px;
-  }
-}
-@media (max-width: 359px) {
-  .entry-date-picker {
-    grid-template-columns: 1fr;
-  }
 }

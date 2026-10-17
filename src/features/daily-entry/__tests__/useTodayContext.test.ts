@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useAppStore } from '@/stores/app';
 import { emptyDailyEntry, emptyWeeklyReview } from '@/types';
 import { useTodayContext } from '../useTodayContext';
+import { reviewReminders } from '@/features/reviews/reminders';
 
 beforeEach(() => {
   setActivePinia(createPinia());
@@ -69,19 +70,9 @@ describe('weekly plan period and optional reflection', () => {
     vi.setSystemTime(new Date(`${today}T12:00:00`));
     const store = useAppStore();
     store.dailyEntries = [{ ...emptyDailyEntry(today), importantFact: 'Запомнился разговор', specialDay: 'travel' }];
-    const context = useTodayContext(
-      store,
-      computed(() => true),
-    );
-    expect(context.activeReviewReminder.value?.id).toBe(period);
-    expect(context.activeReviewReminder.value?.text).not.toContain('основными полями');
-    expect(
-      useTodayContext(
-        store,
-        computed(() => false),
-      ).activeReviewReminder.value,
-    ).toBeNull();
+    // The same text-only fixture now invites reflection through navigation, independently of Today's selected date.
+    expect(reviewReminders(store, today, {})[0]?.period).toBe(period);
     store.dailyEntries = [emptyDailyEntry(today)];
-    expect(context.activeReviewReminder.value).toBeNull();
+    expect(reviewReminders(store, today, {})).toEqual([]);
   });
 });
