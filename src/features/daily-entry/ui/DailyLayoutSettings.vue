@@ -18,7 +18,7 @@ import UiIcon from '@/shared/ui/icons/UiIcon.vue';
   gap: 6px;
   min-height: 44px;
   padding: 6px 2px;
-  color: var(--muted);
+  color: inherit;
   text-decoration: none;
   font-size: 12px;
   line-height: 1.2;
