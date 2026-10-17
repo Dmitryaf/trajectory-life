@@ -4,23 +4,23 @@
   align-items: center;
   gap: 12px;
   margin: 4px 0 14px;
-  padding: 0 2px;
+  padding: 12px 16px;
+  border-radius: 24px;
+  background: linear-gradient(135deg, var(--navy), var(--brand-strong));
   box-shadow: none;
 }
 
 .page--today > .page-heading > * {
   min-width: 0;
-  position: relative;
-  z-index: 1;
 }
 
 .page--today > .page-heading h1 {
-  color: var(--navy);
+  color: var(--text-inverse);
   font-size: clamp(28px, 4vw, 36px);
 }
 
 .page--today > .page-heading .eyebrow {
-  color: var(--muted);
+  color: var(--mint);
 }
 
 .entry-date-picker {
@@ -30,7 +30,7 @@
   justify-items: end;
   gap: 0;
   flex: 0 0 auto;
-  color: var(--navy);
+  color: var(--text-inverse);
   font-size: 12px;
   font-weight: 800;
 }
@@ -132,7 +132,7 @@
   padding: 6px 2px;
   border: 0;
   background: transparent;
-  color: var(--muted);
+  color: inherit;
   font-size: 12px;
   cursor: pointer;
 }
@@ -404,25 +404,13 @@
   }
 
   .page--today > .page-heading {
-    min-height: 0;
     align-items: flex-start;
     gap: 8px;
-  }
-
-  .page--today > .page-heading > :first-child {
-    min-width: 0;
+    padding-inline: 12px;
   }
 
   .page--today > .page-heading h1 {
     font-size: 28px;
-  }
-
-  .entry-date-picker {
-    gap: 0;
-  }
-
-  .entry-date-control {
-    min-width: 132px;
   }
 
   .entry-change-notice {
