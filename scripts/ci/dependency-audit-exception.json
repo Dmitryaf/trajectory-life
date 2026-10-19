@@ -1,6 +1,6 @@
 {
   "advisory": "GHSA-vfj7-8cjw-p6xm",
-  "expiresAt": "2026-10-18T00:00:00Z",
+  "expiresAt": "2026-10-20T08:03:07Z",
   "files": {
     "package-lock.json": "6fa67865227333d6f6867dbb2b1a83f41b403e165571447aa79ece03063c06da",
     "stylelint.config.js": "7767a1f7bf2159f6f4a8f2272791bea09cbe3a5c282a3fe37f585f811d7b0604",
