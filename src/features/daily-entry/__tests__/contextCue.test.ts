@@ -3,23 +3,19 @@ import { resolveTodayContextCue, type TodayContextCueCandidates } from '../conte
 
 const emptyCandidates = (): TodayContextCueCandidates => ({
   firstUse: false,
-  review: false,
   recovery: false,
   plan: false,
   pwa: false,
   ai: false,
-  pulse: false,
 });
 
 describe('Today context cue priority', () => {
   it.each([
-    ['first-use', { firstUse: true, review: true, recovery: true, plan: true, pwa: true, ai: true, pulse: true }],
-    ['review', { review: true, recovery: true, plan: true, pwa: true, ai: true, pulse: true }],
-    ['recovery', { recovery: true, plan: true, pwa: true, ai: true, pulse: true }],
-    ['plan', { plan: true, pwa: true, ai: true, pulse: true }],
-    ['pwa', { pwa: true, ai: true, pulse: true }],
-    ['ai', { ai: true, pulse: true }],
-    ['pulse', { pulse: true }],
+    ['first-use', { firstUse: true, recovery: true, plan: true, pwa: true, ai: true }],
+    ['recovery', { recovery: true, plan: true, pwa: true, ai: true }],
+    ['plan', { plan: true, pwa: true, ai: true }],
+    ['pwa', { pwa: true, ai: true }],
+    ['ai', { ai: true }],
   ] as const)('selects %s before lower-priority candidates', (expected, candidates) => {
     expect(resolveTodayContextCue({ ...emptyCandidates(), ...candidates })).toBe(expected);
   });

@@ -8,8 +8,8 @@ import UiIcon from '@/shared/ui/icons/UiIcon.vue';
     <RouterLink to="/results"
       ><span><UiIcon name="result" /></span><strong>Записать итог</strong></RouterLink
     >
-    <RouterLink to="/events"
-      ><span><UiIcon name="event" /></span><strong>Записать мысль или событие</strong></RouterLink
+    <RouterLink to="/events" aria-label="Записать мысль или событие"
+      ><span><UiIcon name="event" /></span><strong>Мысль или событие</strong></RouterLink
     >
   </nav>
 </template>
@@ -20,17 +20,17 @@ import UiIcon from '@/shared/ui/icons/UiIcon.vue';
   z-index: 2;
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
-  margin: 16px 0;
+  gap: 8px;
+  margin: 0 0 16px;
 }
 .quick-capture a {
   display: flex;
   align-items: center;
-  gap: 11px;
+  gap: 7px;
   min-height: 44px;
-  padding: 12px 15px;
+  padding: 8px 10px;
   border: 1px solid var(--quick-capture-border);
-  border-radius: 18px;
+  border-radius: 12px;
   background: var(--quick-capture-surface);
   color: var(--navy);
   text-decoration: none;
@@ -43,27 +43,16 @@ import UiIcon from '@/shared/ui/icons/UiIcon.vue';
   transform: translateY(-2px);
   box-shadow: none;
 }
-.quick-capture a:nth-child(2) span {
-  color: var(--more-view-event-text);
-  background: var(--archive-event-surface-end);
-}
 .quick-capture span {
-  width: 32px;
-  height: 32px;
+  width: 20px;
+  height: 20px;
   display: grid;
   flex: 0 0 auto;
   place-items: center;
-  border-radius: 11px;
-  background: var(--chip-selected-surface);
   color: var(--more-view-journal-text);
 }
 .quick-capture strong {
-  font-size: 13px;
+  font-size: 12px;
   line-height: 1.25;
-}
-@media (max-width: 720px) {
-  .quick-capture {
-    grid-template-columns: 1fr;
-  }
 }
 </style>
