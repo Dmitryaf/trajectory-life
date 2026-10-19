@@ -1195,8 +1195,11 @@ test('keeps monthly results before the review and secondary context behind a dis
 });
 
 test('keeps weekly facts, observations, reflection and external analysis in decision order', async ({ page }) => {
+  await page.clock.setFixedTime(new Date('2026-08-30T12:00:00.000Z'));
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto(`/week?week=${demoAnchor()}`);
+  await page.locator('input[type="file"]').setInputFiles(visualDemoFilePath);
+  await expect(page.locator('input[type="file"]')).toHaveValue('');
+  await page.goto('/week?week=2026-08-17');
   const records = page.locator('.period-records--featured');
   await expect(records.getByText('Итоги недели', { exact: true })).toBeVisible();
   await expect(records.getByText('События недели', { exact: true })).toBeVisible();
