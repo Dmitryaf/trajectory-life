@@ -37,6 +37,7 @@ vi.mock('@/services/cloudSync', () => ({
 }));
 
 import { useAuthStore } from '../auth';
+import { readViewedReviews, reviewReminderStorageKey, writeViewedReviews } from '@/features/reviews/reminders';
 
 describe('auth store lifecycle', () => {
   it('distinguishes a failed password update from a failed sign-out and retains the recovery gate', async () => {
@@ -229,12 +230,27 @@ describe('auth store lifecycle', () => {
     cloud.clearLocalSession.mockResolvedValue(undefined);
     const auth = useAuthStore();
     auth.session = { user: { id: 'user-1' } } as typeof auth.session;
+    writeViewedReviews('user-1', { week: '2026-10-12' });
 
     await auth.deleteAccount();
 
     expect(cloud.deleteAccount).toHaveBeenCalledOnce();
     expect(cloud.clearLocalSession).toHaveBeenCalledOnce();
     expect(auth.session).toBeNull();
+    expect(window.localStorage.getItem(reviewReminderStorageKey)).toBeNull();
+  });
+
+  it('retains review preferences when deletion fails and never clears another owner', async () => {
+    const auth = useAuthStore();
+    auth.session = { user: { id: 'user-1' } } as typeof auth.session;
+    writeViewedReviews('user-1', { week: '2026-10-12' });
+    cloud.deleteAccount.mockRejectedValueOnce(new Error('offline'));
+    await expect(auth.deleteAccount()).rejects.toThrow('offline');
+    expect(readViewedReviews('user-1')).toEqual({ week: '2026-10-12' });
+    writeViewedReviews('user-2', { week: '2026-10-12' });
+    cloud.deleteAccount.mockResolvedValueOnce(undefined);
+    await auth.deleteAccount();
+    expect(readViewedReviews('user-2')).toEqual({ week: '2026-10-12' });
   });
 });
 import { currentTermsAcceptance } from '@/model/legalDocuments';

@@ -1,4 +1,5 @@
 import { productTelemetry } from '@/features/telemetry/productTelemetry';
+import { clearViewedReviews } from '@/features/reviews/reminders';
 import { defineStore } from 'pinia';
 import type { Session } from '@supabase/supabase-js';
 import type { TermsAcceptance } from '@/model/legalDocuments';
@@ -344,6 +345,7 @@ export const useAuthStore = defineStore('auth', {
       }
 
       productTelemetry.clearDeletedAccount(userId);
+      clearViewedReviews(userId);
       clearCloudSyncMeta(userId);
       try {
         await clearLocalCloudSession();

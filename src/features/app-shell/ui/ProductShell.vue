@@ -21,6 +21,8 @@ import { configureErrorMonitoring, reportClientError } from '@/services/errorMon
 import { notifyInfo, notifyUnknownError } from '@/services/notifications';
 import { useAppStore } from '@/stores/app';
 import { useAuthStore } from '@/stores/auth';
+import { provideReviewReminders } from '@/features/reviews/useReviewReminders';
+import ReviewReminderDot from '@/features/reviews/ui/ReviewReminderDot.vue';
 
 const store = useAppStore();
 const auth = useAuthStore();
@@ -36,6 +38,19 @@ const loadedOwner = ref('');
 const appDataLoadError = ref('');
 const appDataLoadingText = ref('Загружаю записи…');
 const effectiveLoadError = computed(() => store.loadError || appDataLoadError.value);
+const reviewReminder = provideReviewReminders(
+  store,
+  computed(() => auth.session?.user.id ?? (auth.requiresAuth ? '' : 'local')),
+  computed(
+    () =>
+      canOpenApp.value &&
+      appDataReady.value &&
+      loadedOwner.value === (auth.session?.user.id ?? '') &&
+      store.loaded &&
+      !effectiveLoadError.value &&
+      !auth.recoveryRequired,
+  ),
+);
 const flushProductTelemetry = useProductTelemetry(
   () =>
     canOpenApp.value &&
@@ -363,12 +378,19 @@ function isPrimaryNavigationItemActive(item: PrimaryNavigationItem, path: string
       <RouterLink
         v-for="item in navItems"
         :key="item.to"
-        :to="item.to"
+        :to="item.to === '/week' ? reviewReminder.destination.value : item.to"
         class="bottom-nav__item"
+        :aria-label="item.label"
+        :aria-describedby="item.to === '/week' && reviewReminder.reminders.value.length ? 'primary-review-reminder' : undefined"
         :class="{ 'router-link-active': isPrimaryNavigationItemActive(item, $route.path) }"
         :aria-current="isPrimaryNavigationItemActive(item, $route.path) ? 'page' : undefined"
       >
-        <span><UiIcon :name="item.icon" /></span>
+        <span
+          ><UiIcon :name="item.icon" /><ReviewReminderDot
+            v-if="item.to === '/week' && reviewReminder.reminders.value.length"
+            id="primary-review-reminder"
+            :label="reviewReminder.label.value"
+        /></span>
         <small>{{ item.label }}</small>
       </RouterLink>
     </nav>
