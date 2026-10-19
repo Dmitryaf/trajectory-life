@@ -27,7 +27,6 @@ import FormRow from '../shared/ui/forms/FormRow.vue';
 import DateInput from '../shared/ui/forms/DateInput.vue';
 import PageHeading from '../shared/ui/layout/PageHeading.vue';
 import PageShell from '../shared/ui/layout/PageShell.vue';
-import ReviewNudge from '../shared/ui/content/ReviewNudge.vue';
 import EyebrowText from '../shared/ui/typography/EyebrowText.vue';
 import ChipGroup from '../shared/ui/forms/ChipGroup.vue';
 import DurationInput from '../shared/ui/forms/DurationInput.vue';
@@ -38,8 +37,7 @@ import { experimentTextLimits } from '../features/experiments/model';
 import { useDailyEntryForm } from '../features/daily-entry/useDailyEntryForm';
 import { useAppStore } from '../stores/app';
 import { notifyUnknownError } from '../services/notifications';
-import { formatDate, formatMinutes, todayKey } from '../services/dates';
-import { buildObservations } from '../features/analytics';
+import { formatDate, todayKey } from '../services/dates';
 import {
   actionDirectionEntryOptions,
   activityOptions,
@@ -166,16 +164,7 @@ const hasSelectedFocus = computed(() => Boolean(displayedFocusTitle.value.trim()
 const hasRecordedGoalAction = computed(() => form.recordedFields.includes('actionDirection'));
 const showGoalActionChoices = computed(() => hasSelectedFocus.value || hasRecordedGoalAction.value);
 const showLifeAreas = computed(() => activeLifeOptions.value.length > 0 || form.lifeAreas.length > 0 || form.lifeAreasRecorded);
-const {
-  activeReviewReminder,
-  currentWeekEntries,
-  currentWeeklyPlan,
-  currentWeekSummary,
-  showAiAnalysisNudge,
-  yesterday,
-  yesterdayMissing,
-} = useTodayContext(store, isToday);
-const currentWeekObservation = computed(() => buildObservations(currentWeekEntries.value, contextFactorItems.value)[0]);
+const { currentWeeklyPlan, showAiAnalysisNudge, yesterday, yesterdayMissing } = useTodayContext(store, isToday);
 const experimentAppliesToSelectedDate = computed(() => {
   return experimentAppliesToDate(store.settings.experiment, selectedDate.value);
 });
@@ -198,12 +187,10 @@ const activeContextCue = computed(() =>
   resolveTodayContextCue({
     firstUse:
       isToday.value && store.settings.firstUse.status === 'available' && store.dailyEntries.length > 0 && !firstUsePromptHidden.value,
-    review: Boolean(activeReviewReminder.value),
     recovery: yesterdayMissing.value,
     plan: isToday.value && Boolean(currentWeeklyPlan.value.plan),
     pwa: isToday.value && pwaNudgeAvailable.value,
     ai: showAiAnalysisNudge.value,
-    pulse: isToday.value && currentWeekSummary.value.coveredEntriesCount > 0,
   }),
 );
 
@@ -292,13 +279,12 @@ function openEntryDatePicker() {
 
 <template>
   <PageShell class="page--today">
-    <PageHeading>
+    <PageHeading :class="{ 'page-heading--historical': !isToday }">
       <div>
         <EyebrowText>Ежедневная запись</EyebrowText>
         <h1>{{ isToday ? 'Сегодня' : formatDate(selectedDate, { day: 'numeric', month: 'long', weekday: 'long' }) }}</h1>
       </div>
       <div class="entry-date-picker">
-        <span class="entry-date-picker__label">Запись за дату</span>
         <span class="entry-date-control">
           <button class="entry-date-control__trigger" type="button" aria-label="Выбрать дату записи" @click="openEntryDatePicker">
             <span aria-hidden="true">{{ selectedDateLabel }}</span>
@@ -317,8 +303,16 @@ function openEntryDatePicker() {
             @change="selectDate"
           />
         </span>
-        <small>Можно выбрать любой прошедший день</small>
         <DailyLayoutSettings v-if="!firstUseTakesPriority && !isFirstEntry" />
+        <button
+          v-if="!firstUseTakesPriority && activeContextCue === 'recovery'"
+          class="yesterday-recovery"
+          type="button"
+          aria-label="Добавить запись за вчера"
+          @click="fillYesterday"
+        >
+          Записать вчера
+        </button>
       </div>
     </PageHeading>
 
@@ -337,43 +331,6 @@ function openEntryDatePicker() {
       <div class="first-entry-guide__actions">
         <ActionButton :as="RouterLink" variant="secondary" class="context-action" to="/settings#daily-blocks">Настроить блоки</ActionButton>
       </div>
-    </section>
-
-    <section v-if="!firstUseTakesPriority && activeContextCue === 'recovery'" class="recovery-nudge" aria-label="Вчера без записи">
-      <div>
-        <strong>Вчера без записи</strong>
-        <p>Можно заполнить коротко сейчас или спокойно продолжить с сегодняшнего дня.</p>
-      </div>
-      <ActionButton variant="secondary" class="context-action" type="button" @click="fillYesterday">Добавить запись</ActionButton>
-    </section>
-
-    <ReviewNudge
-      v-if="!firstUseTakesPriority && activeContextCue === 'review' && activeReviewReminder"
-      tag="section"
-      aria-label="Период готов к обзору"
-    >
-      <div>
-        <strong>{{ activeReviewReminder.title }}</strong>
-        <p>{{ activeReviewReminder.text }}</p>
-      </div>
-      <ActionButton :as="RouterLink" variant="secondary" class="context-action" :to="activeReviewReminder.to">{{
-        activeReviewReminder.label
-      }}</ActionButton>
-    </ReviewNudge>
-
-    <TodayWeeklyPlan v-else-if="!firstUseTakesPriority && activeContextCue === 'plan'" v-bind="currentWeeklyPlan" />
-
-    <section v-else-if="!firstUseTakesPriority && activeContextCue === 'pulse'" class="today-pulse" aria-label="Пульс недели">
-      <div>
-        <EyebrowText>Пульс недели</EyebrowText>
-        <p>
-          {{ currentWeekSummary.coveredEntriesCount }}
-          {{ currentWeekSummary.coveredEntriesCount === 1 ? 'заполненный день' : 'заполненных дней' }} · средний сон
-          {{ formatMinutes(currentWeekSummary.averageSleep === null ? null : Math.round(currentWeekSummary.averageSleep)) }}
-          (измерений: {{ currentWeekSummary.sleepSamples }}) · {{ currentWeekSummary.externalActionDays }} дн. с шагом к цели
-        </p>
-      </div>
-      <p v-if="currentWeekObservation">{{ currentWeekObservation.text }}</p>
     </section>
 
     <JournalQuickCapture v-if="!firstUseTakesPriority && !isFirstEntry" />
@@ -412,6 +369,7 @@ function openEntryDatePicker() {
           placeholder="Например: после прогулки стало легче собраться с мыслями"
         ></textarea>
       </SurfaceCard>
+      <TodayWeeklyPlan v-if="activeContextCue === 'plan'" v-bind="currentWeeklyPlan" />
       <div v-if="blockIsActive('sleep') || blockIsActive('context')" class="checkin-group-heading">
         <span>Состояние и условия</span>
       </div>
@@ -425,11 +383,11 @@ function openEntryDatePicker() {
         </FormCardHeading>
         <FormHint>Время в кровати посчитается по времени отбоя и подъёма. «Примерно спал» — ваша оценка самого сна.</FormHint>
         <div class="sleep-field-grid">
-          <div>
+          <div class="sleep-timing-field">
             <FormFieldLabel for="bedtime">Лёг спать</FormFieldLabel>
             <input id="bedtime" v-model="form.bedtime" type="time" />
           </div>
-          <div>
+          <div class="sleep-timing-field">
             <FormFieldLabel for="wake-time">Встал</FormFieldLabel>
             <input id="wake-time" v-model="form.wakeTime" type="time" />
           </div>
@@ -489,14 +447,14 @@ function openEntryDatePicker() {
         </div>
       </SurfaceCard>
 
-      <div class="checkin-group-heading">
+      <div v-if="showGoalActionChoices" class="checkin-group-heading">
         <span>Текущая цель</span>
       </div>
       <SurfaceCard
+        v-if="showGoalActionChoices"
         id="goal-actions"
         kind="form"
         class="form-card--direction form-card--wide"
-        :class="{ 'form-card--direction-empty': !showGoalActionChoices }"
         aria-label="Текущая цель"
       >
         <FormCardHeading icon="goal" tone="blue">
@@ -568,12 +526,12 @@ function openEntryDatePicker() {
             </p>
           </FormDisclosure>
         </template>
-        <div v-else-if="!hasSavedEntry" class="empty-block-note goal-empty-action">
-          <ActionButton variant="secondary" class="context-action" type="button" aria-haspopup="dialog" @click="openCurrentGoalDialog">
-            Выбрать цель
-          </ActionButton>
-        </div>
       </SurfaceCard>
+
+      <div v-if="!showGoalActionChoices && !hasSavedEntry" class="optional-goal">
+        <button class="card-settings-link" type="button" aria-haspopup="dialog" @click="openCurrentGoalDialog">Выбрать цель</button>
+        <span>Если хотите отмечать шаги к ней</span>
+      </div>
 
       <details
         v-if="hasAdditionalDayBlocks"
