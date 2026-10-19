@@ -374,6 +374,7 @@
   --bottom-nav-surface: rgba(16, 45, 44, 0.94);
   --bottom-nav-shadow: rgba(16, 45, 44, 0.28);
   --bottom-nav-text: #adbbb6;
+  --review-reminder-dot: #c9a04e;
   --bottom-nav-active-shadow: rgba(0, 0, 0, 0.14);
 
   /* Month review */
@@ -426,29 +427,15 @@
   --week-data-text: #5e697d;
 
   /* Today */
-  --today-heading-border: rgba(255, 255, 255, 0.1);
-  --today-heading-middle: #19443f;
-  --today-heading-end: #22564d;
-  --today-heading-eyebrow: #89dfbd;
-  --today-date-text: #d9f4e8;
-  --today-date-muted: rgba(217, 244, 232, 0.78);
-  --today-date-border: rgba(255, 255, 255, 0.2);
-  --today-date-surface: rgba(255, 255, 255, 0.1);
   --quick-capture-border: rgba(209, 222, 215, 0.9);
   --quick-capture-surface: rgba(255, 255, 255, 0.96);
   --today-summary-surface: rgba(255, 255, 255, 0.82);
   --first-entry-border: #bfe2d4;
   --first-entry-surface: #effbf6;
   --first-entry-text: #60706a;
-  --today-pulse-border: #dceee7;
-  --today-pulse-surface: #f5fbf8;
   --today-pulse-text: #45665a;
-  --today-pulse-secondary: #627083;
-  --recovery-nudge-border: #f2dfc6;
-  --recovery-nudge-surface: #fffaf4;
   --entry-change-border: #f0dec4;
   --entry-change-surface: #fff8ef;
-  --recovery-nudge-title: #5f4930;
   --entry-change-title: #70502b;
   --checkin-group-text: #4f6a61;
   --checkin-group-divider: #d8e4df;
