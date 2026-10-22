@@ -3,17 +3,26 @@ import { createPinia } from 'pinia';
 import { createRouter, createWebHistory } from 'vue-router';
 import App from './App.vue';
 import { installAuthenticatedLandingRedirect } from './features/auth/publicEntry';
+import { observePublicPageUpdates } from './features/pwa/publicUpdates';
+import { hasUnsavedSyncEditors } from './features/sync/editing';
 import './style.css';
 
 const preloadRecoveryKey = 'trajectory:preload-recovery';
 
 window.addEventListener('vite:preloadError', (event) => {
   event.preventDefault();
-  if (window.sessionStorage.getItem(preloadRecoveryKey)) {
+  if (hasUnsavedSyncEditors()) {
     return;
   }
-  window.sessionStorage.setItem(preloadRecoveryKey, '1');
-  window.location.reload();
+  try {
+    if (window.sessionStorage.getItem(preloadRecoveryKey)) {
+      return;
+    }
+    window.sessionStorage.setItem(preloadRecoveryKey, '1');
+    window.location.reload();
+  } catch {
+    // The startup screen remains usable when browser storage is unavailable.
+  }
 });
 
 let productPwaRuntime: Promise<void> | undefined;
@@ -22,7 +31,7 @@ function startProductPwaRuntime(): Promise<void> {
   productPwaRuntime ??= Promise.all([import('virtual:pwa-register'), import('./features/pwa/installation')]).then(
     ([{ registerSW }, { initPwaInstallation }]) => {
       initPwaInstallation();
-      registerSW({ immediate: true });
+      registerSW({ immediate: true, onNeedReload: publicUpdates.onUpdate });
     },
   );
   return productPwaRuntime;
@@ -69,16 +78,28 @@ const router = createRouter({
 
 installAuthenticatedLandingRedirect(router);
 
+const publicUpdates = observePublicPageUpdates(() => {
+  const meta = router.currentRoute.value.meta;
+  return meta.publicLanding === true || meta.publicPage === true;
+});
+
 router.afterEach((to) => {
   document.title = to.meta.publicLanding ? 'Траектория — личная картина времени' : `${String(to.meta.title)} · Траектория`;
   if (!to.meta.publicLanding && !to.meta.publicPage) {
     void startProductPwaRuntime();
+  } else {
+    publicUpdates.check();
   }
 });
 
 const app = createApp(App).use(createPinia()).use(router);
 
-void router.isReady().then(() => {
-  window.sessionStorage.removeItem(preloadRecoveryKey);
+export async function mountApplication() {
+  await router.isReady();
+  try {
+    window.sessionStorage.removeItem(preloadRecoveryKey);
+  } catch {
+    // Storage access is optional for rendering the application.
+  }
   app.mount('#app');
-});
+}

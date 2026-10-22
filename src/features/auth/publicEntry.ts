@@ -24,7 +24,7 @@ export function cloudSessionStorageKey(supabaseUrl = configuredSupabaseUrl): str
 }
 
 export async function hasAuthenticatedStoredSession({
-  storage = window.localStorage,
+  storage,
   supabaseUrl = configuredSupabaseUrl,
   loadSession = async () => (await import('@/services/cloudSync')).getStartupCloudSession(),
 }: StoredSessionProbe = {}): Promise<boolean> {
@@ -32,13 +32,23 @@ export async function hasAuthenticatedStoredSession({
   if (!storageKey) {
     return false;
   }
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
   try {
-    if (!storage.getItem(storageKey)) {
+    if (!(storage ?? window.localStorage).getItem(storageKey)) {
       return false;
     }
-    return Boolean(await loadSession());
+    return Boolean(
+      await Promise.race([
+        loadSession(),
+        new Promise<null>((resolve) => {
+          timeoutId = setTimeout(() => resolve(null), 5_000);
+        }),
+      ]),
+    );
   } catch {
     return false;
+  } finally {
+    clearTimeout(timeoutId);
   }
 }
 

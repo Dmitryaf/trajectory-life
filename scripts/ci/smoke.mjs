@@ -1,4 +1,4 @@
-/* global document, innerWidth */
+/* global document, innerWidth, HTMLImageElement */
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
@@ -246,6 +246,19 @@ export async function smokePublic(origin) {
       await page.setViewportSize({ width, height: 900 });
       await page.goto(origin);
       await page.locator('h1').waitFor();
+      for (const title of ['Сегодня', 'Неделя', 'Месяц', 'История', 'Журнал', 'Настройки']) {
+        await page.getByRole('tab', { name: title, exact: true }).click();
+        const image = page.getByRole('tabpanel').getByRole('img');
+        await image.scrollIntoViewIfNeeded();
+        await image.waitFor({ state: 'visible' });
+        await page.waitForFunction(
+          (expectedWidth) => {
+            const image = document.querySelector('[role="tabpanel"] img');
+            return image instanceof HTMLImageElement && image.complete && image.naturalWidth === expectedWidth;
+          },
+          width === 390 ? 390 : 1200,
+        );
+      }
       await page.goto(`${origin}/today`);
       await page.locator('input[type="password"]').waitFor();
       await page.locator('.auth-form[aria-busy="false"]').waitFor();

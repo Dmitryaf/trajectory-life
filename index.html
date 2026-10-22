@@ -20,7 +20,15 @@
     <title>Траектория — личная картина времени</title>
   </head>
   <body>
-    <div id="app"></div>
-    <script type="module" src="/src/main.ts"></script>
+    <div id="app">
+      <main class="startup-screen" aria-labelledby="startup-title">
+        <strong>Траектория</strong>
+        <h1 id="startup-title">Открываем дневник</h1>
+        <p id="startup-status" role="status" aria-live="polite">Загружаем приложение. Если загрузка затянулась, обновите страницу.</p>
+        <a href="">Обновить страницу</a>
+        <noscript><p>Для работы приложения нужно включить JavaScript в браузере.</p></noscript>
+      </main>
+    </div>
+    <script type="module" src="/src/bootstrap.ts"></script>
   </body>
 </html>

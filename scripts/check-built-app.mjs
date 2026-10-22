@@ -145,6 +145,14 @@ for (const expected of requiredIcons) {
 }
 
 const serviceWorker = await readFile(path.join(distRoot, 'sw.js'), 'utf8');
+for (const assetName of landingMedia) {
+  if (!serviceWorker.includes(`assets/${assetName}`)) {
+    throw new Error(`Service worker must precache the landing image: ${assetName}`);
+  }
+}
+if (!html.includes('id="startup-status"') || !html.includes('Обновить страницу')) {
+  throw new Error('Built HTML must offer recovery before JavaScript starts');
+}
 for (const marker of ['cleanupOutdatedCaches', 'denylist', '/api', '/assets']) {
   if (!serviceWorker.includes(marker)) {
     throw new Error(`Service worker is missing deployment safeguard: ${marker}`);
