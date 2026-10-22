@@ -37,12 +37,18 @@ export default defineConfig({
     },
     {
       name: 'mobile-webkit',
-      testMatch: [...mobileWebKitTests, '**/telemetry-consent.e2e.ts'],
+      testMatch: [...mobileWebKitTests, '**/telemetry-consent.e2e.ts', '**/landing.e2e.ts', '**/startup.e2e.ts'],
       use: { ...devices['iPhone 13'] },
     },
     {
       name: 'webkit',
-      testIgnore: ['**/performance.e2e.ts', '**/today-visual.e2e.ts', '**/interface-visual.e2e.ts', ...mobileWebKitTests],
+      testIgnore: [
+        '**/performance.e2e.ts',
+        '**/pwa-update.e2e.ts',
+        '**/today-visual.e2e.ts',
+        '**/interface-visual.e2e.ts',
+        ...mobileWebKitTests,
+      ],
       use: { ...devices['Desktop Safari'] },
     },
   ],
