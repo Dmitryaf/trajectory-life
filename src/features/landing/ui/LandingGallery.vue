@@ -59,6 +59,20 @@ const screens = [
 ];
 const selectedScreen = ref(0);
 const currentScreen = computed(() => screens[selectedScreen.value]!);
+const retryCount = ref(0);
+const imageKey = computed(() => `${selectedScreen.value}:${retryCount.value}`);
+const failedImage = ref('');
+const imageFailed = computed(() => failedImage.value === imageKey.value);
+
+function handleImageError(event: Event) {
+  if ((event.target as HTMLImageElement).dataset.imageKey === imageKey.value) {
+    failedImage.value = imageKey.value;
+  }
+}
+
+function retryImage() {
+  retryCount.value += 1;
+}
 
 function moveScreen(direction: number) {
   selectedScreen.value = (selectedScreen.value + direction + screens.length) % screens.length;
@@ -105,7 +119,12 @@ async function selectScreenWithKeyboard(event: KeyboardEvent) {
         <h3>{{ currentScreen.heading }}</h3>
         <p>{{ currentScreen.text }}</p>
       </div>
-      <picture class="landing-gallery__screen">
+      <div v-if="imageFailed" class="landing-gallery__screen landing-gallery__error" role="status">
+        <p>Не удалось загрузить изображение. Проверьте соединение или обновите страницу.</p>
+        <button type="button" @click="retryImage">Попробовать ещё раз</button>
+        <a href="">Обновить страницу</a>
+      </div>
+      <picture v-else :key="imageKey" class="landing-gallery__screen">
         <source media="(max-width: 720px)" :srcset="currentScreen.image" width="390" height="844" />
         <img
           :src="currentScreen.desktop"
@@ -113,6 +132,8 @@ async function selectScreenWithKeyboard(event: KeyboardEvent) {
           width="1200"
           height="780"
           loading="lazy"
+          :data-image-key="imageKey"
+          @error="handleImageError"
         />
       </picture>
     </div>

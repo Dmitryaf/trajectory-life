@@ -186,3 +186,26 @@ test('lets visitors browse every example with the keyboard without registering',
     }
   }
 });
+
+test.describe('image load recovery', () => {
+  test.use({ allowedBrowserErrors: [/Failed to load resource.*503|503.*Service Unavailable/] });
+  test('retries a failed image without losing the selected screen', async ({ page }) => {
+    let failImage = true;
+    await page.route('**/*.webp*', async (route) => {
+      if (route.request().resourceType() === 'image' && failImage) {
+        await route.fulfill({ status: 503, contentType: 'image/webp', body: '' });
+      } else {
+        await route.continue();
+      }
+    });
+    await page.goto('/');
+    await page.locator('.landing-gallery__screen').scrollIntoViewIfNeeded();
+    await expect(page.getByText('Не удалось загрузить изображение.', { exact: false })).toBeVisible();
+    failImage = false;
+    await page.getByRole('button', { name: 'Попробовать ещё раз', exact: true }).click();
+    const image = page.getByRole('tabpanel').getByRole('img');
+    await expect(image).toHaveJSProperty('complete', true);
+    await expect.poll(() => image.evaluate((element) => (element as HTMLImageElement).naturalWidth)).toBeGreaterThan(0);
+    await expect(page.getByRole('tab', { name: 'Сегодня', exact: true })).toHaveAttribute('aria-selected', 'true');
+  });
+});
