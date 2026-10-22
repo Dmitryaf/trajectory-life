@@ -3,6 +3,21 @@ import { describe, expect, it, vi } from 'vitest';
 import { cloudSessionStorageKey, hasAuthenticatedStoredSession, installAuthenticatedLandingRedirect } from '../publicEntry';
 
 describe('authenticated public entry', () => {
+  it('opens the landing after five seconds even when the auth module never finishes loading', async () => {
+    vi.useFakeTimers();
+    try {
+      const result = hasAuthenticatedStoredSession({
+        storage: { getItem: () => 'stored-session' },
+        supabaseUrl: 'https://project-ref.supabase.co',
+        loadSession: () => new Promise(() => undefined),
+      });
+      await vi.advanceTimersByTimeAsync(5_000);
+      await expect(result).resolves.toBe(false);
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
   it('checks only the current Supabase project session and skips auth loading without it', async () => {
     const storage = { getItem: vi.fn().mockReturnValue(null) };
     const loadSession = vi.fn();
