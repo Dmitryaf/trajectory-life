@@ -305,7 +305,7 @@ for (const filePath of architectureFiles) {
   const layer = sourceLayer(filePath);
   moduleCounts.set(layer, (moduleCounts.get(layer) ?? 0) + 1);
 }
-const runtimeEntry = architectureFiles.find((filePath) => projectPath(filePath) === 'src/main.ts');
+const runtimeEntry = architectureFiles.find((filePath) => projectPath(filePath) === 'src/bootstrap.ts');
 const reachableModules = findReachableModules(graph, runtimeEntry);
 const unreachableModules = architectureFiles
   .filter((filePath) => !reachableModules.has(filePath))
@@ -315,7 +315,7 @@ const unreachableModuleSet = new Set(unreachableModules);
 for (const filePath of unreachableModules) {
   if (!allowedNonRuntimeModules.has(filePath)) {
     violations.push(
-      `${filePath}: модуль недостижим из src/main.ts. Удалите его, подключите к сценарию или обоснуйте в allowedNonRuntimeModules.`,
+      `${filePath}: модуль недостижим из src/bootstrap.ts. Удалите его, подключите к сценарию или обоснуйте в allowedNonRuntimeModules.`,
     );
   }
 }
@@ -343,7 +343,7 @@ if (!largeFiles.length) {
   console.log('- нет');
 }
 
-console.log('\nЯвно допущенные модули вне графа src/main.ts:');
+console.log('\nЯвно допущенные модули вне графа src/bootstrap.ts:');
 for (const filePath of unreachableModules) {
   console.log(`- ${filePath}`);
 }

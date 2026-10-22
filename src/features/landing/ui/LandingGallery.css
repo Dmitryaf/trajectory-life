@@ -4,7 +4,8 @@
   gap: 8px;
 }
 .landing-screen-options button,
-.landing-gallery__controls button {
+.landing-gallery__controls button,
+.landing-gallery__error button {
   min-height: 44px;
   padding: 10px 16px;
   border: 1px solid var(--line);
@@ -48,6 +49,15 @@
   display: block;
   width: 100%;
   height: auto;
+}
+.landing-gallery__error {
+  display: grid;
+  justify-items: start;
+  gap: 12px;
+  padding: 24px;
+}
+.landing-gallery__error p {
+  margin: 0;
 }
 .landing-gallery__controls {
   display: flex;
