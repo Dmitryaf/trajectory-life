@@ -199,7 +199,7 @@ test.describe('image load recovery', () => {
       }
     });
     await page.goto('/');
-    await page.locator('.landing-gallery__screen').scrollIntoViewIfNeeded();
+    await page.getByRole('tabpanel').evaluate((panel) => panel.scrollIntoView({ block: 'start', behavior: 'instant' }));
     await expect(page.getByText('Не удалось загрузить изображение.', { exact: false })).toBeVisible();
     failImage = false;
     await page.getByRole('button', { name: 'Попробовать ещё раз', exact: true }).click();
