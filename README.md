@@ -17,7 +17,7 @@ There is no score for a person or a day. Missing fields stay missing; you choose
 
 ## Local development
 
-Use Node.js 22, matching [package.json](package.json) and `.nvmrc`.
+Use Node.js 22.22.2 or a later 22.x release, matching [package.json](package.json) and `.nvmrc`.
 
 ```sh
 npm ci
