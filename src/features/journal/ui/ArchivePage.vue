@@ -12,6 +12,7 @@ const props = defineProps<{
   tone: 'results' | 'events';
   editingId: number | null;
   emptyArchive: boolean;
+  openComposer?: boolean;
   headingEyebrow: string;
   headingTitle: string;
   headingDescription: string;
@@ -24,16 +25,27 @@ const props = defineProps<{
   emptyDescription: string;
 }>();
 const composer = ref<HTMLDetailsElement | null>(null);
+const composerOpen = ref(props.editingId !== null || props.emptyArchive || Boolean(props.openComposer));
+watch(
+  () => props.openComposer,
+  (open) => {
+    if (open) {
+      composerOpen.value = true;
+    }
+  },
+);
 let returnFocus: HTMLElement | null = null;
 watch(
   () => props.editingId,
   async (id, previousId) => {
     if (id === null) {
+      composerOpen.value = props.emptyArchive || Boolean(props.openComposer);
       if (previousId !== null && returnFocus?.isConnected) {
         returnFocus.focus();
       }
       return;
     }
+    composerOpen.value = true;
     returnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     await nextTick();
     if (props.editingId === id) {
@@ -57,7 +69,12 @@ watch(
       <RouterLink to="/results" :aria-current="tone === 'results' ? 'page' : undefined">Итоги</RouterLink>
       <RouterLink to="/events" :aria-current="tone === 'events' ? 'page' : undefined">События и мысли</RouterLink>
     </nav>
-    <details ref="composer" class="archive-add" :open="editingId !== null || emptyArchive">
+    <details
+      ref="composer"
+      class="archive-add"
+      :open="composerOpen"
+      @toggle="composerOpen = ($event.currentTarget as HTMLDetailsElement).open"
+    >
       <summary>{{ tone === 'results' ? 'Новый итог' : 'Новое событие или мысль' }}</summary>
       <SurfaceCard kind="form" class="result-composer archive-composer" :class="`archive-composer--${tone}`">
         <slot name="composer"></slot>
@@ -86,6 +103,25 @@ watch(
 </template>
 
 <style scoped>
+:deep(.journal-fields) {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+:deep(.journal-title) {
+  margin-block: 12px;
+}
+:deep(.journal-title > summary) {
+  cursor: pointer;
+  min-height: 32px;
+  padding-block: 6px;
+}
+:deep(.journal-date) {
+  max-width: 210px;
+  margin-block: 12px;
+}
+
 .page--archive > .page-heading {
   position: relative;
   min-height: 132px;

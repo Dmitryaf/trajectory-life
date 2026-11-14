@@ -14,7 +14,7 @@ const reportThresholds = new Map([
 const hotspotContentBudgets = new Map([
   ['src/views/TodayView.vue', 23729],
   ['src/views/SettingsView.vue', 13395],
-  ['src/views/WeekView.vue', 17305],
+  ['src/views/WeekView.vue', 17142],
   ['src/views/MonthView.vue', 20260],
   // Separate entry defaults from historical catalogs; the settings responsibilities remain unchanged.
   ['src/features/settings/useSettingsForm.ts', 11803],
