@@ -140,6 +140,7 @@ test('keeps separate edit drafts and requires an explicit choice before replacin
   expect(await records(page, 'editorDrafts')).toHaveLength(1);
   await page.goto('/results');
   await expect(note).toHaveValue('Черновик второй записи');
+  await expect(page.getByRole('button', { name: 'Обратная связь', exact: true })).toBeVisible();
   await page.reload();
   await expect(note).toHaveValue('Черновик второй записи');
 });
