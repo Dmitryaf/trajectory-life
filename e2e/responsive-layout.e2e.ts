@@ -345,7 +345,7 @@ test('keeps empty-period actions below their explanatory text', async ({ page })
   const emptyDate = emptyPeriodDate();
 
   async function expectEmptyGuideSpacing() {
-    const paragraph = page.locator('.period-empty-guide p');
+    const paragraph = page.locator('.period-empty-guide p').last();
     const action = page.locator('.period-empty-guide .secondary-button');
     const paragraphBox = await paragraph.boundingBox();
     const actionBox = await action.boundingBox();
@@ -998,7 +998,8 @@ test('keeps result details editable when Backspace clears the field', async ({ p
   await expect(details).toBeFocused();
   await details.press('Backspace');
   await expect(page).toHaveURL(/\/results$/);
-  await expect(page.locator('.result-composer details')).toHaveCount(0);
+  await expect(details).toBeVisible();
+  await expect(page.locator('.result-composer .journal-title')).not.toHaveAttribute('open', '');
 
   await page.goto('/events');
   await page.locator('.archive-add > summary').click();

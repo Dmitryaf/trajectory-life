@@ -5,6 +5,7 @@ const mobileWebKitTests = [
   '**/daily-entry.e2e.ts',
   '**/first-use-recovery.e2e.ts',
   '**/journal-entry.e2e.ts',
+  '**/reflection-drafts.e2e.ts',
   '**/pwa-installation.e2e.ts',
   '**/storage-protection.e2e.ts',
 ];

@@ -1,5 +1,4 @@
-import { computed, getCurrentInstance, onBeforeUnmount, onMounted, reactive, ref, watch, type Ref } from 'vue';
-import { onBeforeRouteLeave, onBeforeRouteUpdate } from 'vue-router';
+import { computed, onBeforeUnmount, reactive, ref, watch, type Ref } from 'vue';
 import { buildPeriodPackage, copyAiPrompt, downloadAiPackage } from '../export/browser';
 import { addDays, addMonths, startOfMonth, startOfWeek, todayKey } from '@/services/dates';
 import { notifyInfo, notifySaved, notifyUnknownError } from '@/services/notifications';
@@ -9,6 +8,7 @@ import type { MonthlyReview, WeeklyReview } from '@/types';
 import { captureReviewSave } from './telemetry';
 import { setSyncEditorDirty } from '../sync/editing';
 import { ReviewChangedError } from './version';
+import { useEditorDraft } from '../editor-drafts/useEditorDraft';
 import { useViewedReview } from './useReviewReminders';
 
 type Period = 'week' | 'month';
@@ -21,7 +21,7 @@ type PeriodReviewOptions<T extends PeriodReview> = {
   end: Readonly<Ref<string>>;
   emptyReview: (start: string) => T;
   findReview: (start: string) => T | undefined;
-  persistReview: (review: T, expected: T | null) => Promise<void>;
+  persistReview: (review: T, expected: T | null, draftKey: string) => Promise<void>;
   hasContext: (review: T) => boolean;
   prepareDraft?: (review: T) => void;
   afterLoad?: () => void;
@@ -74,18 +74,38 @@ export function usePeriodReview<T extends PeriodReview>(options: PeriodReviewOpt
       (options.start.value === currentPeriodStart() && todayKey() >= addDays(options.end.value, -availabilityLeadDays)),
   );
 
+  const drafts = useEditorDraft({
+    reset: loadReview,
+    key: computed(() => `${options.period}:${options.start.value}`),
+    value: () => JSON.stringify(review),
+    baseline: () => JSON.stringify(sourceBaseline),
+    dirty,
+    restore(value, baseline) {
+      const restored = JSON.parse(value) as T;
+      const periodKey = options.period === 'week' ? 'weekStart' : 'monthStart';
+      if (!(periodKey in restored) || (restored as unknown as Record<string, unknown>)[periodKey] !== options.start.value) {
+        throw new Error('Invalid draft');
+      }
+      sourceBaseline = JSON.parse(baseline) as T | null;
+      Object.assign(review, restored);
+    },
+  });
+
   function loadReview() {
     loading = true;
+    drafts.suspended.value = true;
     const existing = options.findReview(options.start.value);
     sourceBaseline = existing ? plainCopy(existing) : null;
     Object.assign(review, options.emptyReview(options.start.value), existing ? plainCopy(existing) : {});
     options.prepareDraft?.(review);
     options.afterLoad?.();
-    reviewContextOpen.value = reviewHasContext.value;
     draftBaseline.value = draftSignature(review);
-    reviewConflict.value = false;
+    drafts.suspended.value = false;
+    drafts.restore();
+    reviewContextOpen.value = reviewHasContext.value;
+    reviewConflict.value = dirty.value && JSON.stringify(savedReview.value ?? null) !== JSON.stringify(sourceBaseline);
     loading = false;
-    setSyncEditorDirty(editorId, false);
+    setSyncEditorDirty(editorId, dirty.value);
   }
 
   watch(options.start, loadReview, { immediate: true });
@@ -112,37 +132,21 @@ export function usePeriodReview<T extends PeriodReview>(options: PeriodReviewOpt
     },
     { deep: true, flush: 'sync' },
   );
-  function confirmDiscardChanges() {
-    return !dirty.value || window.confirm('Обзор ещё не сохранён. Отбросить изменения и продолжить?');
-  }
-
-  function changePeriod(anchor: string) {
+  async function changePeriod(anchor: string) {
     const nextStart = options.period === 'week' ? startOfWeek(anchor) : startOfMonth(anchor);
-    if (nextStart === options.start.value || confirmDiscardChanges()) {
+    if (nextStart === options.start.value || (await drafts.beforeLeave())) {
       options.anchor.value = anchor;
     }
   }
-
   function shiftPeriod(offset: number) {
-    changePeriod(options.period === 'week' ? addDays(options.anchor.value, offset * 7) : addMonths(options.start.value, offset));
+    void changePeriod(options.period === 'week' ? addDays(options.anchor.value, offset * 7) : addMonths(options.start.value, offset));
   }
-
-  function handleBeforeUnload(event: BeforeUnloadEvent) {
-    if (dirty.value) {
-      event.preventDefault();
-      event.returnValue = '';
+  onBeforeUnmount(() => setSyncEditorDirty(editorId, false));
+  async function reloadReview() {
+    if (await drafts.discard()) {
+      loadReview();
     }
   }
-
-  if (getCurrentInstance()?.appContext.config.globalProperties.$router) {
-    onBeforeRouteLeave(confirmDiscardChanges);
-    onBeforeRouteUpdate((to, from) => to.query.week === from.query.week || confirmDiscardChanges());
-  }
-  onMounted(() => window.addEventListener('beforeunload', handleBeforeUnload));
-  onBeforeUnmount(() => {
-    setSyncEditorDirty(editorId, false);
-    window.removeEventListener('beforeunload', handleBeforeUnload);
-  });
 
   function updateReviewContextOpen(event: Event) {
     reviewContextOpen.value = (event.currentTarget as HTMLDetailsElement).open;
@@ -153,11 +157,18 @@ export function usePeriodReview<T extends PeriodReview>(options: PeriodReviewOpt
       return;
     }
     reviewSaving.value = true;
+    await drafts.flush();
+    if (!drafts.currentOwner()) {
+      reviewSaving.value = false;
+      return;
+    }
+    drafts.suspended.value = true;
     const savingStart = options.start.value;
     const prepared = plainCopy(review);
     const recordSave = captureReviewSave(prepared, savedReview.value);
     try {
-      await options.persistReview(prepared, sourceBaseline);
+      await options.persistReview(prepared, sourceBaseline, `${options.period}:${savingStart}`);
+      drafts.saved(JSON.stringify(prepared));
       if (options.start.value === savingStart) {
         sourceBaseline = savedReview.value ? plainCopy(savedReview.value) : prepared;
         draftBaseline.value = draftSignature(prepared);
@@ -172,12 +183,19 @@ export function usePeriodReview<T extends PeriodReview>(options: PeriodReviewOpt
       if (error instanceof ReviewChangedError) {
         if (options.start.value === savingStart) {
           reviewConflict.value = true;
+          try {
+            await store.load();
+          } catch {
+            /* Keep the local draft on read failure. */
+          }
         }
       } else {
         notifyUnknownError(error, labels.saveError);
       }
     } finally {
       reviewSaving.value = false;
+      drafts.suspended.value = false;
+      await drafts.flush();
     }
   }
 
@@ -227,7 +245,16 @@ export function usePeriodReview<T extends PeriodReview>(options: PeriodReviewOpt
       next: () => shiftPeriod(1),
       current: () => changePeriod(todayKey()),
     },
-    actions: reactive({ saving: reviewSaving, conflict: reviewConflict, save: saveReview, reload: loadReview, replace: replaceReview }),
+    actions: reactive({
+      saving: reviewSaving,
+      conflict: reviewConflict,
+      save: saveReview,
+      reload: reloadReview,
+      replace: replaceReview,
+      notice: drafts.notice,
+      draftError: drafts.error,
+      retryDraft: drafts.flush,
+    }),
     copyPrompt,
     downloadJson,
     hasSavedReview,

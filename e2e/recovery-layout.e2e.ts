@@ -83,8 +83,8 @@ test('shows yesterday recovery and journal shortcuts before the daily note', asy
     expectVerticalSeparation(shortcutsBox, noteBox, 12, 'journal before daily note');
     await expectPageFitsViewport(page, `restored Today order at ${width}px`);
   }
-  await expect(shortcuts.getByRole('link', { name: 'Записать итог' })).toHaveAttribute('href', '/results');
-  await expect(shortcuts.getByRole('link', { name: 'Записать мысль или событие' })).toHaveAttribute('href', '/events');
+  await expect(shortcuts.getByRole('link', { name: 'Записать итог' })).toHaveAttribute('href', '/results?create=1');
+  await expect(shortcuts.getByRole('link', { name: 'Записать мысль или событие' })).toHaveAttribute('href', '/events?create=1');
   await recovery.click();
   await expect(page.getByLabel('Дата записи', { exact: true })).toHaveValue('2026-10-04');
 });

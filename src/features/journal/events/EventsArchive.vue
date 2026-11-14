@@ -8,24 +8,30 @@ import ChipGroup from '@/shared/ui/forms/ChipGroup.vue';
 import DateInput from '@/shared/ui/forms/DateInput.vue';
 import FormCardHeading from '@/shared/ui/forms/FormCardHeading.vue';
 import { formatDate, todayKey } from '@/services/dates';
-import { notifyError, notifyInfo, notifySaved, notifyUnknownError } from '@/services/notifications';
+import { notifyInfo, notifyUnknownError } from '@/services/notifications';
 import { useAppStore } from '@/stores/app';
-import { lifeEventTypeOptions, type LifeEventRecord, type LifeEventType } from '@/types';
+import { lifeEventTypeOptions, type LifeEventRecord } from '@/types';
 import { archiveRangeFromQuery } from '../archiveQuery';
 import { useArchiveList } from '../useArchiveList';
 import ArchiveDateRange from '../ui/ArchiveDateRange.vue';
 import ArchiveEntryCard from '../ui/ArchiveEntryCard.vue';
 import ArchiveEntryList from '../ui/ArchiveEntryList.vue';
 import ArchivePage from '../ui/ArchivePage.vue';
+import JournalDraftStatus from '../ui/JournalDraftStatus.vue';
+import { useJournalEditor } from '../useJournalEditor';
 
 const store = useAppStore();
-const title = ref('');
-const note = ref('');
-const date = ref(todayKey());
-const type = ref<LifeEventType>('change');
-const editingId = ref<number | null>(null);
-const editingCreatedAt = ref('');
-const saving = ref(false);
+const editor = useJournalEditor<LifeEventRecord>({
+  kind: 'event',
+  empty: () => ({ id: undefined, date: todayKey(), title: '', note: '', type: 'change', createdAt: '' }),
+  records: () => store.lifeEvents,
+  titleLimit: 140,
+  persist: (record, expected, key) =>
+    record.id === undefined
+      ? store.addLifeEvent({ date: record.date, type: record.type, title: record.title, note: record.note }, key)
+      : store.updateLifeEvent(record, expected, key),
+});
+const { title, note, date, type, editingId, saving, titleExpanded, conflict, dirty, drafts, edit, resetForm, save: saveEvent } = editor;
 const removingIds = ref<number[]>([]);
 const archiveRange = archiveRangeFromQuery();
 
@@ -47,63 +53,6 @@ const {
   ...archiveRange,
 });
 
-async function saveEvent() {
-  if (saving.value) {
-    return;
-  }
-  const cleanTitle = title.value.trim();
-  if (!cleanTitle) {
-    return;
-  }
-  if (!date.value) {
-    notifyError('Укажите дату события');
-    return;
-  }
-  saving.value = true;
-  const wasEditing = editingId.value !== null;
-  try {
-    if (editingId.value === null) {
-      await store.addLifeEvent({ date: date.value, type: type.value, title: cleanTitle, note: note.value.trim() });
-    } else {
-      await store.updateLifeEvent({
-        id: editingId.value,
-        createdAt: editingCreatedAt.value,
-        date: date.value,
-        type: type.value,
-        title: cleanTitle,
-        note: note.value.trim(),
-      });
-    }
-    resetForm();
-    notifySaved(wasEditing ? 'Событие обновлено' : 'Событие добавлено');
-  } catch (error) {
-    notifyUnknownError(error, 'Не удалось сохранить событие');
-  } finally {
-    saving.value = false;
-  }
-}
-
-function edit(event: LifeEventRecord) {
-  if (event.id === undefined) {
-    return;
-  }
-  editingId.value = event.id;
-  editingCreatedAt.value = event.createdAt;
-  title.value = event.title;
-  note.value = event.note;
-  date.value = event.date;
-  type.value = event.type;
-}
-
-function resetForm() {
-  editingId.value = null;
-  editingCreatedAt.value = '';
-  title.value = '';
-  note.value = '';
-  date.value = todayKey();
-  type.value = 'change';
-}
-
 async function remove(id?: number) {
   if (id === undefined || removingIds.value.includes(id) || !window.confirm('Удалить это событие?')) {
     return;
@@ -112,7 +61,8 @@ async function remove(id?: number) {
   try {
     await store.removeLifeEvent(id);
     if (editingId.value === id) {
-      resetForm();
+      await drafts.discard();
+      await editor.reload();
     }
     notifyInfo('Событие удалено');
   } catch (error) {
@@ -140,6 +90,7 @@ function eventKey(event: LifeEventRecord) {
     archive-eyebrow="Хронология"
     archive-title="События и мысли"
     :editing-id="editingId"
+    :open-composer="editor.createRequested || dirty || editor.draftOptions.value.length > 0"
     :empty-archive="recentEvents.length === 0"
     :count="filteredEvents.length"
     :has-items="visibleEvents.length > 0"
@@ -156,18 +107,53 @@ function eventKey(event: LifeEventRecord) {
           <p>Выберите, что хотите записать: произошедшее событие или важную мысль.</p>
         </div>
       </FormCardHeading>
-      <ChipGroup v-model="type" :options="lifeEventTypeOptions" />
-      <div class="event-composer__fields">
-        <input v-model="title" type="text" maxlength="140" placeholder="Короткое название" @keydown.enter.prevent="saveEvent" />
-        <DateInput v-model="date" required aria-label="Дата события" />
-      </div>
-      <AutoGrowTextarea v-model="note" :rows="4" :max-length="2000" placeholder="Что произошло или что вы поняли и почему это важно" />
+      <JournalDraftStatus
+        :notice="drafts.notice"
+        :error="drafts.error"
+        :conflict="conflict"
+        :saving="saving"
+        :drafts="editor.draftOptions.value"
+        @retry="drafts.flush"
+        @reload="editor.reload"
+        @replace="editor.replace"
+        @open="editor.openDraft"
+      />
+      <fieldset :disabled="saving" class="journal-fields">
+        <ChipGroup v-model="type" :options="lifeEventTypeOptions" />
+
+        <details :open="titleExpanded" class="journal-title" @toggle="titleExpanded = ($event.currentTarget as HTMLDetailsElement).open">
+          <summary>Название (необязательно)</summary>
+          <div class="event-composer__fields">
+            <input
+              v-model="title"
+              :disabled="saving"
+              type="text"
+              maxlength="140"
+              placeholder="Короткое название"
+              @keydown.enter.prevent="saveEvent()"
+            />
+          </div>
+        </details>
+        <DateInput v-model="date" class="journal-date" required aria-label="Дата события" :disabled="saving" />
+        <AutoGrowTextarea
+          v-model="note"
+          :rows="4"
+          :max-length="2000"
+          placeholder="Что произошло или что вы поняли и почему это важно"
+          :disabled="saving"
+        />
+      </fieldset>
       <div class="composer-actions">
-        <ActionButton variant="primary" type="button" :disabled="!title.trim() || !date || saving" @click="saveEvent">
+        <ActionButton
+          variant="primary"
+          type="button"
+          :disabled="(!title.trim() && !note.trim()) || !date || saving || conflict"
+          @click="saveEvent()"
+        >
           {{ editingId === null ? 'Добавить запись' : 'Сохранить запись' }}
         </ActionButton>
-        <ActionButton v-if="editingId !== null" variant="secondary" class="composer-cancel" type="button" @click="resetForm">
-          Отменить редактирование
+        <ActionButton v-if="editingId !== null || dirty" variant="secondary" class="composer-cancel" type="button" @click="resetForm">
+          {{ editingId === null ? 'Удалить черновик' : 'Отменить редактирование' }}
         </ActionButton>
       </div>
     </template>
@@ -219,7 +205,7 @@ function eventKey(event: LifeEventRecord) {
 <style scoped>
 .event-composer__fields {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 155px;
+  grid-template-columns: minmax(0, 1fr);
   gap: 10px;
   margin: 14px 0 10px;
 }
