@@ -1,5 +1,6 @@
 import { computed, getCurrentInstance, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
-import { onBeforeRouteLeave } from 'vue-router';
+import { onBeforeRouteLeave, onBeforeRouteUpdate } from 'vue-router';
+import { validDate } from '@/model/normalization';
 import { formatDate, todayKey } from '@/services/dates';
 import { notifyError, notifySaved, notifyUnknownError } from '@/services/notifications';
 import { plainCopy } from '@/services/plain';
@@ -20,7 +21,11 @@ import { captureDailySave } from './telemetry';
 type AppStore = ReturnType<typeof useAppStore>;
 
 export function useDailyEntryForm(store: AppStore) {
-  const selectedDate = ref(todayKey());
+  function dateFromQuery(value: unknown) {
+    const date = validDate(value);
+    return date && date <= todayKey() ? date : todayKey();
+  }
+  const selectedDate = ref(dateFromQuery(new URLSearchParams(window.location.search).get('date')));
   const sleepDurationMinutes = ref<number | null>(null);
   const timeInBedDurationMinutes = ref<number | null>(null);
   const weightKg = ref('');
@@ -358,6 +363,12 @@ export function useDailyEntryForm(store: AppStore) {
   );
 
   if (getCurrentInstance()?.appContext.config.globalProperties.$router) {
+    onBeforeRouteUpdate(async (to) => {
+      if (!(await persistDraft()) && !confirmDiscardChanges()) {
+        return false;
+      }
+      return changeSelectedDate(dateFromQuery(to.query.date));
+    });
     onBeforeRouteLeave(async () => {
       if (!isDirty.value || persistedDraftSnapshot.value === currentEntrySnapshot.value) {
         return true;

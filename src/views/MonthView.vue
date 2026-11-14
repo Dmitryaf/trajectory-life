@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import PeriodReviewActions from '@/features/reviews/ui/PeriodReviewActions.vue';
+import MonthDailyNotes from '@/features/reviews/ui/MonthDailyNotes.vue';
 import MonthWeekReviews from '@/features/reviews/ui/MonthWeekReviews.vue';
 import { monthWeekReviews, monthWeekSummariesForPeriod } from '@/features/reviews/monthWeeks';
-import ActionButton from '@/shared/ui/actions/ActionButton.vue';
 import SurfaceCard from '@/shared/ui/layout/SurfaceCard.vue';
 import SectionHeading from '@/shared/ui/layout/SectionHeading.vue';
 import { computed, ref, watch } from 'vue';
@@ -22,7 +22,7 @@ import FormFieldLabel from '@/shared/ui/forms/FormFieldLabel.vue';
 import PeriodNavigator from '@/shared/ui/navigation/PeriodNavigator.vue';
 import Badge from '@/shared/ui/data-display/CountBadge.vue';
 import PageShell from '@/shared/ui/layout/PageShell.vue';
-import PeriodEmptyGuide from '@/shared/ui/content/PeriodEmptyGuide.vue';
+import ReviewEmptyPeriod from '@/features/reviews/ui/ReviewEmptyPeriod.vue';
 import EyebrowText from '@/shared/ui/typography/EyebrowText.vue';
 import { chartColors as c, chartStyles as s } from '@/shared/theme/colors';
 import {
@@ -322,7 +322,7 @@ const {
   end,
   emptyReview: emptyMonthlyReview,
   findReview: (monthStart) => store.reviewByMonth(monthStart),
-  persistReview: (draft, expected) => store.saveMonthlyReview(draft, expected),
+  persistReview: (draft, expected, key) => store.saveMonthlyReview(draft, expected, key),
   hasContext: (draft) => Boolean(draft.mainPattern.trim() || draft.support.trim() || draft.obstacle.trim() || draft.courseChange.trim()),
   afterLoad: () => {
     actionPage.value = 1;
@@ -346,7 +346,7 @@ function minutesToHours(value: number | null): number | null {
     <ReviewHeading
       title="Месяц"
       summary="Сравните недели, вспомните важные события и сделанные дела. При желании запишите планы."
-      :action="hasPeriodData ? (reviewAvailable ? 'К обзору' : 'Обзор позже') : undefined"
+      :action="reviewAvailable ? 'К обзору' : hasPeriodData ? 'Обзор позже' : undefined"
       href="#month-review"
       period="month"
     />
@@ -356,14 +356,10 @@ function minutesToHours(value: number | null): number | null {
       v-on="navigation"
     />
 
-    <PeriodEmptyGuide v-if="!hasPeriodData">
-      <strong>За этот месяц пока нет записей</strong>
-      <p>Данные появятся здесь после ежедневных записей. Итоги и важные события из Журнала тоже войдут в обзор месяца.</p>
-      <ActionButton :as="RouterLink" variant="secondary" to="/today">Перейти к записи за день</ActionButton>
-    </PeriodEmptyGuide>
+    <ReviewEmptyPeriod v-if="!hasPeriodData" period="month" :available="reviewAvailable" />
 
-    <template v-else>
-      <ReviewNotice v-if="!hasDailyData" tag="section" class="period-data-guide">
+    <template v-if="hasPeriodData || reviewAvailable">
+      <ReviewNotice v-if="hasPeriodData && !hasDailyData" tag="section" class="period-data-guide">
         <strong>За этот месяц нет дневных записей</strong>
         <p>Сохранённые обзоры, итоги и события показаны ниже. Для воспоминаний о месяце дневные измерения не обязательны.</p>
       </ReviewNotice>
@@ -416,6 +412,7 @@ function minutesToHours(value: number | null): number | null {
         />
       </section>
 
+      <MonthDailyNotes :entries="entries" />
       <MonthWeekReviews :weeks="savedWeeks" />
 
       <SurfaceCard v-if="reviewAvailable" id="month-review" kind="review">
@@ -550,7 +547,9 @@ function minutesToHours(value: number | null): number | null {
             <div class="period-record-card__details">
               <div class="note-list note-list--columns">
                 <article v-for="entry in visibleActionNotes" :key="entry.date" class="note-item">
-                  <time>{{ formatDate(entry.date, { day: 'numeric', month: 'short' }) }}</time>
+                  <RouterLink :to="`/today?date=${entry.date}`"
+                    ><time>{{ formatDate(entry.date, { day: 'numeric', month: 'short' }) }}</time></RouterLink
+                  >
                   <p>
                     <strong>{{ actionDirectionLabel(entry.actionDirection) }}</strong
                     ><span v-if="entry.focusTitle"><br />Цель: {{ entry.focusTitle }}</span
@@ -576,7 +575,9 @@ function minutesToHours(value: number | null): number | null {
             <div class="period-record-card__details">
               <div class="note-list note-list--columns">
                 <article v-for="entry in visibleContextEntries" :key="entry.date" class="note-item">
-                  <time>{{ formatDate(entry.date, { day: 'numeric', month: 'short' }) }}</time>
+                  <RouterLink :to="`/today?date=${entry.date}`"
+                    ><time>{{ formatDate(entry.date, { day: 'numeric', month: 'short' }) }}</time></RouterLink
+                  >
                   <p>
                     <strong v-if="entry.specialDay">{{ specialDayLabel(entry.specialDay) }}</strong
                     ><span v-if="entry.specialDayNote"><br />{{ entry.specialDayNote }}</span

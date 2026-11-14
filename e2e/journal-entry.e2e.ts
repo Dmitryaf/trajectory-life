@@ -6,6 +6,9 @@ async function openComposer(page: Page) {
   if ((await page.locator('.archive-add').getAttribute('open')) === null) {
     await page.locator('.archive-add > summary').click();
   }
+  if ((await page.locator('.journal-title').getAttribute('open')) === null) {
+    await page.locator('.journal-title > summary').click();
+  }
 }
 
 test.use({ viewport: { width: 390, height: 844 }, isMobile: true });
@@ -64,6 +67,8 @@ test('places both composer actions below focused notes with the same spacing', a
       const input = composer.locator('input[type="text"]');
       const note = composer.locator('textarea');
       const submit = composer.locator('.primary-button');
+      await input.fill('');
+      await note.fill('');
       await expect(submit).toBeDisabled();
       await input.fill('Проверка расположения действия');
       await note.fill('Длинная заметка для проверки роста поля и доступности кнопки. '.repeat(25));
@@ -81,6 +86,7 @@ test('places both composer actions below focused notes with the same spacing', a
         await expect(page.locator('.bottom-nav')).toHaveCSS('pointer-events', 'none');
       }
       await expectPageFitsViewport(page, `${route} composer at ${width}px`);
+      await expect(page.locator('.editor-draft-notice')).toContainText(/Черновик сохранён|Восстановлен черновик/);
       if (width === 390 || width === 1440) {
         await composer.screenshot({ path: `qa/ui-polish-20261012/${route.slice(1)}-${width}.png` });
       }
@@ -106,6 +112,8 @@ test('does not revive the removed journal modal or composer return from legacy q
 });
 
 test('keeps cancellation for the remaining archive edit scenarios', async ({ page }) => {
+  page.removeAllListeners('dialog');
+  page.on('dialog', (dialog) => dialog.accept());
   await page.goto('/results');
   await openComposer(page);
   const resultTitle = page.getByPlaceholder('Что вы сделали или какой результат получили');
@@ -126,6 +134,8 @@ test('keeps cancellation for the remaining archive edit scenarios', async ({ pag
 });
 
 test('opens edits with Enter without saving on key release and returns focus after cancellation', async ({ page }) => {
+  page.removeAllListeners('dialog');
+  page.on('dialog', (dialog) => dialog.accept());
   for (const scenario of [
     { route: '/results', card: '.result-item', edit: 'Редактировать итог', toast: 'Итог обновлён' },
     { route: '/events', card: '.timeline-item', edit: 'Редактировать событие', toast: 'Событие обновлено' },
@@ -181,6 +191,7 @@ test('shows note disclosure only for measured overflow at mobile and desktop wid
   await page.getByRole('button', { name: 'Добавить итог' }).click();
   await expect(page.getByText('Итог добавлен', { exact: true })).toBeVisible();
 
+  await openComposer(page);
   await title.fill('Длинная заметка для проверки раскрытия');
   await note.fill('Подробный синтетический контекст результата. '.repeat(30));
   await page.getByRole('button', { name: 'Добавить итог' }).click();

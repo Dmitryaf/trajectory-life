@@ -20,20 +20,20 @@ for (const period of ['week', 'month']) {
     );
     await input.fill('Собственный вывод, который ещё не сохранён');
     const periodTitle = await page.locator('.period-nav__label strong').textContent();
-    let confirmations = 0;
-    const cancel = async (dialog: import('@playwright/test').Dialog) => {
-      confirmations += 1;
-      expect(dialog.message()).toContain('Обзор ещё не сохранён');
+    const dialogs: string[] = [];
+    page.on('dialog', async (dialog) => {
+      dialogs.push(dialog.message());
       await dialog.dismiss();
-    };
-    page.on('dialog', cancel);
+    });
     await page.getByRole('button', { name: 'Предыдущий период' }).click();
-    await expect(page.locator('.period-nav__label strong')).toHaveText(periodTitle!);
+    await expect(page.locator('.period-nav__label strong')).not.toHaveText(periodTitle!);
+    await page.getByRole('button', { name: 'Следующий период' }).click();
     await expect(input).toHaveValue('Собственный вывод, который ещё не сохранён');
     await page.getByRole('navigation', { name: 'Основная навигация' }).getByRole('link', { name: 'История' }).click();
+    await expect(page).toHaveURL(/\/trends$/);
+    await page.goBack();
     await expect(input).toHaveValue('Собственный вывод, который ещё не сохранён');
-    expect(confirmations).toBe(2);
-    page.off('dialog', cancel);
+    expect(dialogs).toEqual([]);
 
     await page.getByRole('button', { name: period === 'week' ? 'Сохранить обзор' : 'Сохранить обзор месяца', exact: true }).click();
     await expect(page.getByText(period === 'week' ? 'Обзор недели сохранён' : 'Итог месяца сохранён', { exact: true })).toBeVisible();
@@ -41,12 +41,11 @@ for (const period of ['week', 'month']) {
     await page.getByRole('button', { name: 'Следующий период' }).click();
     await expect(input).toHaveValue('Собственный вывод, который ещё не сохранён');
 
-    await input.fill('Черновик, от которого я решил отказаться');
-    page.once('dialog', (dialog) => dialog.accept());
+    await input.fill('Следующий несохранённый черновик');
     await page.getByRole('button', { name: 'Предыдущий период' }).click();
     await expect(page.locator('.period-nav__label strong')).not.toHaveText(periodTitle!);
     await page.getByRole('button', { name: 'Следующий период' }).click();
-    await expect(input).toHaveValue('Собственный вывод, который ещё не сохранён');
+    await expect(input).toHaveValue('Следующий несохранённый черновик');
   });
 }
 

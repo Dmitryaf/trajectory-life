@@ -101,6 +101,10 @@
   max-width: 1168px;
 }
 
+:global([data-sonner-toaster][data-theme='light']) {
+  --success-text: var(--toast-success-text);
+}
+
 :global([data-sonner-toaster][data-y-position='top']) {
   top: calc(var(--offset-top) + var(--safe-top)) !important;
 }

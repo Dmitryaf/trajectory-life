@@ -103,6 +103,7 @@ describe('period review navigation', () => {
     expect(wrapper.get('.review-conflict').text()).toContain('Обзор изменился');
     expect(wrapper.get(`#${period}-review > .primary-button`).attributes('disabled')).toBeDefined();
     await wrapper.get('.review-conflict button').trigger('click');
+    await flushPromises();
     expect((input.element as HTMLTextAreaElement).value).toBe('remote conflicting');
     expect(hasUnsavedSyncEditors()).toBe(false);
     await input.setValue('another draft');
@@ -120,20 +121,24 @@ describe('period review navigation', () => {
         await new Promise<void>((resolve) => {
           complete = resolve;
         });
+        store.forgetEditorDraft(`week:${review.weekStart}`);
         store.weeklyReviews = [{ ...review, updatedAt: '2026-07-21T00:00:00.000Z' }];
       })
       .mockImplementationOnce(async (review) => {
+        store.forgetEditorDraft(`week:${review.weekStart}`);
         store.weeklyReviews = [review];
       });
     const wrapper = mount(WeekView, { global: { plugins: [pinia], stubs: { EChartPanel: true, RouterLink: routerLinkStub } } });
     const input = wrapper.get('textarea[placeholder="Можно продолжить как есть или пока ничего не решать"]');
     await input.setValue('first edit');
     await wrapper.get('#week-review > .primary-button').trigger('click');
+    await flushPromises();
     await input.setValue('newer edit');
     complete();
     await flushPromises();
     expect((input.element as HTMLTextAreaElement).value).toBe('newer edit');
     expect(hasUnsavedSyncEditors()).toBe(true);
+    expect(JSON.parse(store.editorDraftByKey('week:2026-07-20')!.value).nextLever).toBe('newer edit');
     await wrapper.get('#week-review > .primary-button').trigger('click');
     await flushPromises();
     expect(store.weeklyReviews[0]?.nextLever).toBe('newer edit');
@@ -146,6 +151,7 @@ describe('period review navigation', () => {
     const remote = { ...initial, nextLever: 'remote version' };
     store.weeklyReviews = [initial];
     const persist = vi.spyOn(store, 'saveReview').mockImplementation(async (review) => {
+      store.forgetEditorDraft(`week:${review.weekStart}`);
       store.weeklyReviews = [review];
     });
     const wrapper = mount(WeekView, { global: { plugins: [pinia], stubs: { EChartPanel: true, RouterLink: routerLinkStub } } });
@@ -156,7 +162,7 @@ describe('period review navigation', () => {
     expect(persist).not.toHaveBeenCalled();
     await wrapper.findAll('.review-conflict button')[1]!.trigger('click');
     await flushPromises();
-    expect(persist).toHaveBeenCalledWith(expect.objectContaining({ nextLever: 'my version' }), remote);
+    expect(persist).toHaveBeenCalledWith(expect.objectContaining({ nextLever: 'my version' }), remote, 'week:2026-07-20');
     expect(wrapper.find('.review-conflict').exists()).toBe(false);
     expect(hasUnsavedSyncEditors()).toBe(false);
   });
