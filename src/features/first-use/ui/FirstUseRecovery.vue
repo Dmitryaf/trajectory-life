@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import ActionButton from '@/shared/ui/actions/ActionButton.vue';
-import { computed, getCurrentInstance, onMounted, reactive, ref, watch } from 'vue';
+import { computed, getCurrentInstance, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
 import type { Router } from 'vue-router';
 import { captureProductEvent, emitProductEvent } from '@/features/telemetry/productTelemetry';
 import { captureDecisionSave, captureReviewSave } from '@/features/reviews/telemetry';
@@ -13,8 +13,11 @@ import { addDays, formatDate } from '@/services/dates';
 import { plainCopy } from '@/services/plain';
 import { useAppStore } from '@/stores/app';
 import { emptyWeeklyReview, type FirstUseState, type FirstUseStep, type WeeklyReview } from '@/types';
-
-type DecisionChoice = '' | 'continue' | 'change' | 'later';
+import { useEditorDraft } from '@/features/editor-drafts/useEditorDraft';
+import EditorDraftNotice from '@/features/editor-drafts/EditorDraftNotice.vue';
+import { editorDraftKey } from '@/model/editorDraft';
+import { setSyncEditorDirty } from '@/features/sync/editing';
+import { ReviewChangedError } from '@/features/reviews/version';
 
 const props = withDefaults(defineProps<{ showAvailablePrompt?: boolean }>(), { showAvailablePrompt: true });
 const emit = defineEmits<{ availableHidden: [] }>();
@@ -30,7 +33,7 @@ const highlightsText = ref('');
 const stateContext = ref('');
 const support = ref('');
 const obstacle = ref('');
-const decision = ref<DecisionChoice>('');
+const decision = ref('');
 const decisionText = ref('');
 const ifThenPlan = ref('');
 const periodOptions = firstUsePeriodOptions();
@@ -64,6 +67,39 @@ const meaningfulAnswerCount = computed(
 const currentAnswerIsValid = computed(
   () => currentStep.value !== 'decision' || decision.value !== 'change' || Boolean(decisionText.value.trim()),
 );
+const answerFields = {
+  results: [resultsText],
+  highlights: [highlightsText],
+  state_context: [stateContext],
+  support_obstacle: [support, obstacle],
+  decision: [decision, decisionText, ifThenPlan],
+  choice: [],
+  overview: [],
+};
+const draftKey = computed(() => editorDraftKey(`first-use:${firstUse.value.weekStart}:${currentStep.value}`));
+const answer = () => JSON.stringify(answerFields[currentStep.value].map((field) => field.value));
+const answerBaseline = ref('');
+let reviewBaseline: WeeklyReview | null = null;
+const answerDirty = computed(() => isRecovery.value && currentStepIndex.value >= 0 && answer() !== answerBaseline.value);
+const draft = useEditorDraft({
+  key: draftKey,
+  dirty: answerDirty,
+  value: answer,
+  baseline: () => answerBaseline.value,
+  reset: loadDraft,
+  restore(value) {
+    const parsed: unknown = JSON.parse(value);
+    const fields = answerFields[currentStep.value];
+    if (!Array.isArray(parsed) || parsed.length !== fields.length || !parsed.every((item) => typeof item === 'string')) {
+      throw new Error('Не удалось прочитать черновик ответа');
+    }
+    fields.forEach((field, index) => {
+      field.value = parsed[index] as string;
+    });
+  },
+});
+watch(answerDirty, (dirty) => setSyncEditorDirty('first-use', dirty));
+onBeforeUnmount(() => setSyncEditorDirty('first-use', false));
 
 watch(
   () => `${firstUse.value.status}:${firstUse.value.weekStart}:${firstUse.value.periodEnd}:${firstUse.value.lastStep}`,
@@ -109,7 +145,9 @@ function loadDraft() {
   if (!firstUse.value.weekStart) {
     return;
   }
+  draft.suspended.value = true;
   const existing = store.reviewByWeek(firstUse.value.weekStart);
+  reviewBaseline = existing ? plainCopy(existing) : null;
   Object.assign(review, emptyWeeklyReview(firstUse.value.weekStart), existing ? plainCopy(existing) : {});
   review.coveredThrough = firstUse.value.periodEnd;
   resultsText.value = review.results.filter(Boolean).join('\n');
@@ -128,6 +166,9 @@ function loadDraft() {
   }
   decisionText.value = decision.value === 'change' ? review.nextLever : '';
   ifThenPlan.value = review.ifThenPlan;
+  answerBaseline.value = answer();
+  draft.suspended.value = false;
+  draft.restore();
 }
 
 async function saveFirstUse(next: FirstUseState) {
@@ -232,10 +273,17 @@ async function moveTo(nextStep: FirstUseStep, saveAnswer: boolean) {
   saving.value = true;
   try {
     if (saveAnswer) {
+      await draft.flush();
       applyCurrentAnswer();
       const recordDecision = captureDecisionSave(review, store.reviewByWeek(review.weekStart));
-      await store.saveReview(plainCopy(review));
+      await store.saveReview(plainCopy(review), reviewBaseline, draftKey.value);
+      reviewBaseline = plainCopy(store.reviewByWeek(review.weekStart) ?? review);
+      answerBaseline.value = answer();
+      draft.saved();
       recordDecision();
+    } else if (!(await draft.flush())) {
+      saveError.value = 'Не удалось сохранить черновик. Повторите попытку перед переходом.';
+      return;
     }
     await saveFirstUse({
       status: 'in_progress',
@@ -245,8 +293,12 @@ async function moveTo(nextStep: FirstUseStep, saveAnswer: boolean) {
       overviewSeen: nextStep === 'overview' || firstUse.value.overviewSeen,
       updatedAt: '',
     });
-  } catch {
-    saveError.value = 'Не удалось сохранить ответ. Он остался на экране — попробуйте ещё раз.';
+  } catch (error) {
+    if (error instanceof ReviewChangedError) {
+      saveError.value = 'Обзор изменился. Ответ сохранён в черновике. Обновите страницу, чтобы открыть свежий обзор.';
+    } else {
+      saveError.value = 'Не удалось сохранить ответ. Он остался на экране — попробуйте ещё раз.';
+    }
   } finally {
     saving.value = false;
   }
@@ -275,7 +327,7 @@ async function completeRecovery() {
   saving.value = true;
   try {
     const weekStart = firstUse.value.weekStart;
-    await store.saveReview(plainCopy(review));
+    await store.saveReview(plainCopy(review), reviewBaseline);
     await saveFirstUse({
       status: 'completed',
       weekStart,
@@ -395,14 +447,20 @@ async function completeRecovery() {
       <h2 id="first-use-step-title">Что вам удалось закончить или получить?</h2>
       <p>Подойдут и большие результаты, и небольшие сделанные дела.</p>
       <FormFieldLabel for="first-use-results">По одному пункту в строке</FormFieldLabel>
-      <textarea id="first-use-results" v-model="resultsText" rows="5" placeholder="Например: закончил черновик презентации"></textarea>
+      <textarea
+        id="first-use-results"
+        v-model="resultsText"
+        rows="5"
+        :disabled="saving"
+        placeholder="Например: закончил черновик презентации"
+      ></textarea>
     </div>
 
     <div v-else-if="currentStep === 'highlights'" class="first-use-recovery__step">
       <h2 id="first-use-step-title">Что важного произошло?</h2>
       <p>События, решения, мысли или разговоры, которые хочется помнить.</p>
       <FormFieldLabel for="first-use-highlights">По одному пункту в строке</FormFieldLabel>
-      <textarea id="first-use-highlights" v-model="highlightsText" rows="5"></textarea>
+      <textarea id="first-use-highlights" v-model="highlightsText" rows="5" :disabled="saving"></textarea>
     </div>
 
     <div v-else-if="currentStep === 'state_context'" class="first-use-recovery__step">
@@ -412,6 +470,7 @@ async function completeRecovery() {
       <textarea
         id="first-use-state"
         v-model="stateContext"
+        :disabled="saving"
         rows="5"
         placeholder="Например: несколько дней работал над одним большим проектом"
       ></textarea>
@@ -423,11 +482,11 @@ async function completeRecovery() {
       <div class="first-use-recovery__paired-fields">
         <label>
           <FormFieldLabel tag="span">Что помогало</FormFieldLabel>
-          <textarea v-model="support" rows="4" placeholder="Например: прогулки и свободный вечер"></textarea>
+          <textarea v-model="support" rows="4" :disabled="saving" placeholder="Например: прогулки и свободный вечер"></textarea>
         </label>
         <label>
           <FormFieldLabel tag="span">Что мешало</FormFieldLabel>
-          <textarea v-model="obstacle" rows="4" placeholder="Например: плохой сон"></textarea>
+          <textarea v-model="obstacle" rows="4" :disabled="saving" placeholder="Например: плохой сон"></textarea>
         </label>
       </div>
     </div>
@@ -436,13 +495,15 @@ async function completeRecovery() {
       <h2 id="first-use-step-title">Что хотите делать дальше?</h2>
       <p>Можно продолжить как есть, попробовать одно изменение или пока ничего не решать.</p>
       <div class="first-use-recovery__choices" aria-label="Решение после обзора">
-        <button type="button" :aria-pressed="decision === 'continue'" @click="decision = 'continue'">Продолжить как есть</button>
-        <button type="button" :aria-pressed="decision === 'change'" @click="decision = 'change'">Что-то изменить</button>
-        <button type="button" :aria-pressed="decision === 'later'" @click="decision = 'later'">Пока без решения</button>
+        <button type="button" :disabled="saving" :aria-pressed="decision === 'continue'" @click="decision = 'continue'">
+          Продолжить как есть
+        </button>
+        <button type="button" :disabled="saving" :aria-pressed="decision === 'change'" @click="decision = 'change'">Что-то изменить</button>
+        <button type="button" :disabled="saving" :aria-pressed="decision === 'later'" @click="decision = 'later'">Пока без решения</button>
       </div>
       <template v-if="decision === 'change'">
         <FormFieldLabel for="first-use-decision">Какое одно изменение хотите попробовать?</FormFieldLabel>
-        <textarea id="first-use-decision" v-model="decisionText" rows="3"></textarea>
+        <textarea id="first-use-decision" v-model="decisionText" rows="3" :disabled="saving"></textarea>
         <p class="first-use-recovery__field-note">
           В следующем обзоре этот ответ появится как ваше прошлое решение — так будет проще посмотреть, что получилось.
         </p>
@@ -450,6 +511,7 @@ async function completeRecovery() {
         <textarea
           id="first-use-plan"
           v-model="ifThenPlan"
+          :disabled="saving"
           rows="3"
           placeholder="Если снова не будет сил, то перенесу одну необязательную задачу"
         ></textarea>
@@ -471,6 +533,7 @@ async function completeRecovery() {
       </p>
     </div>
 
+    <EditorDraftNotice :notice="draft.notice.value" :error="draft.error.value" @retry="draft.flush" />
     <footer class="first-use-recovery__footer">
       <ActionButton variant="secondary" type="button" :disabled="saving" @click="moveTo(previousStep(), currentStep !== 'overview')">
         {{ currentStep === 'overview' ? 'Исправить ответы' : 'Назад' }}

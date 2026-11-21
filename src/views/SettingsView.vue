@@ -456,14 +456,7 @@ const {
             @click="importInput?.click()"
             >Восстановить из копии</ActionButton
           >
-          <input
-            ref="importInput"
-            class="visually-hidden"
-            type="file"
-            accept="application/json"
-            :disabled="isSaving('import')"
-            @change="importData"
-          />
+          <input ref="importInput" hidden type="file" accept="application/json" :disabled="isSaving('import')" @change="importData" />
         </div>
         <div class="danger-zone">
           <div>

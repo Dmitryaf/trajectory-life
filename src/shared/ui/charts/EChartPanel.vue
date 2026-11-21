@@ -1,31 +1,6 @@
 <script setup lang="ts">
 import { nextTick, onBeforeUnmount, onMounted, ref, useId, watch } from 'vue';
-import { init, use } from 'echarts/core';
-import { BarChart, HeatmapChart, LineChart, ScatterChart } from 'echarts/charts';
-import {
-  CalendarComponent,
-  GridComponent,
-  LegendComponent,
-  MarkLineComponent,
-  TooltipComponent,
-  VisualMapComponent,
-} from 'echarts/components';
-import { CanvasRenderer } from 'echarts/renderers';
 import type { ECharts, EChartsCoreOption } from 'echarts/core';
-
-use([
-  BarChart,
-  HeatmapChart,
-  LineChart,
-  ScatterChart,
-  CalendarComponent,
-  GridComponent,
-  LegendComponent,
-  MarkLineComponent,
-  TooltipComponent,
-  VisualMapComponent,
-  CanvasRenderer,
-]);
 
 const props = withDefaults(
   defineProps<{
@@ -41,6 +16,7 @@ const props = withDefaults(
 );
 
 const chartEl = ref<HTMLDivElement>();
+const unavailable = ref(false);
 const descriptionId = `chart-description-${useId()}`;
 let chart: ECharts | null = null;
 let resizeObserver: ResizeObserver | null = null;
@@ -57,14 +33,19 @@ function resize() {
 }
 
 onMounted(async () => {
-  await nextTick();
-  if (!chartEl.value) {
-    return;
+  try {
+    const engine = await import('./engine');
+    await nextTick();
+    if (!chartEl.value) {
+      return;
+    }
+    chart = engine.init(chartEl.value, null, { renderer: 'canvas' });
+    render();
+    resizeObserver = new ResizeObserver(resize);
+    resizeObserver.observe(chartEl.value);
+  } catch {
+    unavailable.value = true;
   }
-  chart = init(chartEl.value, null, { renderer: 'canvas' });
-  render();
-  resizeObserver = new ResizeObserver(resize);
-  resizeObserver.observe(chartEl.value);
 });
 
 watch(() => props.option, render, { deep: true });
@@ -81,6 +62,7 @@ onBeforeUnmount(() => {
 
 <template>
   <div
+    v-if="!unavailable"
     ref="chartEl"
     class="echart-panel"
     :style="{ height: `${height}px` }"
@@ -88,7 +70,8 @@ onBeforeUnmount(() => {
     :aria-label="ariaLabel"
     :aria-describedby="descriptionId"
   ></div>
-  <p :id="descriptionId" class="visually-hidden">{{ description }}</p>
+  <p v-if="unavailable" class="chart-unavailable" role="status">График не загрузился. Обновите страницу, когда появится сеть.</p>
+  <p :id="descriptionId" :class="{ 'visually-hidden': !unavailable }">{{ description }}</p>
 </template>
 
 <style scoped>
@@ -104,5 +87,8 @@ onBeforeUnmount(() => {
   box-shadow:
     inset 0 1px 0 var(--chart-panel-highlight),
     0 8px 20px var(--chart-panel-shadow);
+}
+.chart-unavailable {
+  font-weight: 700;
 }
 </style>

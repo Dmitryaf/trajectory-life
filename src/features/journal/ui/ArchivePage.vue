@@ -8,6 +8,7 @@ import SectionHeading from '@/shared/ui/layout/SectionHeading.vue';
 import PageHeading from '@/shared/ui/layout/PageHeading.vue';
 import PageShell from '@/shared/ui/layout/PageShell.vue';
 import EyebrowText from '@/shared/ui/typography/EyebrowText.vue';
+import ActionButton from '@/shared/ui/actions/ActionButton.vue';
 const props = defineProps<{
   tone: 'results' | 'events';
   editingId: number | null;
@@ -19,12 +20,14 @@ const props = defineProps<{
   archiveEyebrow: string;
   archiveTitle: string;
   count: number;
+  activeFilters: number;
   hasItems: boolean;
   emptyIcon: UiIconName;
   emptyTitle: string;
   emptyDescription: string;
 }>();
 const composer = ref<HTMLDetailsElement | null>(null);
+const filtersOpen = ref(false);
 const composerOpen = ref(props.editingId !== null || props.emptyArchive || Boolean(props.openComposer));
 watch(
   () => props.openComposer,
@@ -41,7 +44,12 @@ watch(
     if (id === null) {
       composerOpen.value = props.emptyArchive || Boolean(props.openComposer);
       if (previousId !== null && returnFocus?.isConnected) {
-        returnFocus.focus();
+        const target = returnFocus;
+        await nextTick();
+        if (target.isConnected) {
+          target.focus({ preventScroll: true });
+          target.scrollIntoView({ block: 'nearest' });
+        }
       }
       return;
     }
@@ -90,7 +98,20 @@ watch(
         <span class="archive-count">{{ count }}</span>
       </SectionHeading>
       <div class="archive-filters">
-        <slot name="filters"></slot>
+        <slot name="search"></slot>
+        <ActionButton
+          type="button"
+          variant="secondary"
+          class="archive-filter-toggle"
+          :aria-expanded="filtersOpen"
+          :aria-controls="`archive-filters-${tone}`"
+          @click="filtersOpen = !filtersOpen"
+        >
+          Фильтры{{ activeFilters ? ` (${activeFilters})` : '' }}
+        </ActionButton>
+        <div :id="`archive-filters-${tone}`" class="archive-extra-filters" :class="{ 'archive-extra-filters--open': filtersOpen }">
+          <slot name="filters"></slot>
+        </div>
       </div>
       <slot v-if="hasItems"></slot>
       <div v-else class="archive-empty">
@@ -120,6 +141,11 @@ watch(
 :deep(.journal-date) {
   max-width: 210px;
   margin-block: 12px;
+}
+:deep(.journal-note-label) {
+  display: block;
+  margin-bottom: 6px;
+  font-weight: 700;
 }
 
 .page--archive > .page-heading {
@@ -270,8 +296,14 @@ watch(
 .archive-filters > :deep(.archive-filter-field) {
   flex: 1.35 1 220px;
 }
-.archive-filters > :deep(.archive-filter-field:nth-child(2)) {
+.archive-extra-filters > :deep(.archive-filter-field) {
   flex: 0.9 1 170px;
+}
+.archive-extra-filters {
+  display: contents;
+}
+.archive-filter-toggle {
+  display: none;
 }
 .page--events .archive-filters {
   border-color: var(--archive-event-entry-border);
@@ -364,7 +396,28 @@ watch(
 }
 @media (max-width: 520px) {
   .archive-filters {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: end;
+  }
+  .archive-filter-toggle {
+    display: inline-flex;
+    min-height: 48px;
+    padding-inline: 10px;
+  }
+  .archive-extra-filters {
+    display: none;
+    grid-column: 1 / -1;
+    min-width: 0;
+    gap: 10px;
+  }
+  .archive-extra-filters--open {
+    display: grid;
+  }
+  .archive-extra-filters > :deep(*) {
+    grid-column: 1;
+  }
+  .archive-extra-filters > :deep(.archive-filter__all-time) {
+    justify-self: start;
   }
 }
 </style>

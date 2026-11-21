@@ -1,6 +1,6 @@
 import { computed, onBeforeUnmount, reactive, ref, watch, type Ref } from 'vue';
 import { buildPeriodPackage, copyAiPrompt, downloadAiPackage } from '../export/browser';
-import { addDays, addMonths, startOfMonth, startOfWeek, todayKey } from '@/services/dates';
+import { addDays, addMonths, formatDate, startOfMonth, startOfWeek, todayKey } from '@/services/dates';
 import { notifyInfo, notifySaved, notifyUnknownError } from '@/services/notifications';
 import { plainCopy } from '@/services/plain';
 import { useAppStore } from '@/stores/app';
@@ -10,6 +10,7 @@ import { setSyncEditorDirty } from '../sync/editing';
 import { ReviewChangedError } from './version';
 import { useEditorDraft } from '../editor-drafts/useEditorDraft';
 import { useViewedReview } from './useReviewReminders';
+import { editorDraftKey } from '@/model/editorDraft';
 
 type Period = 'week' | 'month';
 type PeriodReview = WeeklyReview | MonthlyReview;
@@ -67,16 +68,18 @@ export function usePeriodReview<T extends PeriodReview>(options: PeriodReviewOpt
   const reviewHasContext = computed(() => options.hasContext(review));
   const currentPeriodStart = () => (options.period === 'week' ? startOfWeek(todayKey()) : startOfMonth(todayKey()));
   const availabilityLeadDays = options.period === 'week' ? 1 : 2;
+  const reviewOpensOn = computed(() => addDays(options.end.value, -availabilityLeadDays));
   const reviewAvailable = computed(
     () =>
       hasSavedReview.value ||
       options.end.value < todayKey() ||
-      (options.start.value === currentPeriodStart() && todayKey() >= addDays(options.end.value, -availabilityLeadDays)),
+      (options.start.value === currentPeriodStart() && todayKey() >= reviewOpensOn.value),
   );
+  const reviewHint = computed(() => (reviewAvailable.value ? undefined : `Обзор можно заполнить с ${formatDate(reviewOpensOn.value)}`));
 
   const drafts = useEditorDraft({
     reset: loadReview,
-    key: computed(() => `${options.period}:${options.start.value}`),
+    key: computed(() => editorDraftKey(`${options.period}:${options.start.value}`)),
     value: () => JSON.stringify(review),
     baseline: () => JSON.stringify(sourceBaseline),
     dirty,
@@ -167,7 +170,7 @@ export function usePeriodReview<T extends PeriodReview>(options: PeriodReviewOpt
     const prepared = plainCopy(review);
     const recordSave = captureReviewSave(prepared, savedReview.value);
     try {
-      await options.persistReview(prepared, sourceBaseline, `${options.period}:${savingStart}`);
+      await options.persistReview(prepared, sourceBaseline, editorDraftKey(`${options.period}:${savingStart}`));
       drafts.saved(JSON.stringify(prepared));
       if (options.start.value === savingStart) {
         sourceBaseline = savedReview.value ? plainCopy(savedReview.value) : prepared;
@@ -261,6 +264,7 @@ export function usePeriodReview<T extends PeriodReview>(options: PeriodReviewOpt
     promptCopying,
     review,
     reviewAvailable,
+    reviewHint,
     reviewContextOpen,
     reviewHasContext,
     reviewSaving,

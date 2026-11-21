@@ -21,7 +21,7 @@ watch(
 );
 </script>
 <template>
-  <SurfaceCard v-if="notes.length" kind="dashboard" class="month-daily-notes">
+  <SurfaceCard v-if="notes.length" id="month-daily-notes" kind="dashboard" class="month-daily-notes" tabindex="-1">
     <SectionHeading
       ><div>
         <h2>Что хочется запомнить</h2>
@@ -41,6 +41,9 @@ watch(
   </SurfaceCard>
 </template>
 <style scoped>
+.month-daily-notes {
+  scroll-margin-top: 88px;
+}
 .month-daily-notes__entry {
   padding-block: 12px;
   border-top: 1px solid var(--period-record-border);

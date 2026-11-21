@@ -95,6 +95,7 @@ function resultKey(result: ResultRecord) {
     :open-composer="editor.createRequested || dirty || editor.draftOptions.value.length > 0"
     :empty-archive="recentResults.length === 0"
     :count="filteredResults.length"
+    :active-filters="Number(filterArea !== 'all') + Number(Boolean(dateFrom || dateTo))"
     :has-items="visibleResults.length > 0"
     empty-icon="result"
     :empty-title="recentResults.length ? 'Ничего не найдено' : 'Итогов пока нет'"
@@ -137,7 +138,9 @@ function resultKey(result: ResultRecord) {
           </div>
         </details>
         <DateInput v-model="date" class="journal-date" required aria-label="Дата итога" :disabled="saving" />
+        <label class="journal-note-label" for="result-note">Что получилось</label>
         <AutoGrowTextarea
+          id="result-note"
           v-model="note"
           :rows="4"
           :max-length="2000"
@@ -159,11 +162,13 @@ function resultKey(result: ResultRecord) {
         </ActionButton>
       </div>
     </template>
-    <template #filters>
+    <template #search>
       <label class="archive-filter-field">
         <span class="archive-filter-field__label">Поиск</span>
         <input v-model="filterText" type="search" placeholder="Поиск по итогам" aria-label="Поиск по итогам" />
       </label>
+    </template>
+    <template #filters>
       <label class="archive-filter-field">
         <span class="archive-filter-field__label">Область</span>
         <select v-model="filterArea" aria-label="Область итога">

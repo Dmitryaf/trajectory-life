@@ -58,6 +58,17 @@ export default defineConfig({
         navigateFallback: '/index.html',
         navigateFallbackDenylist: [/^\/api(?:\/|$)/, /^\/assets(?:\/|$)/],
         globPatterns: ['**/*.{js,css,html,svg,png,webp,woff2}'],
+        globIgnores: ['**/analytics-charts-*.js'],
+        runtimeCaching: [
+          {
+            urlPattern: /\/assets\/analytics-charts-[\w-]+\.js$/,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'trajectory-analytics',
+              expiration: { maxEntries: 2 },
+            },
+          },
+        ],
       },
     }),
   ],
