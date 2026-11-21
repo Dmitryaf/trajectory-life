@@ -25,7 +25,7 @@ import FormFieldLabel from '../shared/ui/forms/FormFieldLabel.vue';
 import PeriodNavigator from '../shared/ui/navigation/PeriodNavigator.vue';
 import Badge from '../shared/ui/data-display/CountBadge.vue';
 import PageShell from '../shared/ui/layout/PageShell.vue';
-import PeriodEmptyGuide from '../shared/ui/content/PeriodEmptyGuide.vue';
+import ReviewEmptyPeriod from '@/features/reviews/ui/ReviewEmptyPeriod.vue';
 import EyebrowText from '../shared/ui/typography/EyebrowText.vue';
 import {
   actionDirectionLabel,
@@ -134,6 +134,7 @@ const {
   promptCopying,
   review,
   reviewAvailable,
+  reviewHint,
   reviewContextOpen,
   reviewHasContext,
   actions,
@@ -146,7 +147,7 @@ const {
   end,
   emptyReview: emptyWeeklyReview,
   findReview: (weekStart) => store.reviewByWeek(weekStart),
-  persistReview: (draft, expected) => store.saveReview(draft, expected),
+  persistReview: (draft, expected, key) => store.saveReview(draft, expected, key),
   hasContext: (draft) =>
     draft.results.some((value) => value.trim()) ||
     draft.highlights.some((value) => value.trim()) ||
@@ -223,13 +224,13 @@ watch(
     <ReviewHeading
       title="Неделя"
       summary="Вспомните события недели и посмотрите свои записи."
-      :action="hasPeriodData ? (reviewAvailable ? 'К обзору' : 'Обзор позже') : undefined"
-      href="#week-review"
+      :href="reviewAvailable ? '#week-review' : undefined"
       period="week"
     />
     <PeriodNavigator
       :title="`${formatDate(start, { day: 'numeric', month: 'short' })} — ${formatDate(end, { day: 'numeric', month: 'short' })}`"
       :subtitle="navigatorSubtitle"
+      :hint="reviewHint"
       v-on="navigation"
     />
 
@@ -252,14 +253,10 @@ watch(
       </ActionButton>
     </ReviewNotice>
 
-    <PeriodEmptyGuide v-if="!hasPeriodData">
-      <strong>За эту неделю пока нет записей</strong>
-      <p>Заполняйте на главной несколько важных пунктов. Здесь они соберутся по дням и помогут сравнить сон, состояние и действия.</p>
-      <ActionButton :as="Link" variant="secondary" to="/today">Перейти к записи за день</ActionButton>
-    </PeriodEmptyGuide>
+    <ReviewEmptyPeriod v-if="!hasPeriodData" period="week" :available="reviewAvailable" />
 
-    <template v-else>
-      <ReviewNotice v-if="!hasDailyData" tag="section" class="period-data-guide">
+    <template v-if="hasPeriodData || reviewAvailable">
+      <ReviewNotice v-if="hasPeriodData && !hasDailyData" tag="section" class="period-data-guide">
         <strong>{{ experimentCards.length ? 'Есть только отметки эксперимента' : 'За эту неделю нет дневных записей' }}</strong>
         <p>
           {{ experimentCards.length ? 'Отметки эксперимента показаны ниже.' : 'Итоги, события и сохранённый обзор показаны ниже.' }} Данных

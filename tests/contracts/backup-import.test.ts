@@ -18,6 +18,20 @@ afterAll(async () => {
 });
 
 describe('backup import', () => {
+  it('keeps a newer day and its draft when an editor saves against a stale version', async () => {
+    const store = useAppStore();
+    const initial = await store.saveEntry({ ...emptyDailyEntry('2026-07-21'), importantFact: 'Исходный текст' });
+    const next = await store.saveEntry({ ...initial, importantFact: 'Версия из другой вкладки' }, initial.updatedAt);
+    await store.saveDailyEntryDraft({ ...initial, importantFact: 'Мой текст' });
+
+    await expect(store.saveEntry({ ...initial, importantFact: 'Мой текст' }, initial.updatedAt)).rejects.toMatchObject({
+      name: 'DailyEntryChangedError',
+      current: next,
+    });
+    expect(await db.dailyEntries.get(initial.date)).toEqual(next);
+    expect((await db.dailyEntryDrafts.get(initial.date))?.entry.importantFact).toBe('Мой текст');
+  });
+
   it('keeps a daily draft local, restores it on load, and removes it when the day is saved', async () => {
     const store = useAppStore();
     const draftEntry = {

@@ -29,6 +29,7 @@ describe('journal scenarios', () => {
     expect(wrapper.get('.archive-add').attributes('open')).toBeDefined();
     expect(document.activeElement).toBe(title.element);
     await title.setValue('Несохранённое изменение');
+    vi.mocked(window.confirm).mockReturnValueOnce(true);
     await wrapper.get('.composer-cancel').trigger('click');
     await flushPromises();
     expect(wrapper.get('.archive-add').attributes('open')).toBeUndefined();
@@ -142,12 +143,15 @@ describe('journal scenarios', () => {
     await wrapper.get('.result-composer .primary-button').trigger('click');
     await flushPromises();
 
-    expect(addResult).toHaveBeenCalledWith({
-      date: '2026-07-21',
-      area: 'career',
-      title: 'Закончил курс',
-      note: 'Собрал финальный проект и получил обратную связь',
-    });
+    expect(addResult).toHaveBeenCalledWith(
+      {
+        date: '2026-07-21',
+        area: 'career',
+        title: 'Закончил курс',
+        note: 'Собрал финальный проект и получил обратную связь',
+      },
+      'result:new',
+    );
   });
 
   it('does not send an outcome or event without a date to the store', async () => {
@@ -236,11 +240,14 @@ describe('journal scenarios', () => {
     await wrapper.get('.result-composer .primary-button').trigger('click');
     await flushPromises();
 
-    expect(addLifeEvent).toHaveBeenCalledWith({
-      date: '2026-07-21',
-      type: 'insight',
-      title: 'Понял причину усталости',
-      note: longNote,
-    });
+    expect(addLifeEvent).toHaveBeenCalledWith(
+      {
+        date: '2026-07-21',
+        type: 'insight',
+        title: 'Понял причину усталости',
+        note: longNote,
+      },
+      'event:new',
+    );
   });
 });

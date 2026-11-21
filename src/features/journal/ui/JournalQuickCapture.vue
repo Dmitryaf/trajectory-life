@@ -5,10 +5,10 @@ import UiIcon from '@/shared/ui/icons/UiIcon.vue';
 
 <template>
   <nav class="quick-capture" aria-label="Быстрые записи">
-    <RouterLink to="/results"
+    <RouterLink to="/results?create=1"
       ><span><UiIcon name="result" /></span><strong>Записать итог</strong></RouterLink
     >
-    <RouterLink to="/events" aria-label="Записать мысль или событие"
+    <RouterLink to="/events?create=1" aria-label="Записать мысль или событие"
       ><span><UiIcon name="event" /></span><strong>Мысль или событие</strong></RouterLink
     >
   </nav>

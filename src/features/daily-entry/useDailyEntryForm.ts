@@ -1,5 +1,6 @@
 import { computed, getCurrentInstance, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
-import { onBeforeRouteLeave } from 'vue-router';
+import { onBeforeRouteLeave, onBeforeRouteUpdate, type Router } from 'vue-router';
+import { validDate } from '@/model/normalization';
 import { formatDate, todayKey } from '@/services/dates';
 import { notifyError, notifySaved, notifyUnknownError } from '@/services/notifications';
 import { plainCopy } from '@/services/plain';
@@ -7,6 +8,7 @@ import { emptyDailyEntry, experimentAppliesToDate, type DailyBlockId, type Daily
 import type { useAppStore } from '@/stores/app';
 import {
   prepareDailyEntryForSave,
+  DailyEntryChangedError,
   normalizeWeight,
   snapshotDailyEntry,
   timeBetween,
@@ -20,7 +22,13 @@ import { captureDailySave } from './telemetry';
 type AppStore = ReturnType<typeof useAppStore>;
 
 export function useDailyEntryForm(store: AppStore) {
-  const selectedDate = ref(todayKey());
+  const router = getCurrentInstance()?.appContext.config.globalProperties.$router as Router | undefined;
+  const localToday = ref(todayKey());
+  function dateFromQuery(value: unknown) {
+    const date = validDate(value);
+    return date && date <= localToday.value ? date : localToday.value;
+  }
+  const selectedDate = ref(dateFromQuery(new URLSearchParams(window.location.search).get('date')));
   const sleepDurationMinutes = ref<number | null>(null);
   const timeInBedDurationMinutes = ref<number | null>(null);
   const weightKg = ref('');
@@ -39,6 +47,9 @@ export function useDailyEntryForm(store: AppStore) {
   let savedTimer: number | undefined;
   let draftTimer: number | undefined;
   let draftSavePromise: Promise<boolean> | null = null;
+  let saveOperation: Promise<void> | undefined;
+  let midnightTimer: number | undefined;
+  let expectedVersion: string | null = null;
 
   const activeDailyBlocks = computed(() => new Set(store.settings.activeDailyBlocks));
   const hasSavedEntry = computed(() => Boolean(store.entryByDate(selectedDate.value)));
@@ -115,12 +126,14 @@ export function useDailyEntryForm(store: AppStore) {
     conflictingSavedEntry.value = null;
     draftStatus.value = 'idle';
     persistedDraftSnapshot.value = '';
-    const savedEntry = store.entryByDate(date) ?? emptyDailyEntry(date);
+    const existing = store.entryByDate(date);
+    expectedVersion = existing?.updatedAt ?? null;
+    const savedEntry = existing ?? { ...emptyDailyEntry(date), updatedAt: '' };
     applyEntry(savedEntry);
     originalEntrySnapshot.value = snapshotDailyEntry(form, currentMetrics());
     const draft = store.draftByDate(date);
     if (draft) {
-      const savedEntryChanged = hasSavedEntry.value && draft.entry.updatedAt !== savedEntry.updatedAt;
+      const savedEntryChanged = Boolean(existing) && draft.entry.updatedAt !== savedEntry.updatedAt;
       applyEntry(draft.entry);
       const draftSnapshot = snapshotDailyEntry(form, currentMetrics());
       if (draftSnapshot !== originalEntrySnapshot.value) {
@@ -149,22 +162,41 @@ export function useDailyEntryForm(store: AppStore) {
     return window.confirm('Черновик ещё не сохранён на устройстве. Отбросить изменения и продолжить?');
   }
 
-  function changeSelectedDate(date: string): boolean {
-    if (!date || date === selectedDate.value) {
-      return true;
-    }
-    if (!confirmDiscardChanges()) {
+  async function changeSelectedDate(date: string) {
+    if (validDate(date) !== date || date > localToday.value) {
       return false;
     }
-    selectedDate.value = date;
-    return true;
+    if (router) {
+      const route = router.currentRoute.value;
+      await router.replace({ path: route.path, query: { ...route.query, date }, hash: route.hash });
+    } else if (confirmDiscardChanges()) {
+      selectedDate.value = date;
+    }
+    return selectedDate.value === date;
   }
 
-  function selectDate(event: Event) {
+  async function selectDate(event: Event) {
     const input = event.currentTarget as HTMLInputElement;
-    if (!changeSelectedDate(input.value)) {
+    if (!(await changeSelectedDate(input.value))) {
       input.value = selectedDate.value;
     }
+  }
+
+  function refreshLocalDate() {
+    window.clearTimeout(midnightTimer);
+    const day = todayKey();
+    if (day !== localToday.value) {
+      const followsToday = selectedDate.value === localToday.value && !router?.currentRoute.value.query.date;
+      localToday.value = day;
+      if (followsToday && !isDirty.value && !saving.value) {
+        selectedDate.value = day;
+      } else if (followsToday && router) {
+        void changeSelectedDate(selectedDate.value);
+      }
+    }
+    const midnight = new Date();
+    midnight.setHours(24, 0, 0, 0);
+    midnightTimer = window.setTimeout(refreshLocalDate, Math.max(1, midnight.getTime() - Date.now()));
   }
 
   function handleBeforeUnload(event: BeforeUnloadEvent) {
@@ -231,10 +263,14 @@ export function useDailyEntryForm(store: AppStore) {
     }
   }
 
-  async function save() {
-    if (saving.value) {
-      return;
-    }
+  function save() {
+    saveOperation ??= saveCurrentEntry().finally(() => {
+      saveOperation = undefined;
+    });
+    return saveOperation;
+  }
+
+  async function saveCurrentEntry() {
     if (draftConflict.value) {
       notifyError('Сначала выберите, какую версию записи оставить.');
       return;
@@ -258,7 +294,9 @@ export function useDailyEntryForm(store: AppStore) {
       },
       !hasSavedEntry.value,
     );
-    const wasExistingEntry = hasSavedEntry.value;
+    const submittedDraft = currentDraftEntry();
+    const submittedSnapshot = currentEntrySnapshot.value;
+    const wasExistingEntry = expectedVersion !== null;
     const recordSave = captureDailySave(entry, store.dailyEntries, wasExistingEntry);
     saving.value = true;
     try {
@@ -269,14 +307,32 @@ export function useDailyEntryForm(store: AppStore) {
         window.clearTimeout(draftTimer);
         draftTimer = undefined;
       }
-      const savedEntry = await store.saveEntry(entry);
+      const savedEntry = await store.saveEntry(entry, expectedVersion);
       recordSave();
-      applyEntry(savedEntry);
-      originalEntrySnapshot.value = snapshotDailyEntry(form, currentMetrics());
+      const changedWhileSaving = currentEntrySnapshot.value !== submittedSnapshot;
+      const currentWeight = weightKg.value;
+      const currentDraft = currentDraftEntry();
+      const nextEntry = plainCopy(savedEntry);
+      if (changedWhileSaving) {
+        for (const key of Object.keys(currentDraft) as Array<keyof DailyEntry>) {
+          if (JSON.stringify(currentDraft[key]) !== JSON.stringify(submittedDraft[key])) {
+            Object.assign(nextEntry, { [key]: currentDraft[key] });
+          }
+        }
+      }
+      applyEntry(nextEntry);
+      if (changedWhileSaving && normalizeWeight(currentWeight) === null && currentWeight.trim()) {
+        weightKg.value = currentWeight;
+      }
+      expectedVersion = savedEntry.updatedAt;
+      originalEntrySnapshot.value = snapshotDailyEntry(savedEntry, savedEntry);
       persistedDraftSnapshot.value = '';
       draftStatus.value = 'idle';
       restoredDraft.value = false;
-      saved.value = true;
+      saved.value = !isDirty.value;
+      if (isDirty.value) {
+        await persistDraft();
+      }
       const localSaveMessage = wasExistingEntry
         ? `Запись за ${formatDate(selectedDate.value, { day: 'numeric', month: 'long' })} обновлена на устройстве`
         : 'День сохранён на устройстве';
@@ -286,20 +342,27 @@ export function useDailyEntryForm(store: AppStore) {
       }
       savedTimer = window.setTimeout(() => (saved.value = false), 2200);
     } catch (error) {
-      notifyUnknownError(error, 'Не удалось сохранить день');
+      if (error instanceof DailyEntryChangedError) {
+        conflictingSavedEntry.value = error.current ?? { ...emptyDailyEntry(selectedDate.value), updatedAt: '' };
+        draftConflict.value = true;
+      } else {
+        notifyUnknownError(error, 'Не удалось сохранить день');
+      }
+      await persistDraft();
     } finally {
       saving.value = false;
     }
   }
 
   async function resolveDraftConflict(useDraft: boolean) {
-    if (!draftConflict.value) {
+    const source = conflictingSavedEntry.value;
+    if (!draftConflict.value || !source) {
       return;
     }
-    if (!useDraft && conflictingSavedEntry.value) {
+    if (!useDraft) {
       try {
         await store.removeDailyEntryDraft(selectedDate.value);
-        applyEntry(conflictingSavedEntry.value);
+        applyEntry(source);
         originalEntrySnapshot.value = snapshotDailyEntry(form, currentMetrics());
         persistedDraftSnapshot.value = '';
         draftStatus.value = 'idle';
@@ -308,7 +371,11 @@ export function useDailyEntryForm(store: AppStore) {
         notifyUnknownError(error, 'Не удалось удалить локальный черновик');
         return;
       }
+    } else {
+      form.updatedAt = source.updatedAt;
+      void persistDraft();
     }
+    expectedVersion = source.updatedAt || null;
     draftConflict.value = false;
     conflictingSavedEntry.value = null;
   }
@@ -357,8 +424,29 @@ export function useDailyEntryForm(store: AppStore) {
     { flush: 'sync' },
   );
 
-  if (getCurrentInstance()?.appContext.config.globalProperties.$router) {
+  if (router) {
+    onBeforeRouteUpdate(async (to) => {
+      await saveOperation;
+      const date = dateFromQuery(to.query.date);
+      if (date === selectedDate.value) {
+        return true;
+      }
+      if (!(await persistDraft()) && !confirmDiscardChanges()) {
+        return false;
+      }
+      return true;
+    });
+    watch(
+      router.currentRoute,
+      (route) => {
+        if (route.path === '/today') {
+          selectedDate.value = dateFromQuery(route.query.date);
+        }
+      },
+      { flush: 'sync' },
+    );
     onBeforeRouteLeave(async () => {
+      await saveOperation;
       if (!isDirty.value || persistedDraftSnapshot.value === currentEntrySnapshot.value) {
         return true;
       }
@@ -366,10 +454,16 @@ export function useDailyEntryForm(store: AppStore) {
     });
   }
   onMounted(() => {
+    refreshLocalDate();
+    window.addEventListener('focus', refreshLocalDate);
+    document.addEventListener('visibilitychange', refreshLocalDate);
     window.addEventListener('beforeunload', handleBeforeUnload);
     window.addEventListener('trajectory:cloud-snapshot-applied', handleCloudSnapshotApplied);
   });
   onBeforeUnmount(() => {
+    window.clearTimeout(midnightTimer);
+    window.removeEventListener('focus', refreshLocalDate);
+    document.removeEventListener('visibilitychange', refreshLocalDate);
     setSyncEditorDirty('daily-entry', false);
     window.removeEventListener('beforeunload', handleBeforeUnload);
     window.removeEventListener('trajectory:cloud-snapshot-applied', handleCloudSnapshotApplied);
@@ -383,6 +477,8 @@ export function useDailyEntryForm(store: AppStore) {
 
   return {
     selectedDate,
+    localToday,
+    isToday: computed(() => selectedDate.value === localToday.value),
     sleepDurationMinutes,
     timeInBedDurationMinutes,
     weightKg,

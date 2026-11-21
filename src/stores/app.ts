@@ -1,4 +1,8 @@
 import { defineStore } from 'pinia';
+import type { Table } from 'dexie';
+import { editorDraftKey, logicalEditorDraftKey, type EditorDraft } from '../model/editorDraft';
+import { assertJournalVersion } from '../features/journal/version';
+import { DailyEntryChangedError } from '../features/daily-entry/model';
 import { db } from '../db';
 import {
   CloudRevisionConflictError,
@@ -113,6 +117,19 @@ async function saveSnapshotWithConflictResolution(
   throw new Error('Не удалось сохранить облачную копию после повторных попыток');
 }
 
+async function writeWithDraft<T>(scope: CloudOperationScope, table: Table, write: () => Promise<T>, key?: string): Promise<T> {
+  return runStorageWrite(() =>
+    db.transaction('rw', [table, db.editorDrafts], async () => {
+      const result = await write();
+      if (key) {
+        await db.editorDrafts.delete(key);
+      }
+      scope.assertCurrent();
+      return result;
+    }),
+  );
+}
+
 export const useAppStore = defineStore('app', {
   state: () => ({
     loaded: false,
@@ -129,6 +146,8 @@ export const useAppStore = defineStore('app', {
     storagePersistenceRevision: 0,
     dailyEntries: [] as DailyEntry[],
     dailyEntryDrafts: [] as DailyEntryDraft[],
+    editorDrafts: [] as EditorDraft[],
+    editorDraftGeneration: 0,
     results: [] as ResultRecord[],
     lifeEvents: [] as LifeEventRecord[],
     weeklyReviews: [] as WeeklyReview[],
@@ -136,6 +155,7 @@ export const useAppStore = defineStore('app', {
     settings: structuredClone(defaultSettings) as AppSettings,
   }),
   getters: {
+    editorDraftByKey: (state) => (key: string) => state.editorDrafts.find((draft) => draft.key === key),
     entryByDate: (state) => (date: string) => state.dailyEntries.find((entry) => entry.date === date),
     draftByDate: (state) => (date: string) => state.dailyEntryDrafts.find((draft) => draft.date === date),
     reviewByWeek: (state) => (weekStart: string) => state.weeklyReviews.find((review) => review.weekStart === weekStart),
@@ -161,47 +181,63 @@ export const useAppStore = defineStore('app', {
     async loadLocalData(scope: CloudOperationScope) {
       this.loadError = '';
       try {
-        const [dailyEntries, dailyEntryDrafts, results, lifeEvents, weeklyReviews, monthlyReviews, settings] = await Promise.all([
-          db.dailyEntries.toArray(),
-          db.dailyEntryDrafts.toArray(),
+        const [results, lifeEvents, weeklyReviews, monthlyReviews] = await Promise.all([
           db.results.toArray(),
           db.lifeEvents.toArray(),
           db.weeklyReviews.toArray(),
           db.monthlyReviews.toArray(),
-          db.settings.get('main'),
         ]);
-        scope.assertCurrent();
-        const activeSettings = normalizeSettings(settings);
-        const normalizedEntries = dailyEntries.map((entry) => normalizeDailyEntry(entry));
-        const linkedEntries = linkLegacyExperimentEntries(normalizedEntries, activeSettings);
-        const normalizedDrafts = dailyEntryDrafts.map((draft) => ({
-          ...draft,
-          entry: normalizeDailyEntry(draft.entry),
-        }));
-        const linkedDrafts = normalizedDrafts.map((draft) => {
-          const linkedEntry = linkLegacyExperimentEntries([draft.entry], activeSettings)[0]!;
-          return {
-            ...draft,
-            entry: experimentEntryLinkError([linkedEntry], activeSettings) ? { ...linkedEntry, experimentId: null } : linkedEntry,
-          };
-        });
-        this.dailyEntries = linkedEntries;
-        this.dailyEntryDrafts = linkedDrafts;
-        this.results = results.map((result) => normalizeResult(result)).sort((a, b) => b.date.localeCompare(a.date));
-        this.lifeEvents = lifeEvents.map((event) => normalizeLifeEvent(event)).sort((a, b) => b.date.localeCompare(a.date));
-        this.weeklyReviews = weeklyReviews.map((review) => normalizeWeeklyReview(review));
-        this.monthlyReviews = monthlyReviews.map((review) => normalizeMonthlyReview(review));
-        this.settings = activeSettings;
-        await runStorageWrite(() =>
-          db.transaction('rw', [db.dailyEntries, db.dailyEntryDrafts, db.settings], async () => {
+        const { linkedEntries, linkedDrafts, activeSettings, editorDrafts } = await runStorageWrite(() =>
+          db.transaction('rw', [db.dailyEntries, db.dailyEntryDrafts, db.settings, db.editorDrafts], async () => {
+            scope.assertCurrent();
+            const [dailyEntries, dailyEntryDrafts, settings, draftRows] = await Promise.all([
+              db.dailyEntries.toArray(),
+              db.dailyEntryDrafts.toArray(),
+              db.settings.get('main'),
+              db.editorDrafts.toArray(),
+            ]);
+            const activeSettings = normalizeSettings(settings);
+            const linkedEntries = linkLegacyExperimentEntries(dailyEntries.map(normalizeDailyEntry), activeSettings);
+            const linkedDrafts = dailyEntryDrafts.map((draft) => {
+              const [entry] = linkLegacyExperimentEntries([normalizeDailyEntry(draft.entry)], activeSettings);
+              const linkedEntry = entry!;
+              return {
+                ...draft,
+                entry: experimentEntryLinkError([linkedEntry], activeSettings) ? { ...linkedEntry, experimentId: null } : linkedEntry,
+              };
+            });
+            const keys = new Set(draftRows.map((draft) => draft.key));
+            const editorDrafts = [];
+            for (const draft of draftRows) {
+              const logicalKey = logicalEditorDraftKey(draft.key);
+              const scopedKey = editorDraftKey(logicalKey);
+              if (draft.key === logicalKey && scopedKey !== logicalKey && !keys.has(scopedKey)) {
+                const scopedDraft = { ...draft, key: scopedKey };
+                await db.editorDrafts.add(scopedDraft);
+                await db.editorDrafts.delete(draft.key);
+                editorDrafts.push(scopedDraft);
+              } else {
+                editorDrafts.push(draft);
+              }
+            }
             await Promise.all([
               linkedEntries.length ? db.dailyEntries.bulkPut(plainCopy(linkedEntries)) : Promise.resolve(),
               linkedDrafts.length ? db.dailyEntryDrafts.bulkPut(plainCopy(linkedDrafts)) : Promise.resolve(),
               db.settings.put(plainCopy(activeSettings)),
             ]);
+            scope.assertCurrent();
+            return { linkedEntries, linkedDrafts, activeSettings, editorDrafts };
           }),
         );
         scope.assertCurrent();
+        this.dailyEntries = linkedEntries;
+        this.dailyEntryDrafts = linkedDrafts;
+        this.editorDrafts = editorDrafts;
+        this.results = results.map((result) => normalizeResult(result)).sort((a, b) => b.date.localeCompare(a.date));
+        this.lifeEvents = lifeEvents.map((event) => normalizeLifeEvent(event)).sort((a, b) => b.date.localeCompare(a.date));
+        this.weeklyReviews = weeklyReviews.map((review) => normalizeWeeklyReview(review));
+        this.monthlyReviews = monthlyReviews.map((review) => normalizeMonthlyReview(review));
+        this.settings = activeSettings;
         void this.checkLocalStoragePersistence();
       } catch (error) {
         scope.assertCurrent();
@@ -212,21 +248,29 @@ export const useAppStore = defineStore('app', {
         this.loaded = true;
       }
     },
-    async saveEntry(entry: DailyEntry): Promise<DailyEntry> {
+    async saveEntry(entry: DailyEntry, expectedVersion?: string | null): Promise<DailyEntry> {
       const scope = this.createCloudOperationScope();
       return serializeLocalData(this, scope.assertCurrent, async () => {
         if (!validDate(entry.date)) {
           throw new Error('Укажите корректную дату записи');
         }
-        const saved = plainCopy(normalizeDailyEntry({ ...entry, updatedAt: new Date().toISOString() }));
-        const entryLinkError = experimentEntryLinkError([saved], this.settings);
-        if (entryLinkError) {
-          throw new Error(entryLinkError);
-        }
-        await runStorageWrite(() =>
+        const saved = await runStorageWrite(() =>
           db.transaction('rw', [db.dailyEntries, db.dailyEntryDrafts], async () => {
+            const current = await db.dailyEntries.get(entry.date);
+            if (expectedVersion !== undefined && (current?.updatedAt ?? null) !== expectedVersion) {
+              throw new DailyEntryChangedError(current ? normalizeDailyEntry(current) : null);
+            }
+            const currentTime = Date.parse(current?.updatedAt ?? '');
+            const updatedAt = new Date(Math.max(Date.now(), Number.isFinite(currentTime) ? currentTime + 1 : 0)).toISOString();
+            const saved = plainCopy(normalizeDailyEntry({ ...entry, updatedAt }));
+            const entryLinkError = experimentEntryLinkError([saved], this.settings);
+            if (entryLinkError) {
+              throw new Error(entryLinkError);
+            }
             await db.dailyEntries.put(saved);
             await db.dailyEntryDrafts.delete(saved.date);
+            scope.assertCurrent();
+            return saved;
           }),
         );
         scope.assertCurrent();
@@ -278,7 +322,46 @@ export const useAppStore = defineStore('app', {
         this.dailyEntryDrafts = this.dailyEntryDrafts.filter((draft) => draft.date !== date);
       });
     },
-    async addResult(result: Omit<ResultRecord, 'id' | 'createdAt'>): Promise<void> {
+    async saveEditorDraft(draft: EditorDraft, generation?: number): Promise<void> {
+      const expectedGeneration = generation ?? this.editorDraftGeneration;
+      const scope = this.createCloudOperationScope();
+      const copy = plainCopy(draft);
+      const assertCurrent = () => {
+        scope.assertCurrent();
+        if (expectedGeneration !== this.editorDraftGeneration) {
+          throw new CloudOperationCancelledError();
+        }
+      };
+      return serializeLocalData(this, assertCurrent, async () => {
+        await runStorageWrite(() =>
+          db.transaction('rw', db.editorDrafts, async () => {
+            await db.editorDrafts.put(copy);
+            assertCurrent();
+          }),
+        );
+        assertCurrent();
+        this.editorDrafts = [...this.editorDrafts.filter((item) => item.key !== copy.key), copy];
+      });
+    },
+    forgetEditorDraft(key?: string) {
+      if (key) {
+        this.editorDrafts = this.editorDrafts.filter((item) => item.key !== key);
+      }
+    },
+    async removeEditorDraft(key: string): Promise<void> {
+      const scope = this.createCloudOperationScope();
+      return serializeLocalData(this, scope.assertCurrent, async () => {
+        await runStorageWrite(() =>
+          db.transaction('rw', db.editorDrafts, async () => {
+            await db.editorDrafts.delete(key);
+            scope.assertCurrent();
+          }),
+        );
+        scope.assertCurrent();
+        this.forgetEditorDraft(key);
+      });
+    },
+    async addResult(result: Omit<ResultRecord, 'id' | 'createdAt'>, draftKey?: string): Promise<void> {
       const scope = this.createCloudOperationScope();
       return serializeLocalData(this, scope.assertCurrent, async () => {
         if (!validDate(result.date)) {
@@ -290,13 +373,15 @@ export const useAppStore = defineStore('app', {
             createdAt: new Date().toISOString(),
           }),
         );
-        const id = await runStorageWrite(() => db.results.add(record));
+        const id = await writeWithDraft(scope, db.results, () => db.results.add(record), draftKey);
+        scope.assertCurrent();
+        this.forgetEditorDraft(draftKey);
         this.results.unshift({ ...record, id });
         void this.requestLocalStoragePersistence();
         void this.syncCloudSnapshot();
       });
     },
-    async updateResult(result: ResultRecord): Promise<void> {
+    async updateResult(result: ResultRecord, expected?: ResultRecord | null, draftKey?: string): Promise<void> {
       const scope = this.createCloudOperationScope();
       return serializeLocalData(this, scope.assertCurrent, async () => {
         if (result.id === undefined) {
@@ -306,11 +391,22 @@ export const useAppStore = defineStore('app', {
           throw new Error('Укажите корректную дату итога');
         }
         const record = plainCopy(normalizeResult(result));
-        await runStorageWrite(() => db.results.put(record));
+        await writeWithDraft(
+          scope,
+          db.results,
+          async () => {
+            assertJournalVersion(await db.results.get(record.id!), expected);
+            return db.results.put(record);
+          },
+          draftKey,
+        );
         scope.assertCurrent();
+        this.forgetEditorDraft(draftKey);
         const index = this.results.findIndex((item) => item.id === record.id);
         if (index >= 0) {
           this.results[index] = record;
+        } else {
+          this.results.push(record);
         }
         this.results.sort((a, b) => b.date.localeCompare(a.date));
         void this.requestLocalStoragePersistence();
@@ -327,7 +423,7 @@ export const useAppStore = defineStore('app', {
         void this.syncCloudSnapshot();
       });
     },
-    async addLifeEvent(event: Omit<LifeEventRecord, 'id' | 'createdAt'>): Promise<void> {
+    async addLifeEvent(event: Omit<LifeEventRecord, 'id' | 'createdAt'>, draftKey?: string): Promise<void> {
       const scope = this.createCloudOperationScope();
       return serializeLocalData(this, scope.assertCurrent, async () => {
         if (!validDate(event.date)) {
@@ -339,14 +435,16 @@ export const useAppStore = defineStore('app', {
             createdAt: new Date().toISOString(),
           }),
         );
-        const id = await runStorageWrite(() => db.lifeEvents.add(record));
+        const id = await writeWithDraft(scope, db.lifeEvents, () => db.lifeEvents.add(record), draftKey);
+        scope.assertCurrent();
+        this.forgetEditorDraft(draftKey);
         this.lifeEvents.unshift({ ...record, id });
         this.lifeEvents.sort((a, b) => b.date.localeCompare(a.date));
         void this.requestLocalStoragePersistence();
         void this.syncCloudSnapshot();
       });
     },
-    async updateLifeEvent(event: LifeEventRecord): Promise<void> {
+    async updateLifeEvent(event: LifeEventRecord, expected?: LifeEventRecord | null, draftKey?: string): Promise<void> {
       const scope = this.createCloudOperationScope();
       return serializeLocalData(this, scope.assertCurrent, async () => {
         if (event.id === undefined) {
@@ -356,11 +454,22 @@ export const useAppStore = defineStore('app', {
           throw new Error('Укажите корректную дату события');
         }
         const record = plainCopy(normalizeLifeEvent(event));
-        await runStorageWrite(() => db.lifeEvents.put(record));
+        await writeWithDraft(
+          scope,
+          db.lifeEvents,
+          async () => {
+            assertJournalVersion(await db.lifeEvents.get(record.id!), expected);
+            return db.lifeEvents.put(record);
+          },
+          draftKey,
+        );
         scope.assertCurrent();
+        this.forgetEditorDraft(draftKey);
         const index = this.lifeEvents.findIndex((item) => item.id === record.id);
         if (index >= 0) {
           this.lifeEvents[index] = record;
+        } else {
+          this.lifeEvents.push(record);
         }
         this.lifeEvents.sort((a, b) => b.date.localeCompare(a.date) || b.createdAt.localeCompare(a.createdAt));
         void this.requestLocalStoragePersistence();
@@ -377,10 +486,9 @@ export const useAppStore = defineStore('app', {
         void this.syncCloudSnapshot();
       });
     },
-    async saveReview(review: WeeklyReview, expected?: WeeklyReview | null): Promise<void> {
+    async saveReview(review: WeeklyReview, expected?: WeeklyReview | null, draftKey?: string): Promise<void> {
       const scope = this.createCloudOperationScope();
       return serializeLocalData(this, scope.assertCurrent, async () => {
-        assertReviewVersion(this.reviewByWeek(review.weekStart), expected);
         if (!validDate(review.weekStart) || startOfWeek(review.weekStart) !== review.weekStart) {
           throw new Error('Начало недельного обзора должно быть понедельником');
         }
@@ -390,8 +498,17 @@ export const useAppStore = defineStore('app', {
             updatedAt: new Date().toISOString(),
           }),
         );
-        await runStorageWrite(() => db.weeklyReviews.put(plainReview));
+        await writeWithDraft(
+          scope,
+          db.weeklyReviews,
+          async () => {
+            assertReviewVersion(await db.weeklyReviews.get(review.weekStart), expected);
+            return db.weeklyReviews.put(plainReview);
+          },
+          draftKey,
+        );
         scope.assertCurrent();
+        this.forgetEditorDraft(draftKey);
         const index = this.weeklyReviews.findIndex((item) => item.weekStart === review.weekStart);
         if (index >= 0) {
           this.weeklyReviews[index] = plainReview;
@@ -402,10 +519,9 @@ export const useAppStore = defineStore('app', {
         void this.syncCloudSnapshot();
       });
     },
-    async saveMonthlyReview(review: MonthlyReview, expected?: MonthlyReview | null): Promise<void> {
+    async saveMonthlyReview(review: MonthlyReview, expected?: MonthlyReview | null, draftKey?: string): Promise<void> {
       const scope = this.createCloudOperationScope();
       return serializeLocalData(this, scope.assertCurrent, async () => {
-        assertReviewVersion(this.reviewByMonth(review.monthStart), expected);
         if (!validDate(review.monthStart) || startOfMonth(review.monthStart) !== review.monthStart) {
           throw new Error('Начало месячного обзора должно быть первым днём месяца');
         }
@@ -415,8 +531,17 @@ export const useAppStore = defineStore('app', {
             updatedAt: new Date().toISOString(),
           }),
         );
-        await runStorageWrite(() => db.monthlyReviews.put(plainReview));
+        await writeWithDraft(
+          scope,
+          db.monthlyReviews,
+          async () => {
+            assertReviewVersion(await db.monthlyReviews.get(review.monthStart), expected);
+            return db.monthlyReviews.put(plainReview);
+          },
+          draftKey,
+        );
         scope.assertCurrent();
+        this.forgetEditorDraft(draftKey);
         const index = this.monthlyReviews.findIndex((item) => item.monthStart === review.monthStart);
         if (index >= 0) {
           this.monthlyReviews[index] = plainReview;
@@ -487,11 +612,21 @@ export const useAppStore = defineStore('app', {
       await runStorageWrite(() =>
         db.transaction(
           'rw',
-          [db.dailyEntries, db.dailyEntryDrafts, db.results, db.lifeEvents, db.weeklyReviews, db.monthlyReviews, db.settings],
+          [
+            db.dailyEntries,
+            db.dailyEntryDrafts,
+            db.editorDrafts,
+            db.results,
+            db.lifeEvents,
+            db.weeklyReviews,
+            db.monthlyReviews,
+            db.settings,
+          ],
           async () => {
             await Promise.all([
               db.dailyEntries.clear(),
               options.preserveDailyDrafts ? Promise.resolve() : db.dailyEntryDrafts.clear(),
+              options.preserveDailyDrafts ? Promise.resolve() : db.editorDrafts.clear(),
               db.results.clear(),
               db.lifeEvents.clear(),
               db.weeklyReviews.clear(),
@@ -509,6 +644,9 @@ export const useAppStore = defineStore('app', {
         ),
       );
       scope.assertCurrent();
+      if (!options.preserveDailyDrafts) {
+        this.editorDraftGeneration += 1;
+      }
       await this.loadLocalData(scope);
       void this.requestLocalStoragePersistence();
       if (options.syncCloud) {
@@ -524,6 +662,7 @@ export const useAppStore = defineStore('app', {
             [
               db.dailyEntries,
               db.dailyEntryDrafts,
+              db.editorDrafts,
               db.results,
               db.lifeEvents,
               db.weeklyReviews,
@@ -535,6 +674,7 @@ export const useAppStore = defineStore('app', {
               await Promise.all([
                 db.dailyEntries.clear(),
                 db.dailyEntryDrafts.clear(),
+                db.editorDrafts.clear(),
                 db.results.clear(),
                 db.lifeEvents.clear(),
                 db.weeklyReviews.clear(),
@@ -546,9 +686,11 @@ export const useAppStore = defineStore('app', {
           ),
         );
         scope.assertCurrent();
+        this.editorDraftGeneration += 1;
         this.dailyEntries = [];
         scope.assertCurrent();
         this.dailyEntryDrafts = [];
+        this.editorDrafts = [];
         scope.assertCurrent();
         this.results = [];
         scope.assertCurrent();
@@ -727,6 +869,7 @@ export const useAppStore = defineStore('app', {
       this.storagePersistenceRevision = 0;
       this.dailyEntries = [];
       this.dailyEntryDrafts = [];
+      this.editorDrafts = [];
       this.results = [];
       this.lifeEvents = [];
       this.weeklyReviews = [];

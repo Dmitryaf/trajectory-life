@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import UiIcon from '@/shared/ui/icons/UiIcon.vue';
 
-defineProps<{ title: string; subtitle?: string }>();
+defineProps<{ title: string; subtitle?: string; hint?: string }>();
 defineEmits<{ previous: []; next: []; current: [] }>();
 </script>
 
 <template>
-  <div class="period-nav">
+  <div class="period-nav" :class="{ 'period-nav--with-hint': hint }">
     <button class="icon-button" type="button" aria-label="Предыдущий период" @click="$emit('previous')">
       <UiIcon name="arrow-left" />
     </button>
@@ -18,6 +18,7 @@ defineEmits<{ previous: []; next: []; current: [] }>();
       <UiIcon name="arrow-right" />
     </button>
   </div>
+  <p v-if="hint" class="period-nav__hint">{{ hint }}</p>
 </template>
 
 <style scoped>
@@ -65,6 +66,15 @@ defineEmits<{ previous: []; next: []; current: [] }>();
 .period-nav__label strong,
 .period-nav__label span {
   display: block;
+}
+.period-nav.period-nav--with-hint {
+  margin-bottom: 6px;
+}
+.period-nav__hint {
+  margin: 0 0 16px;
+  color: var(--muted);
+  font-size: 13px;
+  text-align: center;
 }
 .period-nav__label strong {
   font-size: 17px;

@@ -16,6 +16,13 @@ function createStore() {
   setActivePinia(pinia);
   const store = useAppStore();
   store.loaded = true;
+  // View scenarios isolate browser storage; persistence is covered by IndexedDB integration tests.
+  vi.spyOn(store, 'saveEditorDraft').mockImplementation(async (draft) => {
+    store.editorDrafts = [...store.editorDrafts.filter((item) => item.key !== draft.key), draft];
+  });
+  vi.spyOn(store, 'removeEditorDraft').mockImplementation(async (key) => {
+    store.forgetEditorDraft(key);
+  });
   store.settings = structuredClone(defaultSettings);
   store.settings.firstUse = {
     status: 'completed',

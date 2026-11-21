@@ -20,6 +20,7 @@ import { subscribeToCloudSnapshot } from '@/services/cloudSync';
 import { configureErrorMonitoring, reportClientError } from '@/services/errorMonitoring';
 import { notifyInfo, notifyUnknownError } from '@/services/notifications';
 import { useAppStore } from '@/stores/app';
+import { initializeEditorDraftTab } from '@/model/editorDraft';
 import { useAuthStore } from '@/stores/auth';
 import { provideReviewReminders } from '@/features/reviews/useReviewReminders';
 import ReviewReminderDot from '@/features/reviews/ui/ReviewReminderDot.vue';
@@ -248,6 +249,7 @@ async function loadAppData() {
     try {
       const userId = auth.requiresAuth ? auth.session?.user.id : null;
       await prepareLocalCacheOwner(store, userId);
+      await initializeEditorDraftTab();
       await store.load();
       if (userId) {
         appDataLoadingText.value = 'Сверяю записи с облаком…';

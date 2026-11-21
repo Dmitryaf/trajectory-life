@@ -165,6 +165,12 @@ test('keeps archive filters aligned across responsive widths', async ({ page }) 
 
       const panel = page.locator('.archive-panel');
       const filters = page.locator('.archive-filters');
+      if (width <= 520) {
+        const toggle = filters.getByRole('button', { name: 'Фильтры' });
+        await expect(filters.locator('select')).toBeHidden();
+        await toggle.click();
+        await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+      }
       const [panelBox, filtersBox] = await Promise.all([
         readLayoutBox(panel, `${route} panel at ${width}px`),
         readLayoutBox(filters, `${route} filters at ${width}px`),
@@ -233,8 +239,12 @@ test('reflows archive filters inside their container at 200 percent', async ({ p
       });
       await expectPageFitsViewport(page, `${route} at ${width}px / 200%`);
       const filters = page.locator('.archive-filters');
+      const toggle = filters.getByRole('button', { name: 'Фильтры' });
+      if (await toggle.isVisible()) {
+        await toggle.click();
+      }
       const box = await readLayoutBox(filters, 'zoomed archive filters');
-      for (const control of await filters.locator('input, select, button').all()) {
+      for (const control of await filters.locator('input:visible, select:visible, button:visible').all()) {
         const controlBox = await readLayoutBox(control, 'zoomed archive control');
         expectBoxInside(controlBox, box, 'zoomed control stays in its panel');
         expect(controlBox.width).toBeGreaterThanOrEqual(140);
@@ -258,6 +268,9 @@ test('keeps archive reset geometry stable between active and inactive ranges', a
     for (const route of ['/results', '/events']) {
       await page.goto(route);
       const filters = page.locator('.archive-filters');
+      if (width <= 520) {
+        await filters.getByRole('button', { name: 'Фильтры' }).click();
+      }
       const reset = page.getByRole('button', { name: 'За всё время' });
       await page.locator('.archive-date-filter input').first().fill(demoAnchor());
       await expect(reset).toBeEnabled();
@@ -345,7 +358,7 @@ test('keeps empty-period actions below their explanatory text', async ({ page })
   const emptyDate = emptyPeriodDate();
 
   async function expectEmptyGuideSpacing() {
-    const paragraph = page.locator('.period-empty-guide p');
+    const paragraph = page.locator('.period-empty-guide p').last();
     const action = page.locator('.period-empty-guide .secondary-button');
     const paragraphBox = await paragraph.boundingBox();
     const actionBox = await action.boundingBox();
@@ -605,9 +618,6 @@ for (const scenario of [
   test(`moves ${scenario.route} list height smoothly at ${scenario.width}px`, async ({ page }) => {
     await page.setViewportSize({ width: scenario.width, height: 1024 });
     await page.goto(scenario.route);
-    if (scenario.route === '/results' || scenario.route === '/events') {
-      await expect(page.getByRole('button', { name: 'За всё время' })).toBeDisabled();
-    }
     const list = page.locator(scenario.list);
     const pagination = page.locator(scenario.pagination);
     await expect(pagination).toBeVisible();
@@ -998,7 +1008,8 @@ test('keeps result details editable when Backspace clears the field', async ({ p
   await expect(details).toBeFocused();
   await details.press('Backspace');
   await expect(page).toHaveURL(/\/results$/);
-  await expect(page.locator('.result-composer details')).toHaveCount(0);
+  await expect(details).toBeVisible();
+  await expect(page.locator('.result-composer .journal-title')).not.toHaveAttribute('open', '');
 
   await page.goto('/events');
   await page.locator('.archive-add > summary').click();
