@@ -11,7 +11,7 @@ const preloadRecoveryKey = 'trajectory:preload-recovery';
 
 window.addEventListener('vite:preloadError', (event) => {
   event.preventDefault();
-  if (hasUnsavedSyncEditors()) {
+  if (!navigator.onLine || hasUnsavedSyncEditors()) {
     return;
   }
   try {

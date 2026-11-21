@@ -93,6 +93,7 @@ function eventKey(event: LifeEventRecord) {
     :open-composer="editor.createRequested || dirty || editor.draftOptions.value.length > 0"
     :empty-archive="recentEvents.length === 0"
     :count="filteredEvents.length"
+    :active-filters="Number(filterType !== 'all') + Number(Boolean(dateFrom || dateTo))"
     :has-items="visibleEvents.length > 0"
     empty-icon="event"
     :empty-title="recentEvents.length ? 'Ничего не найдено' : 'Записей пока нет'"
@@ -135,7 +136,9 @@ function eventKey(event: LifeEventRecord) {
           </div>
         </details>
         <DateInput v-model="date" class="journal-date" required aria-label="Дата события" :disabled="saving" />
+        <label class="journal-note-label" for="event-note">Событие или мысль</label>
         <AutoGrowTextarea
+          id="event-note"
           v-model="note"
           :rows="4"
           :max-length="2000"
@@ -157,11 +160,13 @@ function eventKey(event: LifeEventRecord) {
         </ActionButton>
       </div>
     </template>
-    <template #filters>
+    <template #search>
       <label class="archive-filter-field">
         <span class="archive-filter-field__label">Поиск</span>
         <input v-model="filterText" type="search" placeholder="Поиск по событиям" aria-label="Поиск по событиям" />
       </label>
+    </template>
+    <template #filters>
       <label class="archive-filter-field">
         <span class="archive-filter-field__label">Тип</span>
         <select v-model="filterType" aria-label="Тип события">

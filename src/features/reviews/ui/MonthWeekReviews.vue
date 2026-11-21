@@ -25,7 +25,7 @@ const cards = computed(() =>
 </script>
 
 <template>
-  <SurfaceCard v-if="weeks.length" kind="dashboard" class="month-week-reviews">
+  <SurfaceCard v-if="weeks.length" id="month-week-reviews" kind="dashboard" class="month-week-reviews" tabindex="-1">
     <SectionHeading>
       <div>
         <h2>Что вы заметили за недели</h2>
@@ -73,6 +73,7 @@ const cards = computed(() =>
 
 <style scoped>
 .month-week-reviews {
+  scroll-margin-top: 88px;
   margin-bottom: 16px;
 }
 .month-week-reviews__list {

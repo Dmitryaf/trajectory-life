@@ -34,27 +34,6 @@
 .period-records__content {
   padding-bottom: 16px;
 }
-.month-week-story {
-  display: grid;
-  gap: 10px;
-}
-.month-week-story article {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px 12px;
-  padding: 12px 14px;
-  border: 1px solid var(--month-summary-item-border);
-  border-radius: 14px;
-  background: var(--weekly-rhythm-item-surface);
-}
-.month-week-story strong {
-  min-width: 112px;
-}
-.month-week-story span {
-  color: var(--muted);
-  font-size: 13px;
-}
 .observation-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);

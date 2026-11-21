@@ -9,7 +9,6 @@ const props = defineProps<{
   label?: string;
   title: string;
   summary: string;
-  action?: string;
   href?: string;
   period?: 'week' | 'month';
 }>();
@@ -25,8 +24,8 @@ const headingLabel = computed(() => props.label ?? (props.period ? periodLabels[
       <h1>{{ title }}</h1>
       <p>{{ summary }}</p>
     </div>
-    <a v-if="action && href" class="review-jump" :href="href"
-      >{{ action }} <span><UiIcon name="arrow-down" /></span
+    <a v-if="href" class="review-jump" :href="href"
+      >К обзору <span><UiIcon name="arrow-down" /></span
     ></a>
   </PageHeading>
   <ReviewPeriodNavigation v-if="period" :period="period" />

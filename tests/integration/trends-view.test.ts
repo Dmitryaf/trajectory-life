@@ -86,6 +86,10 @@ describe('trends scenarios', () => {
     expect(wrapper.find('.trends-additional-details').exists()).toBe(false);
     expect(wrapper.text()).not.toContain('Показать остальные наблюдения');
     expect(wrapper.findAll('.trend-chart-description')).toHaveLength(1);
+    expect(wrapper.findAll('e-chart-panel-stub')).toHaveLength(0);
+    const metrics = wrapper.get<HTMLDetailsElement>('.trends-metric-details');
+    metrics.element.open = true;
+    await metrics.trigger('toggle');
     expect(wrapper.findAll('e-chart-panel-stub')).toHaveLength(1);
     const chartOption = wrapper.getComponent({ name: 'EChartPanel' }).props('option') as {
       series: Array<{ tooltip: { valueFormatter: (value: unknown, dataIndex: number) => string } }>;

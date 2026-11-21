@@ -134,6 +134,7 @@ const {
   promptCopying,
   review,
   reviewAvailable,
+  reviewHint,
   reviewContextOpen,
   reviewHasContext,
   actions,
@@ -223,13 +224,13 @@ watch(
     <ReviewHeading
       title="Неделя"
       summary="Вспомните события недели и посмотрите свои записи."
-      :action="reviewAvailable ? 'К обзору' : hasPeriodData ? 'Обзор позже' : undefined"
-      href="#week-review"
+      :href="reviewAvailable ? '#week-review' : undefined"
       period="week"
     />
     <PeriodNavigator
       :title="`${formatDate(start, { day: 'numeric', month: 'short' })} — ${formatDate(end, { day: 'numeric', month: 'short' })}`"
       :subtitle="navigatorSubtitle"
+      :hint="reviewHint"
       v-on="navigation"
     />
 
