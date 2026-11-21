@@ -37,7 +37,7 @@ import { experimentTextLimits } from '../features/experiments/model';
 import { useDailyEntryForm } from '../features/daily-entry/useDailyEntryForm';
 import { useAppStore } from '../stores/app';
 import { notifyUnknownError } from '../services/notifications';
-import { formatDate, todayKey } from '../services/dates';
+import { formatDate } from '../services/dates';
 import {
   actionDirectionEntryOptions,
   activityOptions,
@@ -69,6 +69,8 @@ const { goalDialogOpen, goalSaving, openCurrentGoalDialog, closeCurrentGoalDialo
   useCurrentGoalDialog(store);
 const {
   selectedDate,
+  localToday,
+  isToday,
   sleepDurationMinutes,
   timeInBedDurationMinutes,
   weightKg,
@@ -143,7 +145,6 @@ const dailyLifeAreaItems = computed(() => [
     (option) => form.lifeAreas.includes(option.id) && !activeLifeOptions.value.some((active) => active.id === option.id),
   ),
 ]);
-const isToday = computed(() => selectedDate.value === todayKey());
 const isFirstEntry = computed(() => store.loaded && store.dailyEntries.length === 0);
 const firstUseEditRequested = new URL(window.location.href).searchParams.get('first-use') === 'edit';
 const firstUseTakesPriority = computed(() => isToday.value && isFirstUsePrimary(store.settings.firstUse, firstUseEditRequested));
@@ -295,7 +296,7 @@ function openEntryDatePicker() {
           <DateInput
             ref="entryDateInput"
             :display-value="selectedDate"
-            :max="todayKey()"
+            :max="localToday"
             tabindex="-1"
             aria-hidden="true"
             aria-label="Дата записи"

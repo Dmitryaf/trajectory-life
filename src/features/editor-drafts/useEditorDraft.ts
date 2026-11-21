@@ -94,11 +94,11 @@ export function useEditorDraft(options: Options) {
     return result;
   }
 
-  function restore() {
+  function restore(sourceKey = options.key.value) {
     cancelTimer();
     error.value = false;
     restored.value = false;
-    const draft = store.editorDraftByKey(options.key.value);
+    const draft = store.editorDraftByKey(sourceKey);
     if (draft) {
       suspended.value = true;
       try {
@@ -110,7 +110,10 @@ export function useEditorDraft(options: Options) {
         suspended.value = false;
       }
     }
-    protectedValue.value = options.value();
+    protectedValue.value = draft && sourceKey !== options.key.value && !error.value ? '' : options.value();
+    if (protectedValue.value === '') {
+      void flush();
+    }
   }
 
   function saved(value = options.value()) {
@@ -149,6 +152,11 @@ export function useEditorDraft(options: Options) {
       event.returnValue = '';
     }
   }
+  function protectOnHide() {
+    if (document.visibilityState === 'hidden' && options.dirty.value) {
+      void flush();
+    }
+  }
   watch(
     () => store.editorDraftGeneration,
     (value) => {
@@ -174,11 +182,15 @@ export function useEditorDraft(options: Options) {
     onBeforeRouteLeave(beforeLeave);
     onBeforeRouteUpdate(beforeLeave);
   }
-  onMounted(() => window.addEventListener('beforeunload', beforeUnload));
+  onMounted(() => {
+    window.addEventListener('beforeunload', beforeUnload);
+    document.addEventListener('visibilitychange', protectOnHide);
+  });
   onBeforeUnmount(() => {
     disposed = true;
     cancelTimer();
     window.removeEventListener('beforeunload', beforeUnload);
+    document.removeEventListener('visibilitychange', protectOnHide);
   });
   return { error, notice, suspended, restore, saved, discard, flush, beforeLeave, currentOwner };
 }

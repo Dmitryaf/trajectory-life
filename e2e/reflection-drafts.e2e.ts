@@ -35,6 +35,51 @@ async function records(page: Page, table: string) {
   );
 }
 
+test('keeps an independent new journal draft when another tab saves its own', async ({ page, context }) => {
+  await page.goto('/results?create=1');
+  const second = await context.newPage();
+  await second.goto('/results?create=1');
+  const firstNote = page.locator('.archive-composer textarea');
+  const secondNote = second.locator('.archive-composer textarea');
+  await firstNote.fill('Итог из первой вкладки');
+  await expect(page.getByText(/Черновик сохранён на этом устройстве/)).toBeVisible();
+  await secondNote.fill('Черновик из второй вкладки');
+  await expect(second.getByText(/Черновик сохранён на этом устройстве/)).toBeVisible();
+  expect(await records(page, 'editorDrafts')).toHaveLength(2);
+
+  await page.getByRole('button', { name: 'Добавить итог', exact: true }).click();
+  await expect(page.getByText('Итог добавлен', { exact: true })).toBeVisible();
+  await second.reload();
+  await expect(secondNote).toHaveValue('Черновик из второй вкладки');
+  expect(await records(page, 'editorDrafts')).toHaveLength(1);
+  await second.close();
+});
+
+test('a stale daily editor requires a choice before replacing the persisted entry', async ({ page, context }) => {
+  const date = '2026-11-14';
+  await seed(page, [{ date, importantFact: 'Исходный текст' }]);
+  await page.goto(`/today?date=${date}`);
+  const other = await context.newPage();
+  await other.clock.setFixedTime(new Date('2026-11-14T12:00:00Z'));
+  await other.goto(`/today?date=${date}`);
+  const note = other.getByLabel('Заметка дня');
+  await expect(note).toHaveValue('Исходный текст');
+  await page.getByLabel('Заметка дня').fill('Первая версия');
+  await page.getByRole('button', { name: 'Сохранить изменения' }).click();
+  await expect(page.getByText(/обновлена на устройстве/)).toBeVisible();
+  await note.fill('Вторая версия');
+  await other.getByRole('button', { name: 'Сохранить изменения' }).click();
+  await expect(other.locator('.draft-conflict-notice')).toBeVisible();
+  await expect(note).toHaveValue('Вторая версия');
+  expect((await records(page, 'dailyEntries'))[0]?.importantFact).toBe('Первая версия');
+
+  await other.getByRole('button', { name: 'Продолжить с черновиком' }).click();
+  await other.getByRole('button', { name: 'Сохранить изменения' }).click();
+  await expect(other.getByText(/обновлена на устройстве/)).toBeVisible();
+  expect((await records(page, 'dailyEntries'))[0]?.importantFact).toBe('Вторая версия');
+  await other.close();
+});
+
 for (const [route, other, table, saved] of [
   ['results', 'events', 'results', 'Итог добавлен'],
   ['events', 'results', 'lifeEvents', 'Событие добавлено'],

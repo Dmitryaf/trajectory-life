@@ -1,6 +1,21 @@
 import { expect, test } from './fixtures';
 import { expectPageFitsViewport, expectVerticalSeparation, readLayoutBox } from './layout-assertions';
 
+test('recovers the text of the active first review step before continuing', async ({ page }) => {
+  await page.goto('/today');
+  await page.locator('.first-use-retrospective > summary').click();
+  await page.getByRole('button', { name: 'Начать обзор' }).click();
+  const field = page.getByLabel('По одному пункту в строке');
+  await field.fill('Ответ, который ещё не добавлен в обзор');
+  await page.getByRole('heading', { name: 'Что вам удалось закончить или получить?' }).click();
+  const navigation = page.getByRole('navigation', { name: 'Основная навигация' });
+  await navigation.getByRole('link', { name: 'Журнал' }).click();
+  await navigation.getByRole('link', { name: 'Сегодня' }).click();
+  await expect(field).toHaveValue('Ответ, который ещё не добавлен в обзор');
+  await page.reload();
+  await expect(field).toHaveValue('Ответ, который ещё не добавлен в обзор');
+});
+
 test('saves and resumes the first week recovery on a small screen', async ({ page }) => {
   test.slow();
   await page.setViewportSize({ width: 390, height: 844 });

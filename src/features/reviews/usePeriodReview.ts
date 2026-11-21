@@ -10,6 +10,7 @@ import { setSyncEditorDirty } from '../sync/editing';
 import { ReviewChangedError } from './version';
 import { useEditorDraft } from '../editor-drafts/useEditorDraft';
 import { useViewedReview } from './useReviewReminders';
+import { editorDraftKey } from '@/model/editorDraft';
 
 type Period = 'week' | 'month';
 type PeriodReview = WeeklyReview | MonthlyReview;
@@ -76,7 +77,7 @@ export function usePeriodReview<T extends PeriodReview>(options: PeriodReviewOpt
 
   const drafts = useEditorDraft({
     reset: loadReview,
-    key: computed(() => `${options.period}:${options.start.value}`),
+    key: computed(() => editorDraftKey(`${options.period}:${options.start.value}`)),
     value: () => JSON.stringify(review),
     baseline: () => JSON.stringify(sourceBaseline),
     dirty,
@@ -167,7 +168,7 @@ export function usePeriodReview<T extends PeriodReview>(options: PeriodReviewOpt
     const prepared = plainCopy(review);
     const recordSave = captureReviewSave(prepared, savedReview.value);
     try {
-      await options.persistReview(prepared, sourceBaseline, `${options.period}:${savingStart}`);
+      await options.persistReview(prepared, sourceBaseline, editorDraftKey(`${options.period}:${savingStart}`));
       drafts.saved(JSON.stringify(prepared));
       if (options.start.value === savingStart) {
         sourceBaseline = savedReview.value ? plainCopy(savedReview.value) : prepared;

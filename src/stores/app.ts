@@ -1,7 +1,8 @@
 import { defineStore } from 'pinia';
 import type { Table } from 'dexie';
-import type { EditorDraft } from '../model/editorDraft';
+import { editorDraftKey, logicalEditorDraftKey, type EditorDraft } from '../model/editorDraft';
 import { assertJournalVersion } from '../features/journal/version';
+import { DailyEntryChangedError } from '../features/daily-entry/model';
 import { db } from '../db';
 import {
   CloudRevisionConflictError,
@@ -180,32 +181,55 @@ export const useAppStore = defineStore('app', {
     async loadLocalData(scope: CloudOperationScope) {
       this.loadError = '';
       try {
-        const [dailyEntries, dailyEntryDrafts, editorDrafts, results, lifeEvents, weeklyReviews, monthlyReviews, settings] =
-          await Promise.all([
-            db.dailyEntries.toArray(),
-            db.dailyEntryDrafts.toArray(),
-            db.editorDrafts.toArray(),
-            db.results.toArray(),
-            db.lifeEvents.toArray(),
-            db.weeklyReviews.toArray(),
-            db.monthlyReviews.toArray(),
-            db.settings.get('main'),
-          ]);
+        const [results, lifeEvents, weeklyReviews, monthlyReviews] = await Promise.all([
+          db.results.toArray(),
+          db.lifeEvents.toArray(),
+          db.weeklyReviews.toArray(),
+          db.monthlyReviews.toArray(),
+        ]);
+        const { linkedEntries, linkedDrafts, activeSettings, editorDrafts } = await runStorageWrite(() =>
+          db.transaction('rw', [db.dailyEntries, db.dailyEntryDrafts, db.settings, db.editorDrafts], async () => {
+            scope.assertCurrent();
+            const [dailyEntries, dailyEntryDrafts, settings, draftRows] = await Promise.all([
+              db.dailyEntries.toArray(),
+              db.dailyEntryDrafts.toArray(),
+              db.settings.get('main'),
+              db.editorDrafts.toArray(),
+            ]);
+            const activeSettings = normalizeSettings(settings);
+            const linkedEntries = linkLegacyExperimentEntries(dailyEntries.map(normalizeDailyEntry), activeSettings);
+            const linkedDrafts = dailyEntryDrafts.map((draft) => {
+              const [entry] = linkLegacyExperimentEntries([normalizeDailyEntry(draft.entry)], activeSettings);
+              const linkedEntry = entry!;
+              return {
+                ...draft,
+                entry: experimentEntryLinkError([linkedEntry], activeSettings) ? { ...linkedEntry, experimentId: null } : linkedEntry,
+              };
+            });
+            const keys = new Set(draftRows.map((draft) => draft.key));
+            const editorDrafts = [];
+            for (const draft of draftRows) {
+              const logicalKey = logicalEditorDraftKey(draft.key);
+              const scopedKey = editorDraftKey(logicalKey);
+              if (draft.key === logicalKey && scopedKey !== logicalKey && !keys.has(scopedKey)) {
+                const scopedDraft = { ...draft, key: scopedKey };
+                await db.editorDrafts.add(scopedDraft);
+                await db.editorDrafts.delete(draft.key);
+                editorDrafts.push(scopedDraft);
+              } else {
+                editorDrafts.push(draft);
+              }
+            }
+            await Promise.all([
+              linkedEntries.length ? db.dailyEntries.bulkPut(plainCopy(linkedEntries)) : Promise.resolve(),
+              linkedDrafts.length ? db.dailyEntryDrafts.bulkPut(plainCopy(linkedDrafts)) : Promise.resolve(),
+              db.settings.put(plainCopy(activeSettings)),
+            ]);
+            scope.assertCurrent();
+            return { linkedEntries, linkedDrafts, activeSettings, editorDrafts };
+          }),
+        );
         scope.assertCurrent();
-        const activeSettings = normalizeSettings(settings);
-        const normalizedEntries = dailyEntries.map((entry) => normalizeDailyEntry(entry));
-        const linkedEntries = linkLegacyExperimentEntries(normalizedEntries, activeSettings);
-        const normalizedDrafts = dailyEntryDrafts.map((draft) => ({
-          ...draft,
-          entry: normalizeDailyEntry(draft.entry),
-        }));
-        const linkedDrafts = normalizedDrafts.map((draft) => {
-          const linkedEntry = linkLegacyExperimentEntries([draft.entry], activeSettings)[0]!;
-          return {
-            ...draft,
-            entry: experimentEntryLinkError([linkedEntry], activeSettings) ? { ...linkedEntry, experimentId: null } : linkedEntry,
-          };
-        });
         this.dailyEntries = linkedEntries;
         this.dailyEntryDrafts = linkedDrafts;
         this.editorDrafts = editorDrafts;
@@ -214,16 +238,6 @@ export const useAppStore = defineStore('app', {
         this.weeklyReviews = weeklyReviews.map((review) => normalizeWeeklyReview(review));
         this.monthlyReviews = monthlyReviews.map((review) => normalizeMonthlyReview(review));
         this.settings = activeSettings;
-        await runStorageWrite(() =>
-          db.transaction('rw', [db.dailyEntries, db.dailyEntryDrafts, db.settings], async () => {
-            await Promise.all([
-              linkedEntries.length ? db.dailyEntries.bulkPut(plainCopy(linkedEntries)) : Promise.resolve(),
-              linkedDrafts.length ? db.dailyEntryDrafts.bulkPut(plainCopy(linkedDrafts)) : Promise.resolve(),
-              db.settings.put(plainCopy(activeSettings)),
-            ]);
-          }),
-        );
-        scope.assertCurrent();
         void this.checkLocalStoragePersistence();
       } catch (error) {
         scope.assertCurrent();
@@ -234,21 +248,29 @@ export const useAppStore = defineStore('app', {
         this.loaded = true;
       }
     },
-    async saveEntry(entry: DailyEntry): Promise<DailyEntry> {
+    async saveEntry(entry: DailyEntry, expectedVersion?: string | null): Promise<DailyEntry> {
       const scope = this.createCloudOperationScope();
       return serializeLocalData(this, scope.assertCurrent, async () => {
         if (!validDate(entry.date)) {
           throw new Error('Укажите корректную дату записи');
         }
-        const saved = plainCopy(normalizeDailyEntry({ ...entry, updatedAt: new Date().toISOString() }));
-        const entryLinkError = experimentEntryLinkError([saved], this.settings);
-        if (entryLinkError) {
-          throw new Error(entryLinkError);
-        }
-        await runStorageWrite(() =>
+        const saved = await runStorageWrite(() =>
           db.transaction('rw', [db.dailyEntries, db.dailyEntryDrafts], async () => {
+            const current = await db.dailyEntries.get(entry.date);
+            if (expectedVersion !== undefined && (current?.updatedAt ?? null) !== expectedVersion) {
+              throw new DailyEntryChangedError(current ? normalizeDailyEntry(current) : null);
+            }
+            const currentTime = Date.parse(current?.updatedAt ?? '');
+            const updatedAt = new Date(Math.max(Date.now(), Number.isFinite(currentTime) ? currentTime + 1 : 0)).toISOString();
+            const saved = plainCopy(normalizeDailyEntry({ ...entry, updatedAt }));
+            const entryLinkError = experimentEntryLinkError([saved], this.settings);
+            if (entryLinkError) {
+              throw new Error(entryLinkError);
+            }
             await db.dailyEntries.put(saved);
             await db.dailyEntryDrafts.delete(saved.date);
+            scope.assertCurrent();
+            return saved;
           }),
         );
         scope.assertCurrent();

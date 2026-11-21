@@ -26,6 +26,32 @@ vi.mock('@/services/notifications', () => ({
 }));
 
 describe('daily entry scenario', () => {
+  it('keeps typing after an asynchronous save starts and protects the newer text', async () => {
+    const { pinia, store } = createStore();
+    let complete!: () => void;
+    vi.spyOn(store, 'saveEntry').mockImplementation(
+      (entry) =>
+        new Promise((resolve) => {
+          complete = () => resolve({ ...entry, updatedAt: '2026-07-21T12:30:00.000Z' });
+        }),
+    );
+    const saveDraft = vi.spyOn(store, 'saveDailyEntryDraft').mockImplementation(async (entry) => ({
+      date: entry.date,
+      entry,
+      updatedAt: '2026-07-21T12:30:01.000Z',
+    }));
+    const wrapper = mount(TodayView, { global: { plugins: [pinia], stubs: { RouterLink: routerLinkStub } } });
+    const note = wrapper.get<HTMLTextAreaElement>('[aria-label="Заметка дня"]');
+    await note.setValue('До сохранения');
+    await wrapper.get('form').trigger('submit');
+    await note.setValue('Введено во время сохранения');
+    complete();
+    await flushPromises();
+
+    expect(note.element.value).toBe('Введено во время сохранения');
+    expect(saveDraft).toHaveBeenCalledWith(expect.objectContaining({ importantFact: 'Введено во время сохранения' }));
+  });
+
   it.each(['pending', 'conflict', 'error'] as const)('reports only local saving when cloud status is %s', async (status) => {
     const { pinia, store } = createStore();
     store.cloudSyncStatus = status;
@@ -394,6 +420,7 @@ describe('daily entry scenario', () => {
         experimentCompleted: false,
         experimentNote: 'Заранее убрал телефон, но поздний звонок сбил план',
       }),
+      null,
     );
     wrapper.unmount();
   });
@@ -437,6 +464,7 @@ describe('daily entry scenario', () => {
         actionDirection: null,
         recordedFields: expect.arrayContaining(['careerStates', 'actionDirection']),
       }),
+      null,
     );
   });
 
@@ -506,6 +534,7 @@ describe('daily entry scenario', () => {
         careerStates: ['external', 'workday', 'work_result'],
         contextFactors: ['series_video', 'work_code', 'late_food'],
       }),
+      expect.any(String),
     );
   });
 
@@ -585,6 +614,7 @@ describe('daily entry scenario', () => {
         nutritionState: 'supports_goal',
         importantFact: 'Обновил только общий факт',
       }),
+      '2026-07-21T07:00:00.000Z',
     );
   });
 
@@ -746,7 +776,7 @@ describe('daily entry scenario', () => {
     expect(wrapper.find('.draft-conflict-notice').exists()).toBe(false);
     await wrapper.get('form').trigger('submit');
     await flushPromises();
-    expect(saveEntry).toHaveBeenCalledWith(expect.objectContaining({ importantFact: 'Локальный черновик' }));
+    expect(saveEntry).toHaveBeenCalledWith(expect.objectContaining({ importantFact: 'Локальный черновик' }), '2026-07-21T12:00:00.000Z');
   });
 
   it('can discard a conflicting draft and keep the saved entry', async () => {
