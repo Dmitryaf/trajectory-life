@@ -567,11 +567,13 @@ describe('daily entry scenario', () => {
 
   it('hides inactive blocks while preserving values in an existing entry', async () => {
     const { pinia, store } = createStore();
+    const version = '2026-07-21T07:00:00.000Z';
     store.settings.activeDailyBlocks = [];
     store.settings.activeLifeAreas = [];
     store.dailyEntries = [
       {
         ...emptyDailyEntry('2026-07-21'),
+        updatedAt: version,
         bedtime: '23:40',
         wakeTime: '07:30',
         sleepMinutes: 600,
@@ -614,7 +616,7 @@ describe('daily entry scenario', () => {
         nutritionState: 'supports_goal',
         importantFact: 'Обновил только общий факт',
       }),
-      '2026-07-21T07:00:00.000Z',
+      version,
     );
   });
 
