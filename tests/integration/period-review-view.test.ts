@@ -542,7 +542,7 @@ describe('period review navigation', () => {
     expect(details.find('e-chart-panel-stub').exists()).toBe(false);
   });
 
-  it('keeps the monthly decision before detailed analytics and compares filled weeks', () => {
+  it('keeps the monthly decision before detailed analytics and compares filled weeks', async () => {
     const { pinia, store } = createStore();
     store.dailyEntries = Array.from({ length: 14 }, (_, index) => ({
       ...emptyDailyEntry('2026-07-' + String(index + 1).padStart(2, '0')),
@@ -585,6 +585,9 @@ describe('period review navigation', () => {
     expect(wrapper.find('.month-calendar').exists()).toBe(false);
     expect((analysis.element as HTMLDetailsElement).open).toBe(false);
     expect(analysis.find('.month-chart-guide').exists()).toBe(false);
+    expect(analysis.findAll('e-chart-panel-stub')).toHaveLength(0);
+    (analysis.element as HTMLDetailsElement).open = true;
+    await analysis.trigger('toggle');
     expect(analysis.findAll('e-chart-panel-stub')).toHaveLength(1);
     expect(analysis.text()).toContain('Области жизни');
     expect(analysis.find('.review-cue-grid--additional').exists()).toBe(false);
@@ -611,7 +614,7 @@ describe('period review navigation', () => {
     expect(analysis.find('e-chart-panel-stub').exists()).toBe(false);
   });
 
-  it('shows the monthly weight graph from the first measurement', () => {
+  it('shows the monthly weight graph from the first measurement', async () => {
     const { pinia, store } = createStore();
     store.dailyEntries = [
       {
@@ -626,6 +629,8 @@ describe('period review navigation', () => {
 
     expect(analysis.get('.metric-switcher').text()).toContain('Вес');
     expect(analysis.get('.month-metric-card').text()).toContain('1 изм.');
+    (analysis.element as HTMLDetailsElement).open = true;
+    await analysis.trigger('toggle');
     expect(analysis.findAll('e-chart-panel-stub')).toHaveLength(1);
     expect(analysis.find('.month-chart-guide').exists()).toBe(false);
   });

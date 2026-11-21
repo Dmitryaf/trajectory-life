@@ -1,12 +1,20 @@
 <script setup lang="ts">
-defineProps<{ title: string; open?: boolean }>();
-defineEmits<{ toggle: [event: Event] }>();
+import { ref } from 'vue';
+
+const props = defineProps<{ title: string; open?: boolean }>();
+const emit = defineEmits<{ toggle: [event: Event] }>();
+const expanded = ref(Boolean(props.open));
+
+function toggle(event: Event) {
+  expanded.value = (event.currentTarget as HTMLDetailsElement).open;
+  emit('toggle', event);
+}
 </script>
 
 <template>
-  <details class="period-details" :open="open" @toggle="$emit('toggle', $event)">
+  <details class="period-details" :open="open" @toggle="toggle">
     <summary>{{ title }}</summary>
-    <div class="period-details__content"><slot></slot></div>
+    <div class="period-details__content"><slot :expanded="expanded"></slot></div>
   </details>
 </template>
 

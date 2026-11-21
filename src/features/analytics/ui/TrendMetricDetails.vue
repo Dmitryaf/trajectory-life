@@ -21,7 +21,7 @@ defineEmits<{ 'update:modelValue': [value: string] }>();
 </script>
 
 <template>
-  <PeriodDetails class="trends-metric-details" title="Показать один показатель по месяцам">
+  <PeriodDetails v-slot="{ expanded }" class="trends-metric-details" title="Показать один показатель по месяцам">
     <SurfaceCard v-if="options.length" kind="dashboard" class="trend-metric-card">
       <SectionHeading>
         <div>
@@ -37,7 +37,13 @@ defineEmits<{ 'update:modelValue': [value: string] }>();
         label="Показатель графика"
         @update:model-value="$emit('update:modelValue', $event)"
       />
-      <EChartPanel :option="chartOption" :height="300" :aria-label="`Динамика: ${selectedLabel}`" :description="description" />
+      <EChartPanel
+        v-if="expanded"
+        :option="chartOption"
+        :height="300"
+        :aria-label="`Динамика: ${selectedLabel}`"
+        :description="description"
+      />
       <DataNote class="trend-chart-description">
         Показаны средние значения за каждый месяц и важные события. Изменения на графике не обязательно связаны с этими событиями. Текущий
         месяц ещё может быть неполным.

@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 
-import { mount } from '@vue/test-utils';
+import { flushPromises, mount } from '@vue/test-utils';
 import { createPinia, setActivePinia } from 'pinia';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 const { recordedEvents } = vi.hoisted(() => ({ recordedEvents: [] as string[] }));
@@ -18,6 +18,7 @@ function setupStore() {
   setActivePinia(pinia);
   const store = useAppStore();
   store.settings = structuredClone(defaultSettings);
+  store.saveEditorDraft = vi.fn().mockResolvedValue(undefined);
   store.saveSettings = vi.fn(async (settings: AppSettings) => {
     store.settings = structuredClone(settings);
   });
@@ -109,8 +110,11 @@ describe('first-use week recovery', () => {
     await wrapper.get('#first-use-results').setValue('Закончил черновик\nОтправил письмо');
     await wrapper.get('.first-use-recovery__footer .primary-button').trigger('click');
 
+    await flushPromises();
     expect(store.saveReview).toHaveBeenCalledWith(
       expect.objectContaining({ weekStart, coveredThrough: '2026-08-02', results: ['Закончил черновик', 'Отправил письмо'] }),
+      null,
+      `first-use:${weekStart}:results`,
     );
     expect(store.settings.firstUse.lastStep).toBe('highlights');
     expect(wrapper.text()).toContain('Что важного произошло?');
@@ -197,6 +201,7 @@ describe('first-use week recovery', () => {
 
     expect(store.saveReview).toHaveBeenLastCalledWith(
       expect.objectContaining({ weekStart, results: ['Закончил черновик'], highlights: ['Поговорил с другом'] }),
+      expect.objectContaining({ weekStart }),
     );
     expect(store.settings.firstUse).toMatchObject({ status: 'completed', lastStep: 'overview', overviewSeen: true });
   });

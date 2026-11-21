@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import PeriodReviewActions from '@/features/reviews/ui/PeriodReviewActions.vue';
 import MonthDailyNotes from '@/features/reviews/ui/MonthDailyNotes.vue';
+import MonthSectionLinks from '@/features/reviews/ui/MonthSectionLinks.vue';
 import MonthWeekReviews from '@/features/reviews/ui/MonthWeekReviews.vue';
+import MonthWeekComparison from '@/features/reviews/ui/MonthWeekComparison.vue';
 import { monthWeekReviews, monthWeekSummariesForPeriod } from '@/features/reviews/monthWeeks';
 import SurfaceCard from '@/shared/ui/layout/SurfaceCard.vue';
 import SectionHeading from '@/shared/ui/layout/SectionHeading.vue';
@@ -75,6 +77,7 @@ const additionalObservations = computed(() =>
 const hasDailyData = computed(() => summary.value.coveredEntriesCount > 0);
 const hasJournal = computed(() => results.value.length > 0 || lifeEvents.value.length > 0);
 const savedWeeks = computed(() => monthWeekReviews(store.weeklyReviews, start.value, archiveEnd.value));
+const hasDailyNotes = computed(() => entries.value.some((entry) => entry.importantFact.trim()));
 const hasPeriodData = computed(() => hasDailyData.value || hasJournal.value || hasSavedReview.value || savedWeeks.value.length > 0);
 const monthDates = computed(() => dateRange(start.value, end.value));
 const chartDates = computed(() => monthDates.value.filter((date) => date <= todayKey()));
@@ -311,6 +314,7 @@ const {
   promptCopying,
   review,
   reviewAvailable,
+  reviewHint,
   reviewContextOpen,
   reviewHasContext,
   actions,
@@ -346,15 +350,16 @@ function minutesToHours(value: number | null): number | null {
     <ReviewHeading
       title="Месяц"
       summary="Сравните недели, вспомните важные события и сделанные дела. При желании запишите планы."
-      :action="reviewAvailable ? 'К обзору' : hasPeriodData ? 'Обзор позже' : undefined"
-      href="#month-review"
+      :href="reviewAvailable ? '#month-review' : undefined"
       period="month"
     />
     <PeriodNavigator
       :title="formatDate(start, { month: 'long', year: 'numeric' })"
       :subtitle="start === startOfMonth(todayKey()) ? 'Текущий месяц' : ''"
+      :hint="reviewHint"
       v-on="navigation"
     />
+    <MonthSectionLinks :daily-notes="hasDailyNotes" :week-reviews="Boolean(savedWeeks.length)" />
 
     <ReviewEmptyPeriod v-if="!hasPeriodData" period="month" :available="reviewAvailable" />
 
@@ -364,32 +369,7 @@ function minutesToHours(value: number | null): number | null {
         <p>Сохранённые обзоры, итоги и события показаны ниже. Для воспоминаний о месяце дневные измерения не обязательны.</p>
       </ReviewNotice>
 
-      <SurfaceCard v-if="hasDailyData" kind="dashboard" class="month-week-overview">
-        <SectionHeading>
-          <div>
-            <EyebrowText>Недели месяца</EyebrowText>
-            <h2>Сравнение недель</h2>
-          </div>
-          <Badge>{{ summary.coveredEntriesCount }} дн.</Badge>
-        </SectionHeading>
-        <div v-if="monthWeekSummaries.length >= 2" class="month-week-story">
-          <article v-for="week in monthWeekSummaries" :key="week.rangeStart">
-            <strong>
-              {{ formatDate(week.rangeStart, { day: 'numeric', month: 'short' }) }}–{{
-                formatDate(week.rangeEnd, { day: 'numeric', month: 'short' })
-              }}
-            </strong>
-            <span>{{ week.summary.coveredEntriesCount }} дн. с записями</span>
-            <span v-if="week.resultsCount">Итогов: {{ week.resultsCount }}</span>
-            <span v-if="week.eventsCount">Событий: {{ week.eventsCount }}</span>
-            <span v-if="week.summary.specialDays">Особых дней: {{ week.summary.specialDays }}</span>
-          </article>
-        </div>
-        <ReviewNotice v-else>
-          <strong>Для сравнения нужны записи хотя бы за две недели</strong>
-          <p>Сейчас данные есть только в одной части месяца. Подробности уже доступны ниже.</p>
-        </ReviewNotice>
-      </SurfaceCard>
+      <MonthWeekComparison v-if="hasDailyData" :weeks="monthWeekSummaries" :covered-days="summary.coveredEntriesCount" />
 
       <section v-if="hasJournal" class="period-records period-records--featured">
         <PeriodRecordCard
@@ -460,7 +440,7 @@ function minutesToHours(value: number | null): number | null {
         @download="downloadJson"
       />
 
-      <PeriodDetails v-if="hasDailyData" class="month-analysis-details" title="Показать графики и сравнения">
+      <PeriodDetails v-if="hasDailyData" v-slot="{ expanded }" class="month-analysis-details" title="Показать графики и сравнения">
         <SurfaceCard v-if="additionalObservations.length" kind="dashboard">
           <SectionHeading>
             <div>
@@ -486,6 +466,7 @@ function minutesToHours(value: number | null): number | null {
           </SectionHeading>
           <MetricSwitcher v-model="selectedMonthMetric" :options="monthMetricOptions" label="Показатель графика" />
           <EChartPanel
+            v-if="expanded"
             :option="monthMetricOption"
             :height="280"
             :aria-label="`Динамика: ${selectedMonthMetricInfo?.label}`"

@@ -15,6 +15,7 @@ type RoundResult = {
   monthTransitionMs: number;
   todayLoadedCharts: boolean;
   monthLoadedCharts: boolean;
+  workerLoadedChartsOnToday: boolean;
 };
 
 type LandingRoundResult = {
@@ -73,13 +74,26 @@ async function runLandingRound(browser: Browser): Promise<LandingRoundResult> {
   return { landingOpenMs, loadedProductRuntime, serviceWorkerRegistrations, indexedDatabases };
 }
 
-async function runRound(browser: Browser): Promise<RoundResult> {
+async function runRound(browser: Browser, verifyOffline: boolean): Promise<RoundResult> {
   const context = await browser.newContext({
     ...devices['Pixel 5'],
     baseURL: 'http://127.0.0.1:4284',
     serviceWorkers: 'allow',
   });
   const page = await context.newPage();
+  const workerChartRequests: string[] = [];
+  context.on('request', (request) => {
+    if (request.serviceWorker() && new RegExp(analyticsChunkPatternSource, 'i').test(request.url())) {
+      workerChartRequests.push(request.url());
+    }
+  });
+  page.on('dialog', async (dialog) => {
+    if (dialog.type() === 'confirm' && dialog.message().startsWith('Заменить текущие записи')) {
+      await dialog.accept();
+    } else {
+      await dialog.dismiss();
+    }
+  });
   await throttleLikeMidRangeMobile(page);
 
   const firstOpenMs = await elapsed(async () => {
@@ -94,26 +108,38 @@ async function runRound(browser: Browser): Promise<RoundResult> {
     await page.reload();
     await page.locator('.page--today').waitFor();
   });
+  await page.evaluate(async () => navigator.serviceWorker.ready.then(() => undefined));
+  const workerLoadedChartsOnToday = workerChartRequests.length > 0;
 
   await page.goto('/settings');
   await page.locator('input[type="file"]').setInputFiles(demoFilePath);
-  await expect(page.locator('input[type="file"]')).toHaveValue('');
+  await expect(page.getByText('Резервная копия восстановлена на этом устройстве', { exact: true }).last()).toBeVisible();
   await page.getByRole('navigation', { name: 'Основная навигация' }).getByRole('link', { name: 'Обзор' }).click();
   await page.locator('.page--week').waitFor();
   await page.evaluate(() => performance.clearResourceTimings());
   const monthTransitionMs = await elapsed(async () => {
     await page.getByRole('navigation', { name: 'Период обзора' }).getByRole('link', { name: 'Месяц' }).click();
     await page.locator('.page--month').waitFor();
+    expect(workerChartRequests).toHaveLength(0);
     await page.locator('.month-analysis-details > summary').click();
-    await page.locator('.echart-panel').first().waitFor();
+    await page.locator('.echart-panel canvas').first().waitFor();
   });
   const monthLoadedCharts = await page.evaluate(
     (pattern) => performance.getEntriesByType('resource').some((entry) => new RegExp(pattern, 'i').test(entry.name)),
     analyticsChunkPatternSource,
   );
 
+  if (verifyOffline) {
+    await context.setOffline(true);
+    await page.goto('/today');
+    await expect(page.locator('.page--today')).toBeVisible();
+    await page.goto('/month');
+    await expect(page.locator('.page--month')).toBeVisible();
+    await page.locator('.month-analysis-details > summary').click();
+    await expect(page.locator('.echart-panel canvas').first()).toBeVisible();
+  }
   await context.close();
-  return { firstOpenMs, repeatOpenMs, monthTransitionMs, todayLoadedCharts, monthLoadedCharts };
+  return { firstOpenMs, repeatOpenMs, monthTransitionMs, todayLoadedCharts, monthLoadedCharts, workerLoadedChartsOnToday };
 }
 
 function median(values: number[]) {
@@ -125,7 +151,7 @@ test('measures production PWA entry and the analytics route on a mid-range mobil
   const results: RoundResult[] = [];
   for (let round = 0; round < rounds; round += 1) {
     landingResults.push(await runLandingRound(browser));
-    results.push(await runRound(browser));
+    results.push(await runRound(browser, round === 0));
   }
 
   const medians = {
@@ -159,6 +185,10 @@ test('measures production PWA entry and the analytics route on a mid-range mobil
   expect(
     results.every((result) => !result.todayLoadedCharts),
     `Today must not download ${analyticsChunkPatternSource}`,
+  ).toBe(true);
+  expect(
+    results.every((result) => !result.workerLoadedChartsOnToday),
+    'The service worker must not precache charts',
   ).toBe(true);
   expect(medians.landingOpenMs).toBeLessThanOrEqual(budgets.landingOpenMs);
   expect(

@@ -5,6 +5,7 @@ import { notifyError, notifySaved, notifyUnknownError } from '@/services/notific
 import { useEditorDraft } from '../editor-drafts/useEditorDraft';
 import { setSyncEditorDirty } from '../sync/editing';
 import { JournalChangedError } from './version';
+import { editorDraftKey, isOwnEditorDraft, logicalEditorDraftKey, makeDraftId } from '@/model/editorDraft';
 
 type Record = { id?: number; date: string; title: string; note: string; createdAt: string };
 let nextEditor = 0;
@@ -18,7 +19,8 @@ export function useJournalEditor<T extends Record>(options: {
   const store = useAppStore();
   const form = reactive(options.empty()) as T;
   const editingId = computed(() => form.id ?? null);
-  const key = computed(() => `${options.kind}:${editingId.value ?? 'new'}`);
+  const alternateKey = ref('');
+  const key = computed(() => alternateKey.value || editorDraftKey(`${options.kind}:${editingId.value ?? 'new'}`));
   const source = computed(() => options.records().find((item) => item.id === editingId.value));
   const baseline = ref('');
   let expected: T | null = null;
@@ -51,19 +53,24 @@ export function useJournalEditor<T extends Record>(options: {
       .map((item) => {
         try {
           const value = JSON.parse(item.value) as T;
-          return { key: item.key, label: (value.title || value.note || value.date).slice(0, 80) };
+          const label = (value.title || value.note || value.date).slice(0, 80);
+          return { key: item.key, label: isOwnEditorDraft(item.key) ? label : `Открыть копию: ${label}` };
         } catch {
           return { key: item.key, label: 'Черновик записи' };
         }
       }),
   );
-  function load(record?: T) {
+  function load(record?: T, draftKey?: string) {
     drafts.suspended.value = true;
     expected = record ? plainCopy(record) : null;
     Object.assign(form, options.empty(), record ? plainCopy(record) : {}, { id: record?.id });
+    alternateKey.value = '';
+    if (draftKey && draftKey !== key.value) {
+      alternateKey.value = isOwnEditorDraft(draftKey) ? draftKey : `${key.value}:${makeDraftId()}`;
+    }
     baseline.value = JSON.stringify(form);
     drafts.suspended.value = false;
-    drafts.restore();
+    drafts.restore(draftKey);
     titleExpanded.value = Boolean(form.title) || form.id !== undefined;
     conflict.value = dirty.value && JSON.stringify(source.value ?? null) !== JSON.stringify(expected);
   }
@@ -89,18 +96,19 @@ export function useJournalEditor<T extends Record>(options: {
       if (!(await drafts.beforeLeave())) {
         return;
       }
-      if (draftKey === `${options.kind}:new`) {
-        load();
+      const idKey = logicalEditorDraftKey(draftKey).split(':')[1];
+      if (idKey === 'new') {
+        load(undefined, draftKey);
         return;
       }
-      const id = Number(draftKey.split(':')[1]);
+      const id = Number(idKey);
       const existing = options.records().find((item) => item.id === id);
       const draft = store.editorDraftByKey(draftKey);
       if (existing) {
-        load(existing);
+        load(existing, draftKey);
       } else if (draft) {
         try {
-          load({ ...options.empty(), ...JSON.parse(draft.baseline), id });
+          load({ ...options.empty(), ...JSON.parse(draft.baseline), id }, draftKey);
         } catch {
           notifyUnknownError(new Error('Повреждён черновик'), 'Не удалось открыть черновик');
         }
@@ -190,9 +198,9 @@ export function useJournalEditor<T extends Record>(options: {
   onBeforeUnmount(() => setSyncEditorDirty(editorId, false));
   load();
   const latest = [...store.editorDrafts]
-    .filter((item) => item.key.startsWith(`${options.kind}:`))
+    .filter((item) => item.key.startsWith(`${options.kind}:`) && isOwnEditorDraft(item.key))
     .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0];
-  if (!createRequested && latest && latest.key !== key.value) {
+  if (latest && latest.key !== key.value && (!createRequested || logicalEditorDraftKey(latest.key) === `${options.kind}:new`)) {
     void openDraft(latest.key);
   }
   return {

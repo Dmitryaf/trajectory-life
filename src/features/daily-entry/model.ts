@@ -61,6 +61,13 @@ export function snapshotDailyEntry(entry: DailyEntry, metrics: DailyEntryMetrics
   });
 }
 
+export class DailyEntryChangedError extends Error {
+  constructor(public readonly current: DailyEntry | null) {
+    super('Запись за этот день изменилась. Выберите, какую версию оставить.');
+    this.name = 'DailyEntryChangedError';
+  }
+}
+
 export function prepareDailyEntryForSave(
   entry: DailyEntry,
   metrics: DailyEntryMetrics,
