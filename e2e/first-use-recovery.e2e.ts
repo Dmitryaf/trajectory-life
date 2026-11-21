@@ -10,8 +10,10 @@ test('recovers the text of the active first review step before continuing', asyn
   await page.getByRole('heading', { name: 'Что вам удалось закончить или получить?' }).click();
   const navigation = page.getByRole('navigation', { name: 'Основная навигация' });
   await navigation.getByRole('link', { name: 'Журнал' }).click();
+  await expect(page.getByRole('heading', { name: 'Журнал', exact: true })).toBeVisible();
   await navigation.getByRole('link', { name: 'Сегодня' }).click();
   await expect(field).toHaveValue('Ответ, который ещё не добавлен в обзор');
+  await expect(page.getByRole('button', { name: 'Обратная связь', exact: true })).toBeVisible();
   await page.reload();
   await expect(field).toHaveValue('Ответ, который ещё не добавлен в обзор');
 });
