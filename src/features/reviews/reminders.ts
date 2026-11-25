@@ -1,11 +1,23 @@
 import { dataCoverageLevel } from '@/features/analytics/coverage';
-import { addDays, endOfMonth, endOfWeek, startOfMonth, startOfWeek } from '@/services/dates';
+import { addDays, endOfMonth, endOfWeek, formatDate, startOfMonth, startOfWeek } from '@/services/dates';
 import type { DailyEntry, LifeEventRecord, MonthlyReview, ResultRecord, WeeklyReview } from '@/types';
+import type { SelfReminder } from '@/model/selfReminder';
 
 export type ReviewPeriod = 'week' | 'month';
-export type ViewedReviews = Partial<Record<ReviewPeriod, string>>;
-export type ReviewReminder = { period: ReviewPeriod; start: string; to: string; label: string };
-export const reviewReminderStorageKey = 'trajectory:review-reminders:v1';
+export type DismissedReviews = Partial<Record<ReviewPeriod, string>>;
+export type ReviewReminder = { period: ReviewPeriod; start: string; to: string; label: string; dates: string };
+export const reviewReminderStorageKey = 'trajectory:review-reminders:v2';
+const legacyReminderStorageKey = 'trajectory:review-reminders:v1';
+const periodBounds = {
+  week: { start: startOfWeek, end: endOfWeek, lead: 1, label: 'Вспомнить неделю', format: formatWeek },
+  month: {
+    start: startOfMonth,
+    end: endOfMonth,
+    lead: 2,
+    label: 'Вспомнить месяц',
+    format: (date: string) => formatDate(date, { month: 'long', year: 'numeric' }),
+  },
+};
 
 type ReviewData = {
   dailyEntries: DailyEntry[];
@@ -13,68 +25,81 @@ type ReviewData = {
   lifeEvents: LifeEventRecord[];
   weeklyReviews: WeeklyReview[];
   monthlyReviews: MonthlyReview[];
+  selfReminders?: readonly SelfReminder[];
 };
 
-export function reviewReminders(data: ReviewData, today: string, viewed: ViewedReviews): ReviewReminder[] {
+function formatWeek(start: string, end: string) {
+  const endLabel = formatDate(end);
+  const startLabel = start.slice(0, 7) === end.slice(0, 7) ? String(Number(start.slice(-2))) : formatDate(start);
+  return `${startLabel}–${endLabel}`;
+}
+
+export function reviewReminders(data: ReviewData, today: string, dismissed: DismissedReviews): ReviewReminder[] {
   return (['week', 'month'] as const).flatMap((period) => {
-    const start = period === 'week' ? startOfWeek(today) : startOfMonth(today);
-    const end = period === 'week' ? endOfWeek(today) : endOfMonth(today);
-    if (today < addDays(end, period === 'week' ? -1 : -2) || viewed[period] === start) {
+    const bounds = periodBounds[period];
+    const current = bounds.start(today);
+    const anchor = today >= addDays(bounds.end(today), -bounds.lead) ? today : addDays(current, -1);
+    const start = bounds.start(anchor);
+    const end = bounds.end(anchor);
+    if (dismissed[period] === start) {
       return [];
     }
     const saved =
       period === 'week'
         ? data.weeklyReviews.some((review) => review.weekStart === start)
         : data.monthlyReviews.some((review) => review.monthStart === start);
-    const inPeriod = (date: string) => date >= start && date <= today;
+    const inPeriod = (date: string) => date >= start && date <= end && date <= today;
     const hasData =
+      (period === 'month' && Boolean(data.selfReminders?.length)) ||
       data.dailyEntries.some((entry) => inPeriod(entry.date) && dataCoverageLevel(entry) > 0) ||
       data.results.some((record) => inPeriod(record.date) && Boolean(record.title.trim() || record.note.trim())) ||
       data.lifeEvents.some((record) => inPeriod(record.date) && Boolean(record.title.trim() || record.note.trim()));
     return !saved && hasData
-      ? [{ period, start, to: `/${period}`, label: period === 'week' ? 'Можно вспомнить неделю' : 'Можно вспомнить месяц' }]
+      ? [{ period, start, to: `/${period}?${period}=${start}`, label: bounds.label, dates: bounds.format(start, end) }]
       : [];
   });
 }
 
-export function readViewedReviews(owner: string, storage?: Pick<Storage, 'getItem'>): ViewedReviews {
+export function readDismissedReviews(owner: string, storage?: Pick<Storage, 'getItem'>): DismissedReviews {
   try {
     const value: unknown = JSON.parse((storage ?? window.localStorage).getItem(reviewReminderStorageKey) ?? 'null');
     if (!value || typeof value !== 'object' || !('owner' in value) || value.owner !== owner) {
       return {};
     }
-    const viewed: ViewedReviews = {};
+    const dismissed: DismissedReviews = {};
     for (const period of ['week', 'month'] as const) {
       if (period in value) {
         const start = (value as Record<string, unknown>)[period];
         if (typeof start === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(start)) {
-          viewed[period] = start;
+          dismissed[period] = start;
         }
       }
     }
-    return viewed;
+    return dismissed;
   } catch {
     return {};
   }
 }
 
-export function writeViewedReviews(owner: string, viewed: ViewedReviews, storage?: Pick<Storage, 'setItem'>) {
+export function writeDismissedReviews(owner: string, dismissed: DismissedReviews, storage?: Pick<Storage, 'setItem'>) {
   try {
     // Only the current owner's two period keys are retained; no diary text or accumulated history.
-    (storage ?? window.localStorage).setItem(reviewReminderStorageKey, JSON.stringify({ owner, ...viewed }));
+    (storage ?? window.localStorage).setItem(reviewReminderStorageKey, JSON.stringify({ owner, ...dismissed }));
   } catch {
     // An optional reminder can still be dismissed in memory when browser storage is unavailable.
   }
 }
 
-export function clearViewedReviews(owner: string, storage?: Pick<Storage, 'getItem' | 'removeItem'>) {
-  try {
-    const target = storage ?? window.localStorage;
-    const value: unknown = JSON.parse(target.getItem(reviewReminderStorageKey) ?? 'null');
-    if (value && typeof value === 'object' && 'owner' in value && value.owner === owner) {
-      target.removeItem(reviewReminderStorageKey);
+export function clearDismissedReviews(owner: string, storage?: Pick<Storage, 'getItem' | 'removeItem'>) {
+  for (const key of [reviewReminderStorageKey, legacyReminderStorageKey]) {
+    try {
+      const target = storage ?? window.localStorage;
+      const value: unknown = JSON.parse(target.getItem(key) ?? 'null');
+      if (value && typeof value === 'object' && 'owner' in value && value.owner === owner) {
+        target.removeItem(key);
+      }
+    } catch {
+      // Optional browser preferences must not block successful account deletion.
     }
-  } catch {
-    // Optional browser preferences must not block successful account deletion.
   }
 }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { emptyDailyEntry, emptyMonthlyReview, emptyWeeklyReview } from '@/types';
-import { readViewedReviews, reviewReminders, reviewReminderStorageKey, writeViewedReviews } from '../reminders';
+import { readDismissedReviews, reviewReminders, reviewReminderStorageKey, writeDismissedReviews } from '../reminders';
 
 const data = (): Parameters<typeof reviewReminders>[0] => ({
   dailyEntries: [],
@@ -33,7 +33,11 @@ describe('optional review reminders', () => {
     expect(reviewReminders(diary, '2026-10-31', {}).map((item) => item.period)).toEqual(['week', 'month']);
     expect(reviewReminders(diary, '2026-10-31', { week: '2026-10-26' }).map((item) => item.period)).toEqual(['month']);
     expect(reviewReminders(diary, '2026-10-31', { week: '2026-10-19' })).toHaveLength(2);
-    expect(reviewReminders(diary, '2026-11-02', {})).toEqual([]);
+    expect(reviewReminders(diary, '2026-11-02', {})).toEqual([
+      expect.objectContaining({ period: 'week', start: '2026-10-26', to: '/week?week=2026-10-26' }),
+      expect.objectContaining({ period: 'month', start: '2026-10-01', to: '/month?month=2026-10-01' }),
+    ]);
+    expect(reviewReminders(diary, '2026-11-07', {}).map((item) => item.period)).toEqual(['month']);
     diary.weeklyReviews = [emptyWeeklyReview('2026-10-26')];
     expect(reviewReminders(diary, '2026-10-31', {}).map((item) => item.period)).toEqual(['month']);
     diary.monthlyReviews = [emptyMonthlyReview('2026-10-01')];
@@ -55,11 +59,11 @@ describe('optional review reminders', () => {
         memory.set(key, value);
       },
     };
-    writeViewedReviews('alice', { week: '2026-10-12', month: '2026-10-01' }, storage);
-    expect(readViewedReviews('alice', storage)).toEqual({ week: '2026-10-12', month: '2026-10-01' });
-    expect(readViewedReviews('bob', storage)).toEqual({});
+    writeDismissedReviews('alice', { week: '2026-10-12', month: '2026-10-01' }, storage);
+    expect(readDismissedReviews('alice', storage)).toEqual({ week: '2026-10-12', month: '2026-10-01' });
+    expect(readDismissedReviews('bob', storage)).toEqual({});
     memory.set(reviewReminderStorageKey, '{broken');
-    expect(readViewedReviews('alice', storage)).toEqual({});
+    expect(readDismissedReviews('alice', storage)).toEqual({});
     const unavailable = {
       getItem: () => {
         throw new Error('unavailable');
@@ -68,7 +72,7 @@ describe('optional review reminders', () => {
         throw new Error('full');
       },
     };
-    expect(readViewedReviews('alice', unavailable)).toEqual({});
-    expect(() => writeViewedReviews('alice', { week: '2026-10-12' }, unavailable)).not.toThrow();
+    expect(readDismissedReviews('alice', unavailable)).toEqual({});
+    expect(() => writeDismissedReviews('alice', { week: '2026-10-12' }, unavailable)).not.toThrow();
   });
 });

@@ -307,12 +307,14 @@ test('keeps the Journal and archive chrome compact at pilot widths', async ({ pa
       readLayoutBox(journalCards.nth(1), `second Journal choice at ${width}px`),
     ]);
     const settingsBox = await readLayoutBox(page.locator('.journal-settings-card'), `Journal settings at ${width}px`);
+    const remindersBox = await readLayoutBox(page.getByRole('link', { name: /Напоминания себе/ }), `Journal reminders at ${width}px`);
 
     expect(journalTitleSize, `Journal title size at ${width}px`).toBeLessThanOrEqual(width <= 720 ? 34 : 44);
     expect(Math.max(...cardBoxes.map((box) => box.height)), `Journal choice height at ${width}px`).toBeLessThanOrEqual(
       width <= 760 ? 160 : 176,
     );
     expect(settingsBox.height, `Journal settings height at ${width}px`).toBeLessThanOrEqual(100);
+    expectVerticalSeparation(cardBoxes[1], remindersBox, 12, `Journal reminders follow the archives at ${width}px`);
     expectVerticalSeparation(journalHeading, cardBoxes[0], 0, `Journal heading and choices at ${width}px`);
     if (width === 390) {
       expect(cardBoxes[0].y, 'Journal choices should appear in the first mobile viewport').toBeLessThanOrEqual(300);
