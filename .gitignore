@@ -27,7 +27,6 @@ demo/generated/
 supabase/.temp/
 coverage/
 
-# Project documentation and agent instructions are owner-only.
 /docs/
 /.ai-rules/
 /AGENTS.md

@@ -1,19 +1,19 @@
 # Trajectory
 
-A personal journal connecting daily notes with weekly and monthly reflection. The interface is in Russian. [Open the app](https://trajectory-life.ru) · [Data policy](https://trajectory-life.ru/data-policy).
+A personal journal connecting daily notes with weekly and monthly reflection. [Open the app](https://trajectory-life.ru) · [Data policy](https://trajectory-life.ru/data-policy).
 
 ## Current workflows
 
 - Daily notes with optional sleep, energy, activities, context and nutrition fields.
 - Weekly and monthly reviews, a current goal, concrete next steps and personal experiments.
 - Separate archives of results and life events, search and charts over time.
-- Compatible JSON backup/restore and a separately prepared export for external analysis.
+- Compatible JSON backup and restore, plus a manual export for external analysis.
 - Local IndexedDB storage, optional account sync and PWA installation.
 
-There is no score for a person or a day. Missing fields stay missing; you choose what to record. The app does not automatically send journal entries to an AI service.
+There is no score for a person or a day. Missing fields stay missing; you choose what to record.
 
-![Today with generated example data](src/features/landing/assets/today-desktop.webp)
-![Week with generated example data](src/features/landing/assets/week-desktop.webp)
+![Daily view with sample data](src/features/landing/assets/today-desktop.webp)
+![Weekly review with sample data](src/features/landing/assets/week-desktop.webp)
 
 ## Local development
 

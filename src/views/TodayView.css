@@ -515,7 +515,6 @@
     padding: 10px 6px;
   }
 }
-/* Scenario spacing stays with the daily-entry owner. */
 .form-card > :deep(.chip-group) + textarea,
 .form-card > :deep(.chip-group) + .sleep-field-grid,
 .form-card > .sleep-field-grid + textarea,
