@@ -7,7 +7,7 @@ import { expectPageFitsViewport } from './layout-assertions';
 
 const require = createRequire(import.meta.url);
 const axeSource = readFileSync(require.resolve('axe-core/axe.min.js'), 'utf8');
-const criticalRoutes = ['/today', '/week', '/month', '/trends', '/more', '/results', '/events', '/settings'];
+const criticalRoutes = ['/today', '/week', '/month', '/trends', '/more', '/results', '/events', '/self-reminders', '/settings'];
 
 test.beforeEach(async ({ page }) => {
   await page.goto('/settings');

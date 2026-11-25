@@ -5,8 +5,8 @@ import { createPinia, setActivePinia } from 'pinia';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { useAppStore } from '@/stores/app';
 import { emptyDailyEntry } from '@/types';
-import { provideReviewReminders, useViewedReview } from '../useReviewReminders';
-import { readViewedReviews } from '../reminders';
+import { provideReviewReminders } from '../useReviewReminders';
+import { readDismissedReviews } from '../reminders';
 
 beforeEach(() => {
   setActivePinia(createPinia());
@@ -16,23 +16,16 @@ beforeEach(() => {
 });
 afterEach(() => vi.useRealTimers());
 
-it('acknowledges the mounted period after data is ready, survives reload and isolates owners', async () => {
+it('stores an explicit dismissal after data is ready, survives reload and isolates owners', async () => {
   const store = useAppStore();
   store.dailyEntries = [{ ...emptyDailyEntry('2026-10-31'), importantFact: 'Заметка' }];
   const owner = ref('alice');
   const ready = ref(false);
-  const start = ref('2026-10-19');
-  const Reader = {
-    setup() {
-      useViewedReview('week', start);
-      return () => h('div');
-    },
-  };
   let context!: ReturnType<typeof provideReviewReminders>;
   const Host = {
     setup() {
       context = provideReviewReminders(store, owner, ready);
-      return () => h(Reader);
+      return () => h('div');
     },
   };
   let wrapper = mount(Host);
@@ -40,14 +33,12 @@ it('acknowledges the mounted period after data is ready, survives reload and iso
   ready.value = true;
   await nextTick();
   expect(context.reminders.value).toHaveLength(2);
-  start.value = '2026-10-26';
-  await nextTick();
-  expect(context.destination.value).toBe('/month');
-  expect(readViewedReviews('alice')).toEqual({ week: '2026-10-26' });
+  context.dismiss(context.reminders.value[0]!);
+  expect(context.reminders.value.map((item) => item.period)).toEqual(['month']);
+  expect(readDismissedReviews('alice')).toEqual({ week: '2026-10-26' });
   wrapper.unmount();
   wrapper = mount(Host);
   expect(context.reminders.value.map((item) => item.period)).toEqual(['month']);
-  start.value = '2026-10-19';
   owner.value = 'bob';
   await nextTick();
   expect(context.reminders.value).toHaveLength(2);
@@ -67,8 +58,8 @@ it('refreshes the reminder window on resume and does not dismiss while loading f
     },
   };
   const wrapper = mount(Host);
-  context.markViewed('month', '2026-10-01');
-  expect(readViewedReviews('alice')).toEqual({});
+  expect(context.reminders.value).toEqual([]);
+  expect(readDismissedReviews('alice')).toEqual({});
   ready.value = true;
   expect(context.reminders.value.map((item) => item.period)).toEqual(['month']);
   vi.setSystemTime(new Date('2026-10-31T00:01:00'));
@@ -76,6 +67,6 @@ it('refreshes the reminder window on resume and does not dismiss while loading f
   expect(context.reminders.value.map((item) => item.period)).toEqual(['week', 'month']);
   vi.setSystemTime(new Date('2026-11-02T00:01:00'));
   await vi.advanceTimersByTimeAsync(60_000);
-  expect(context.reminders.value).toEqual([]);
+  expect(context.reminders.value.map((item) => item.period)).toEqual(['week', 'month']);
   wrapper.unmount();
 });

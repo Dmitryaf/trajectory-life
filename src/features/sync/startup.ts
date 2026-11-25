@@ -181,12 +181,15 @@ export function sameSnapshotData(store: AppStore, snapshot: CloudSnapshot) {
 
 export function samePayloadData(leftInput: unknown, rightInput: unknown) {
   try {
-    const left = { ...normalizeSnapshot(leftInput), exportedAt: '' };
-    const right = { ...normalizeSnapshot(rightInput), exportedAt: '' };
-    return JSON.stringify(left) === JSON.stringify(right);
+    return JSON.stringify(snapshotData(leftInput)) === JSON.stringify(snapshotData(rightInput));
   } catch {
     return false;
   }
+}
+
+function snapshotData(input: unknown) {
+  const { version, exportedAt, ...data } = normalizeSnapshot(input);
+  return data;
 }
 
 export async function prepareLocalCacheOwner(
@@ -210,6 +213,7 @@ export function hasLocalUserData(store: AppStore): boolean {
     store.dailyEntries.length ||
     store.results.length ||
     store.lifeEvents.length ||
+    store.selfReminders.length ||
     store.weeklyReviews.length ||
     store.monthlyReviews.length ||
     JSON.stringify(store.settings) !== JSON.stringify(defaultSettings),

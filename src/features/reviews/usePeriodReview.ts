@@ -9,7 +9,6 @@ import { captureReviewSave } from './telemetry';
 import { setSyncEditorDirty } from '../sync/editing';
 import { ReviewChangedError } from './version';
 import { useEditorDraft } from '../editor-drafts/useEditorDraft';
-import { useViewedReview } from './useReviewReminders';
 import { editorDraftKey } from '@/model/editorDraft';
 
 type Period = 'week' | 'month';
@@ -50,7 +49,6 @@ function draftSignature(review: PeriodReview) {
 }
 
 export function usePeriodReview<T extends PeriodReview>(options: PeriodReviewOptions<T>) {
-  useViewedReview(options.period, options.start);
   const store = useAppStore();
   const labels = periodLabels[options.period];
   const review = reactive(options.emptyReview(options.start.value)) as T;

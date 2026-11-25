@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import TodayWeeklyPlan from '@/features/daily-entry/ui/TodayWeeklyPlan.vue';
+import ReviewInvitations from '@/features/reviews/ui/ReviewInvitations.vue';
 import ActionButton from '@/shared/ui/actions/ActionButton.vue';
 import { RouterLink } from 'vue-router';
 import SurfaceCard from '@/shared/ui/layout/SurfaceCard.vue';
@@ -317,6 +318,7 @@ function openEntryDatePicker() {
       </div>
     </PageHeading>
 
+    <ReviewInvitations v-if="isToday" />
     <FirstUseRecovery
       v-if="isToday"
       :show-available-prompt="activeContextCue === 'first-use'"

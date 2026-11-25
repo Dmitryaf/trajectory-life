@@ -78,9 +78,8 @@ test('carries the outgoing Sunday plan into Monday and supports a text-only revi
     .setInputFiles({ name: 'text-diary.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(payload)) });
   await expect(page.locator('input[type="file"]')).toHaveValue('');
   await page.goto('/today');
-  await expect(page.getByRole('img', { name: 'Можно вспомнить неделю', exact: true })).toBeVisible();
-  await page.locator('.bottom-nav__item[href="/week"]').click();
-  await expect(page.locator('.bottom-nav .review-reminder-dot')).toHaveCount(0);
+  await page.getByRole('link', { name: /Вспомнить неделю/ }).click();
+  await expect(page).toHaveURL(/week\?week=2026-08-17/);
   await expect(page.locator('.review-cue')).toHaveCount(0);
   await expect(page.locator('.review-cue-empty')).toContainText('измерения для этого не нужны');
   await page.getByPlaceholder('Например: если не могу начать, то выделю 10 минут на черновик').fill('Если устану, выйду на прогулку');
@@ -88,6 +87,7 @@ test('carries the outgoing Sunday plan into Monday and supports a text-only revi
   await expect(page.getByText('Обзор недели сохранён', { exact: true })).toBeVisible();
   await page.clock.setFixedTime(new Date('2026-08-24T12:00:00.000Z'));
   await page.goto('/today');
+  await expect(page.getByRole('link', { name: /Вспомнить неделю/ })).toHaveCount(0);
   const plan = page.getByRole('region', { name: 'Текущий план недели' });
   await plan.locator('summary').click();
   await expect(plan).toContainText('Если устану, выйду на прогулку');

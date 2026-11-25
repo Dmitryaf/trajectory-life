@@ -49,7 +49,15 @@ const sections = computed<Array<{ to: string; icon: UiIconName; tone: string; co
         <i><UiIcon name="arrow-right" /></i>
       </RouterLink>
     </div>
-    <RouterLink to="/settings" class="journal-settings-card">
+    <RouterLink to="/self-reminders" class="journal-link-card">
+      <span><UiIcon name="note" /></span>
+      <div>
+        <h2>Напоминания себе</h2>
+        <p>Принципы, вопросы и уроки, к которым хочется возвращаться.</p>
+      </div>
+      <i><UiIcon name="arrow-right" /></i>
+    </RouterLink>
+    <RouterLink to="/settings" class="journal-link-card journal-settings-card">
       <span><UiIcon name="settings" /></span>
       <div>
         <small>Управление приложением</small>
