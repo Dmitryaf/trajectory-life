@@ -50,7 +50,7 @@ try {
       expand: '.trends-metric-details > summary',
       scroll: '.trends-metric-details',
     },
-    { route: '/results', selector: '.page--archive', file: 'journal.webp' },
+    { route: '/more', selector: '.page--journal', file: 'journal.webp' },
     { route: '/settings', selector: '#daily-blocks', file: 'settings.webp' },
   ];
 
