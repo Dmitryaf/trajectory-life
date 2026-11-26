@@ -133,7 +133,7 @@ function normalizeSnapshotResult(value: unknown, index: number): ResultRecord {
   return normalizeResult({
     ...(typeof id === 'number' ? { id } : {}),
     date: requireDate(result.date, `results[${index}].date`),
-    area: requireString(result.area, `results[${index}].area`) as ResultRecord['area'],
+    ...(result.area === undefined ? {} : { area: requireString(result.area, `results[${index}].area`) }),
     title: requireString(result.title, `results[${index}].title`),
     note: typeof result.note === 'string' ? result.note : '',
     createdAt: typeof result.createdAt === 'string' ? result.createdAt : '',

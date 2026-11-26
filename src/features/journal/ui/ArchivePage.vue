@@ -22,6 +22,7 @@ const props = defineProps<{
   count: number;
   activeFilters: number;
   hasItems: boolean;
+  selectedEntry?: boolean;
   emptyIcon: UiIconName;
   emptyTitle: string;
   emptyDescription: string;
@@ -74,10 +75,13 @@ watch(
     </PageHeading>
 
     <nav class="archive-navigation" aria-label="Разделы журнала">
+      <RouterLink to="/more">К журналу</RouterLink>
       <RouterLink to="/results" :aria-current="tone === 'results' ? 'page' : undefined">Итоги</RouterLink>
       <RouterLink to="/events" :aria-current="tone === 'events' ? 'page' : undefined">События и мысли</RouterLink>
+      <RouterLink to="/self-reminders">Напоминания себе</RouterLink>
     </nav>
     <details
+      v-show="!selectedEntry || editingId !== null"
       ref="composer"
       class="archive-add"
       :open="composerOpen"
@@ -93,11 +97,11 @@ watch(
       <SectionHeading>
         <div>
           <EyebrowText>{{ archiveEyebrow }}</EyebrowText>
-          <h2>{{ archiveTitle }}</h2>
+          <h2>{{ selectedEntry ? 'Выбранная запись' : archiveTitle }}</h2>
         </div>
-        <span class="archive-count">{{ count }}</span>
+        <span v-if="!selectedEntry" class="archive-count">{{ count }}</span>
       </SectionHeading>
-      <div class="archive-filters">
+      <div v-if="!selectedEntry" class="archive-filters">
         <slot name="search"></slot>
         <ActionButton
           type="button"
@@ -116,9 +120,12 @@ watch(
       <slot v-if="hasItems"></slot>
       <div v-else class="archive-empty">
         <span><UiIcon :name="emptyIcon" /></span>
-        <h3>{{ emptyTitle }}</h3>
-        <p>{{ emptyDescription }}</p>
+        <h3>{{ selectedEntry ? 'Запись не найдена' : emptyTitle }}</h3>
+        <p>{{ selectedEntry ? 'Возможно, её уже удалили.' : emptyDescription }}</p>
       </div>
+      <RouterLink v-if="selectedEntry" class="archive-show-all" :to="tone === 'results' ? '/results' : '/events'">
+        {{ tone === 'results' ? 'Все итоги' : 'Все события и мысли' }}
+      </RouterLink>
     </section>
   </PageShell>
 </template>
@@ -140,7 +147,7 @@ watch(
 }
 :deep(.journal-date) {
   max-width: 210px;
-  margin-block: 12px;
+  margin: 0;
 }
 :deep(.journal-note-label) {
   display: block;
@@ -203,6 +210,13 @@ watch(
 .archive-navigation a {
   color: var(--brand-strong);
   text-underline-offset: 4px;
+}
+.archive-show-all {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  color: var(--brand-strong);
+  text-underline-offset: 3px;
 }
 .archive-navigation a[aria-current] {
   font-weight: 750;

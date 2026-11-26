@@ -1,26 +1,26 @@
 <script setup lang="ts">
 import { computed } from 'vue';
+import ReminderReadingList from './ReminderReadingList.vue';
 import { selfReminderCategories, type SelfReminder } from '@/model/selfReminder';
 
-const props = withDefaults(defineProps<{ reminders: readonly SelfReminder[]; heading?: 'h2' | 'h3' }>(), { heading: 'h2' });
+const props = withDefaults(
+  defineProps<{ reminders: readonly SelfReminder[]; heading?: 'h2' | 'h3'; editable?: boolean; selectedId?: string }>(),
+  { heading: 'h2', selectedId: undefined },
+);
 const groups = computed(() => {
-  const sorted = [...props.reminders].sort((left, right) => right.createdAt.localeCompare(left.createdAt));
   return selfReminderCategories
-    .map((category) => ({ ...category, reminders: sorted.filter((reminder) => reminder.category === category.value) }))
+    .map((category) => ({ ...category, reminders: props.reminders.filter((reminder) => reminder.category === category.value) }))
     .filter((group) => group.reminders.length);
 });
 </script>
 
 <template>
   <div class="self-reminder-list">
-    <section v-for="group in groups" :key="group.value">
+    <section v-for="group in groups" :id="group.value" :key="group.value">
       <component :is="heading">{{ group.label }}</component>
-      <ul>
-        <li v-for="reminder in group.reminders" :key="reminder.id">
-          <p>{{ reminder.text }}</p>
-          <slot name="actions" :reminder="reminder" />
-        </li>
-      </ul>
+      <ReminderReadingList :reminders="group.reminders" compact :editable="editable" :selected-id="selectedId">
+        <template #actions="{ reminder }"><slot name="actions" :reminder="reminder" /></template>
+      </ReminderReadingList>
     </section>
   </div>
 </template>
@@ -35,24 +35,5 @@ const groups = computed(() => {
   margin: 0 0 4px;
   color: var(--navy);
   font-size: 1rem;
-}
-.self-reminder-list ul {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-.self-reminder-list li {
-  padding-block: 10px;
-}
-.self-reminder-list li + li {
-  border-top: 1px solid var(--line-soft);
-}
-.self-reminder-list p {
-  max-width: 70ch;
-  margin: 0;
-  color: var(--text);
-  line-height: 1.55;
-  overflow-wrap: anywhere;
-  white-space: pre-wrap;
 }
 </style>

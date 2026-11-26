@@ -1,11 +1,11 @@
-import { lifeEventTypeOptions } from './options';
+import { lifeEventTypeOptions, unassignedResultArea } from './options';
 import { validDate } from './normalization';
 import type { LifeEventRecord, LifeEventType, MonthlyReview, ResultRecord, WeeklyReview } from './schema';
 
 export function normalizeResult(result: Partial<ResultRecord> & { date: string; title: string }): ResultRecord {
   return {
     date: result.date,
-    area: typeof result.area === 'string' ? result.area : 'career',
+    area: typeof result.area === 'string' && result.area.trim() ? result.area : unassignedResultArea,
     title: typeof result.title === 'string' ? result.title : '',
     note: typeof result.note === 'string' ? result.note : '',
     createdAt: typeof result.createdAt === 'string' ? result.createdAt : '',

@@ -1,17 +1,16 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
 import ActionButton from '@/shared/ui/actions/ActionButton.vue';
-import IconActionButton from '@/shared/ui/actions/IconActionButton.vue';
 import ClampedText from '@/shared/ui/content/ClampedText.vue';
 import AutoGrowTextarea from '@/shared/ui/forms/AutoGrowTextarea.vue';
 import ChipGroup from '@/shared/ui/forms/ChipGroup.vue';
 import DateInput from '@/shared/ui/forms/DateInput.vue';
 import FormCardHeading from '@/shared/ui/forms/FormCardHeading.vue';
-import { formatDate, todayKey } from '@/services/dates';
+import { formatDate } from '@/services/dates';
 import { notifyInfo, notifyUnknownError } from '@/services/notifications';
 import { useAppStore } from '@/stores/app';
 import { lifeEventTypeOptions, type LifeEventRecord } from '@/types';
-import { archiveRangeFromQuery } from '../archiveQuery';
+import { archiveRangeFromQuery, newJournalDate, useArchiveEntryId } from '../archiveQuery';
 import { useArchiveList } from '../useArchiveList';
 import ArchiveDateRange from '../ui/ArchiveDateRange.vue';
 import ArchiveEntryCard from '../ui/ArchiveEntryCard.vue';
@@ -23,7 +22,7 @@ import { useJournalEditor } from '../useJournalEditor';
 const store = useAppStore();
 const editor = useJournalEditor<LifeEventRecord>({
   kind: 'event',
-  empty: () => ({ id: undefined, date: todayKey(), title: '', note: '', type: 'change', createdAt: '' }),
+  empty: () => ({ id: undefined, date: newJournalDate(), title: '', note: '', type: 'change', createdAt: '' }),
   records: () => store.lifeEvents,
   titleLimit: 140,
   persist: (record, expected, key) =>
@@ -46,12 +45,17 @@ const {
   currentPage,
   filteredItems: filteredEvents,
   pageCount,
-  visibleItems: visibleEvents,
+  visibleItems: pagedEvents,
 } = useArchiveList(recentEvents, {
   getSearchText: (event) => `${event.title} ${event.note}`,
   getCategory: (event) => event.type,
   ...archiveRange,
 });
+
+const requestedEntry = useArchiveEntryId();
+const visibleEvents = computed(() =>
+  requestedEntry.value === null ? pagedEvents.value : recentEvents.value.filter((item) => String(item.id) === requestedEntry.value),
+);
 
 async function remove(id?: number) {
   if (id === undefined || removingIds.value.includes(id) || !window.confirm('Удалить это событие?')) {
@@ -95,6 +99,7 @@ function eventKey(event: LifeEventRecord) {
     :count="filteredEvents.length"
     :active-filters="Number(filterType !== 'all') + Number(Boolean(dateFrom || dateTo))"
     :has-items="visibleEvents.length > 0"
+    :selected-entry="requestedEntry !== null"
     empty-icon="event"
     :empty-title="recentEvents.length ? 'Ничего не найдено' : 'Записей пока нет'"
     :empty-description="
@@ -105,7 +110,7 @@ function eventKey(event: LifeEventRecord) {
       <FormCardHeading icon="event" tone="amber">
         <div>
           <h2>{{ editingId === null ? 'Добавить запись' : 'Редактировать запись' }}</h2>
-          <p>Выберите, что хотите записать: произошедшее событие или важную мысль.</p>
+          <p>Запишите событие или мысль, к которой хочется вернуться.</p>
         </div>
       </FormCardHeading>
       <JournalDraftStatus
@@ -120,22 +125,6 @@ function eventKey(event: LifeEventRecord) {
         @open="editor.openDraft"
       />
       <fieldset :disabled="saving" class="journal-fields">
-        <ChipGroup v-model="type" :options="lifeEventTypeOptions" />
-
-        <details :open="titleExpanded" class="journal-title" @toggle="titleExpanded = ($event.currentTarget as HTMLDetailsElement).open">
-          <summary>Название (необязательно)</summary>
-          <div class="event-composer__fields">
-            <input
-              v-model="title"
-              :disabled="saving"
-              type="text"
-              maxlength="140"
-              placeholder="Короткое название"
-              @keydown.enter.prevent="saveEvent()"
-            />
-          </div>
-        </details>
-        <DateInput v-model="date" class="journal-date" required aria-label="Дата события" :disabled="saving" />
         <label class="journal-note-label" for="event-note">Событие или мысль</label>
         <AutoGrowTextarea
           id="event-note"
@@ -158,7 +147,27 @@ function eventKey(event: LifeEventRecord) {
         <ActionButton v-if="editingId !== null || dirty" variant="secondary" class="composer-cancel" type="button" @click="resetForm">
           {{ editingId === null ? 'Удалить черновик' : 'Отменить редактирование' }}
         </ActionButton>
+        <DateInput v-model="date" class="journal-date" required aria-label="Дата события" :disabled="saving" />
       </div>
+      <fieldset :disabled="saving" class="journal-fields">
+        <details :open="titleExpanded" class="journal-title" @toggle="titleExpanded = ($event.currentTarget as HTMLDetailsElement).open">
+          <summary>Название и тип записи</summary>
+          <div class="event-composer__fields">
+            <label for="event-title">Название (необязательно)</label>
+            <input
+              id="event-title"
+              v-model="title"
+              :disabled="saving"
+              type="text"
+              maxlength="140"
+              placeholder="Короткое название"
+              @keydown.enter.prevent="saveEvent()"
+            />
+          </div>
+          <p class="journal-note-label">Тип записи</p>
+          <ChipGroup v-model="type" :options="lifeEventTypeOptions" />
+        </details>
+      </fieldset>
     </template>
     <template #search>
       <label class="archive-filter-field">
@@ -176,7 +185,12 @@ function eventKey(event: LifeEventRecord) {
       </label>
       <ArchiveDateRange v-model:date-from="dateFrom" v-model:date-to="dateTo" context-label="событий" />
     </template>
-    <ArchiveEntryList v-model:page="currentPage" tone="events" :page-count="pageCount" context-label="событий">
+    <ArchiveEntryList
+      v-model:page="currentPage"
+      tone="events"
+      :page-count="requestedEntry === null ? pageCount : 1"
+      context-label="событий"
+    >
       <ArchiveEntryCard
         v-for="event in visibleEvents"
         :key="eventKey(event)"
@@ -186,21 +200,21 @@ function eventKey(event: LifeEventRecord) {
         :metadata="`${eventMeta(event.type).label} · ${formatDate(event.date, { day: 'numeric', month: 'short', year: 'numeric' })}`"
       >
         <ClampedText
-          v-if="event.note"
+          v-if="event.note && event.note !== event.title"
           :text="event.note"
           :content-id="`event-note-${eventKey(event)}`"
           text-class="timeline-item__note"
           tone="event"
         />
         <template #actions>
-          <IconActionButton icon="edit" label="Редактировать событие" @click="edit(event)" />
-          <IconActionButton
-            icon="delete"
-            danger
-            label="Удалить событие"
+          <ActionButton variant="secondary" aria-label="Редактировать событие" @click="edit(event)">Редактировать</ActionButton>
+          <ActionButton
+            variant="danger"
+            aria-label="Удалить событие"
             :disabled="event.id !== undefined && removingIds.includes(event.id)"
             @click="remove(event.id)"
-          />
+            >Удалить</ActionButton
+          >
         </template>
       </ArchiveEntryCard>
     </ArchiveEntryList>

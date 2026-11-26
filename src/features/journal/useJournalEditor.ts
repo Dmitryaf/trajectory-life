@@ -31,7 +31,8 @@ export function useJournalEditor<T extends Record>(options: {
   const busy = computed(() => saving.value || switching.value);
   const conflict = ref(false);
   const editorId = `journal:${++nextEditor}`;
-  const createRequested = new URLSearchParams(window.location.search).get('create') === '1';
+  const query = new URLSearchParams(window.location.search);
+  const createRequested = query.get('create') === '1';
   const drafts = useEditorDraft({
     reset: () => load(source.value),
     key,
@@ -200,7 +201,12 @@ export function useJournalEditor<T extends Record>(options: {
   const latest = [...store.editorDrafts]
     .filter((item) => item.key.startsWith(`${options.kind}:`) && isOwnEditorDraft(item.key))
     .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0];
-  if (latest && latest.key !== key.value && (!createRequested || logicalEditorDraftKey(latest.key) === `${options.kind}:new`)) {
+  if (
+    !query.has('entry') &&
+    latest &&
+    latest.key !== key.value &&
+    (!createRequested || logicalEditorDraftKey(latest.key) === `${options.kind}:new`)
+  ) {
     void openDraft(latest.key);
   }
   return {
