@@ -114,7 +114,7 @@ async function runRound(browser: Browser, verifyOffline: boolean): Promise<Round
   await page.goto('/settings');
   await page.locator('input[type="file"]').setInputFiles(demoFilePath);
   await expect(page.getByText('Резервная копия восстановлена на этом устройстве', { exact: true }).last()).toBeVisible();
-  await page.getByRole('navigation', { name: 'Основная навигация' }).getByRole('link', { name: 'Обзор' }).click();
+  await page.getByRole('navigation', { name: 'Основная навигация' }).getByRole('link', { name: 'Обзоры' }).click();
   await page.locator('.page--week').waitFor();
   await page.evaluate(() => performance.clearResourceTimings());
   const monthTransitionMs = await elapsed(async () => {

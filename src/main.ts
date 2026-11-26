@@ -64,7 +64,7 @@ const router = createRouter({
     {
       path: '/week',
       component: () => import('./views/WeekView.vue'),
-      props: (route) => ({ initialWeek: typeof route.query.week === 'string' ? route.query.week : '' }),
+      props: (route) => ({ initialWeek: typeof route.query.week === 'string' ? route.query.week : '', initialHash: route.hash }),
       meta: { title: 'Неделя' },
     },
     {
@@ -73,7 +73,12 @@ const router = createRouter({
       props: (route) => ({ initialMonth: typeof route.query.month === 'string' ? route.query.month : '' }),
       meta: { title: 'Месяц' },
     },
-    { path: '/trends', component: () => import('./views/TrendsView.vue'), meta: { title: 'История изменений' } },
+    {
+      path: '/trends',
+      component: () => import('./views/TrendsView.vue'),
+      props: (route) => ({ initialHash: route.hash }),
+      meta: { title: 'Динамика' },
+    },
     { path: '/more', component: () => import('./views/MoreView.vue'), meta: { title: 'Журнал' } },
     { path: '/self-reminders', component: () => import('./views/SelfRemindersView.vue'), meta: { title: 'Напоминания себе' } },
     { path: '/settings', component: () => import('./views/SettingsView.vue'), meta: { title: 'Настройки' } },

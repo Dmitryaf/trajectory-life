@@ -1,11 +1,11 @@
 import { confirmDataReset } from './confirmDataReset';
-import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue';
+import { computed, reactive, ref } from 'vue';
 import { useAppStore } from '@/stores/app';
 import { useAuthStore } from '@/stores/auth';
 import { useExperimentSettings } from '../experiments/useExperimentSettings';
 import { notifyInfo, notifySaved, notifyUnknownError } from '@/services/notifications';
 import { plainCopy } from '@/services/plain';
-import { setSyncEditorDirty } from '../sync/editing';
+import { useSettingsCards, type SettingsCardId } from './useSettingsCards';
 import { confirmBackupImport, downloadBackup } from '../backup/browser';
 import {
   activityOptions,
@@ -27,24 +27,7 @@ import {
 
 export function useSettingsForm() {
   const store = useAppStore();
-  const settings = reactive<AppSettings>(plainCopy(store.settings));
-  const settingsBaseline = ref(JSON.stringify(store.settings));
-  const settingsDirty = computed(() => JSON.stringify(settings) !== settingsBaseline.value);
-  watch(settingsDirty, (dirty) => setSyncEditorDirty('settings', dirty), { immediate: true });
-  function replaceSettingsFromStore() {
-    Object.assign(settings, plainCopy(store.settings));
-    settingsBaseline.value = JSON.stringify(store.settings);
-  }
-  function handleCloudSnapshotApplied() {
-    if (!settingsDirty.value) {
-      replaceSettingsFromStore();
-    }
-  }
-  window.addEventListener('trajectory:cloud-snapshot-applied', handleCloudSnapshotApplied);
-  onBeforeUnmount(() => {
-    setSyncEditorDirty('settings', false);
-    window.removeEventListener('trajectory:cloud-snapshot-applied', handleCloudSnapshotApplied);
-  });
+  const { settings, saveCard, cardDirty, replaceSettingsFromStore } = useSettingsCards(store);
   const importInput = ref<HTMLInputElement>();
   const newCareerLabel = ref('');
   const newActivityLabel = ref('');
@@ -128,10 +111,9 @@ export function useSettingsForm() {
     }
   }
 
-  async function save(message = 'Настройки сохранены', action = 'settings', nextSettings: AppSettings = plainCopy(settings)) {
+  async function save(message: string, action: SettingsCardId, nextSettings: AppSettings = plainCopy(settings)) {
     return runAction(action, 'Не удалось сохранить настройки', async () => {
-      await store.saveSettings(nextSettings);
-      settingsBaseline.value = JSON.stringify(nextSettings);
+      await saveCard(action, nextSettings);
       notifySaved(message);
     });
   }
@@ -381,6 +363,7 @@ export function useSettingsForm() {
     dailyBlockOptions,
     store,
     settings,
+    cardDirty,
     importInput,
     newCareerLabel,
     newActivityLabel,

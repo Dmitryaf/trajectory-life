@@ -29,7 +29,7 @@ for (const period of ['week', 'month']) {
     await expect(page.locator('.period-nav__label strong')).not.toHaveText(periodTitle!);
     await page.getByRole('button', { name: 'Следующий период' }).click();
     await expect(input).toHaveValue('Собственный вывод, который ещё не сохранён');
-    await page.getByRole('navigation', { name: 'Основная навигация' }).getByRole('link', { name: 'История' }).click();
+    await page.getByRole('navigation', { name: 'Основная навигация' }).getByRole('link', { name: 'Динамика' }).click();
     await expect(page).toHaveURL(/\/trends$/);
     await page.goBack();
     await expect(input).toHaveValue('Собственный вывод, который ещё не сохранён');
@@ -60,7 +60,7 @@ test('exposes selected scales and analysis controls to assistive technology', as
     await expect(group.getByRole('button', { pressed: true })).toHaveText('4');
   }
   await page.goto('/trends');
-  const range = page.getByRole('group', { name: 'Период истории' });
+  const range = page.getByRole('group', { name: 'Период динамики' });
   await range.getByRole('button', { name: '6 месяцев' }).click();
   await expect(range.getByRole('button', { pressed: true })).toHaveText('6 месяцев');
   await page.locator('.trends-metric-details > summary').click();

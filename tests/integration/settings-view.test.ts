@@ -1,13 +1,14 @@
 // @vitest-environment happy-dom
 
 import { flushPromises, mount } from '@vue/test-utils';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { db } from '@/db';
 import { copyText, downloadJson } from '@/features/export/browser';
 import { notifyError, notifySaved, notifyUnknownError } from '@/services/notifications';
 import { useAuthStore } from '@/stores/auth';
 import { emptyDailyEntry } from '@/types';
 import SettingsView from '@/views/SettingsView.vue';
-import { createStore } from '../helpers/viewScenario';
+import { createStore, routerLinkStub } from '../helpers/viewScenario';
 
 vi.mock('@/services/notifications', () => ({
   notifyError: vi.fn(),
@@ -22,6 +23,19 @@ vi.mock('@/features/export/browser', async (importOriginal) => ({
   downloadJson: vi.fn(),
 }));
 
+function mountSettings(pinia: ReturnType<typeof createStore>['pinia']) {
+  return mount(SettingsView, { global: { plugins: [pinia], stubs: { RouterLink: routerLinkStub } } });
+}
+
+function trackSettingsSave(store: ReturnType<typeof createStore>['store']) {
+  vi.spyOn(db.settings, 'put').mockResolvedValue('main');
+  vi.spyOn(store, 'requestLocalStoragePersistence').mockResolvedValue('unsupported');
+  vi.spyOn(store, 'syncCloudSnapshot').mockResolvedValue({ status: 'disabled' });
+  return vi.spyOn(store, 'saveSettings');
+}
+
+afterEach(() => vi.restoreAllMocks());
+
 describe('settings scenarios', () => {
   it('validates a backup before confirmation and leaves existing records intact when replacement is canceled', async () => {
     const { pinia, store } = createStore();
@@ -30,7 +44,7 @@ describe('settings scenarios', () => {
     const baseline = store.exportData();
     const importData = vi.spyOn(store, 'importData').mockResolvedValue(undefined);
     const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
-    const wrapper = mount(SettingsView, { global: { plugins: [pinia] } });
+    const wrapper = mountSettings(pinia);
     const input = wrapper.get('input[type="file"]');
     Object.defineProperty(input.element, 'files', {
       configurable: true,
@@ -64,7 +78,7 @@ describe('settings scenarios', () => {
     const snapshot = store.exportData();
     const importData = vi.spyOn(store, 'importData').mockResolvedValue(undefined);
     const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
-    const wrapper = mount(SettingsView, { global: { plugins: [pinia] } });
+    const wrapper = mountSettings(pinia);
     const input = wrapper.get('input[type="file"]');
     Object.defineProperty(input.element, 'files', {
       configurable: true,
@@ -87,7 +101,7 @@ describe('settings scenarios', () => {
     const clearAll = vi.spyOn(store, 'clearAll');
     vi.spyOn(window, 'confirm').mockReturnValue(true);
     vi.spyOn(window, 'prompt').mockReturnValue(null);
-    const wrapper = mount(SettingsView, { global: { plugins: [pinia] } });
+    const wrapper = mountSettings(pinia);
     const button = wrapper.findAll('button').find((item) => item.text() === 'Удалить аккаунт')!;
     await button.trigger('click');
     await flushPromises();
@@ -101,7 +115,7 @@ describe('settings scenarios', () => {
     const auth = useAuthStore();
     auth.configured = true;
     auth.session = { user: { id: 'user-1', email: 'friend@example.com' } } as typeof auth.session;
-    const wrapper = mount(SettingsView, { global: { plugins: [pinia] } });
+    const wrapper = mountSettings(pinia);
     const tabs = wrapper.findAll('[aria-label="Разделы настроек"] button');
 
     expect(tabs.map((tab) => tab.text())).toEqual(['Ежедневная запись', 'Эксперимент', 'Данные и синхронизация', 'Аккаунт и безопасность']);
@@ -154,7 +168,7 @@ describe('settings scenarios', () => {
       updatedAt: '2026-09-12T05:01:00.000Z',
     });
     const confirm = vi.spyOn(window, 'confirm').mockReturnValueOnce(false).mockReturnValueOnce(true);
-    const wrapper = mount(SettingsView, { global: { plugins: [pinia] } });
+    const wrapper = mountSettings(pinia);
     await wrapper.findAll('[aria-label="Разделы настроек"] button')[2]!.trigger('click');
     const cloudCard = wrapper.get('#cloud-settings');
 
@@ -183,7 +197,7 @@ describe('settings scenarios', () => {
     auth.configured = true;
     auth.session = { user: { id: 'user-1', email: 'friend@example.com' } } as typeof auth.session;
     auth.updatePassword = vi.fn().mockResolvedValue(undefined);
-    const wrapper = mount(SettingsView, { global: { plugins: [pinia] } });
+    const wrapper = mountSettings(pinia);
 
     await wrapper.get('#new-password').setValue('new-safe-password');
     await wrapper.get('#new-password-confirmation').setValue('new-safe-password');
@@ -209,7 +223,7 @@ describe('settings scenarios', () => {
     auth.signOut = vi.fn().mockImplementation(async () => {
       auth.session = null;
     });
-    const wrapper = mount(SettingsView, { global: { plugins: [pinia] } });
+    const wrapper = mountSettings(pinia);
 
     await wrapper.get('#new-password').setValue('new-safe-password');
     await wrapper.get('#new-password-confirmation').setValue('new-safe-password');
@@ -246,7 +260,7 @@ describe('settings scenarios', () => {
         finishUpdate = resolve;
       }),
     );
-    const wrapper = mount(SettingsView, { global: { plugins: [pinia] } });
+    const wrapper = mountSettings(pinia);
     await wrapper.get('#new-password').setValue('submitted-password');
     await wrapper.get('#new-password-confirmation').setValue('submitted-password');
     await wrapper.get('.account-security__form .secondary-button').trigger('click');
@@ -275,7 +289,7 @@ describe('settings scenarios', () => {
           failUpdate = reject;
         }),
       );
-      const wrapper = mount(SettingsView, { global: { plugins: [pinia] } });
+      const wrapper = mountSettings(pinia);
       await wrapper.get('#new-password').setValue('submitted-password');
       await wrapper.get('#new-password-confirmation').setValue('submitted-password');
       await wrapper.get('.account-security__form .secondary-button').trigger('click');
@@ -307,7 +321,7 @@ describe('settings scenarios', () => {
         finishUpdate = resolve;
       }),
     );
-    const wrapper = mount(SettingsView, { global: { plugins: [pinia] } });
+    const wrapper = mountSettings(pinia);
     await wrapper.get('#new-password').setValue('submitted-password');
     await wrapper.get('#new-password-confirmation').setValue('submitted-password');
     await wrapper.get('.account-security__form .secondary-button').trigger('click');
@@ -326,7 +340,7 @@ describe('settings scenarios', () => {
       rejectFirstSave = reject;
     });
     const saveSettings = vi.spyOn(store, 'saveSettings').mockReturnValueOnce(firstSave).mockResolvedValueOnce(undefined);
-    const wrapper = mount(SettingsView, { global: { plugins: [pinia] } });
+    const wrapper = mountSettings(pinia);
     const saveButton = wrapper.get('.settings-card--daily-blocks .primary-button');
 
     await saveButton.trigger('click');
@@ -353,7 +367,7 @@ describe('settings scenarios', () => {
       rejectFirstClear = reject;
     });
     const clearAll = vi.spyOn(store, 'clearAll').mockReturnValueOnce(firstClear).mockResolvedValueOnce(undefined);
-    const wrapper = mount(SettingsView, { global: { plugins: [pinia] } });
+    const wrapper = mountSettings(pinia);
     const clearButton = wrapper.get('.settings-card--backup .danger-button');
 
     await clearButton.trigger('click');
@@ -454,8 +468,8 @@ describe('settings scenarios', () => {
 
   it('saves the selected daily entry blocks', async () => {
     const { pinia, store } = createStore();
-    const saveSettings = vi.spyOn(store, 'saveSettings').mockResolvedValue(undefined);
-    const wrapper = mount(SettingsView, { global: { plugins: [pinia] } });
+    const saveSettings = trackSettingsSave(store);
+    const wrapper = mountSettings(pinia);
     const blockCard = wrapper.get('.settings-card--daily-blocks');
     const careerChip = blockCard.findAll('.chip').find((chip) => chip.text().includes('Работа'));
 
@@ -468,32 +482,39 @@ describe('settings scenarios', () => {
       expect.objectContaining({
         activeDailyBlocks: ['sleep', 'context', 'movement', 'nutrition', 'career'],
       }),
+      ['activeDailyBlocks'],
     );
   });
 
   it('hides and restores built-in context factors without deleting their definition', async () => {
     const { pinia, store } = createStore();
-    const saveSettings = vi.spyOn(store, 'saveSettings').mockResolvedValue(undefined);
-    const wrapper = mount(SettingsView, { global: { plugins: [pinia] } });
+    const saveSettings = trackSettingsSave(store);
+    const wrapper = mountSettings(pinia);
     const contextCard = wrapper.get('.settings-card--context');
 
     await contextCard.get('[aria-label="Убрать Экранное время из ежедневной записи"]').trigger('click');
     await flushPromises();
-    expect(saveSettings).toHaveBeenLastCalledWith(expect.objectContaining({ hiddenContextFactorIds: ['screen'] }));
+    expect(saveSettings).toHaveBeenLastCalledWith(expect.objectContaining({ hiddenContextFactorIds: ['screen'] }), [
+      'customContextFactorOptions',
+      'hiddenContextFactorIds',
+    ]);
     expect(contextCard.text()).toContain('Убраны из ежедневной записи');
     expect(contextCard.text()).toContain('Прежние отметки остаются в истории, графиках и выгрузке.');
 
     const restoreButton = contextCard.findAll('.restore-option').find((button) => button.text().includes('Экранное время'));
     await restoreButton!.trigger('click');
     await flushPromises();
-    expect(saveSettings).toHaveBeenLastCalledWith(expect.objectContaining({ hiddenContextFactorIds: [] }));
+    expect(saveSettings).toHaveBeenLastCalledWith(expect.objectContaining({ hiddenContextFactorIds: [] }), [
+      'customContextFactorOptions',
+      'hiddenContextFactorIds',
+    ]);
   });
 
   it('lets users add retired default labels as their own options', async () => {
     const { pinia, store } = createStore();
     store.settings.hiddenContextFactorIds = ['series_video'];
-    const saveSettings = vi.spyOn(store, 'saveSettings').mockResolvedValue(undefined);
-    const wrapper = mount(SettingsView, { global: { plugins: [pinia] } });
+    const saveSettings = trackSettingsSave(store);
+    const wrapper = mountSettings(pinia);
     const contextCard = wrapper.get('.settings-card--context');
     const careerCard = wrapper.get('.settings-card--career');
     expect(contextCard.text()).not.toContain('Видео и сериалы');
@@ -507,6 +528,7 @@ describe('settings scenarios', () => {
         customContextFactorOptions: [expect.objectContaining({ label: 'Видео и сериалы' })],
         hiddenContextFactorIds: ['series_video'],
       }),
+      ['customContextFactorOptions', 'hiddenContextFactorIds'],
     );
 
     await careerCard.get('input[type="text"]').setValue('Рабочий день');
@@ -514,13 +536,14 @@ describe('settings scenarios', () => {
     await flushPromises();
     expect(saveSettings).toHaveBeenLastCalledWith(
       expect.objectContaining({ customCareerOptions: [expect.objectContaining({ label: 'Рабочий день' })] }),
+      ['customCareerOptions'],
     );
   });
 
   it('adds a personal activity and can hide and restore it', async () => {
     const { pinia, store } = createStore();
-    const saveSettings = vi.spyOn(store, 'saveSettings').mockResolvedValue(undefined);
-    const wrapper = mount(SettingsView, { global: { plugins: [pinia] } });
+    const saveSettings = trackSettingsSave(store);
+    const wrapper = mountSettings(pinia);
     const movementCard = wrapper.get('.settings-card--movement');
 
     await movementCard.get('#new-activity-option').setValue('Бачата');
@@ -533,6 +556,7 @@ describe('settings scenarios', () => {
       expect.objectContaining({
         customActivityOptions: [expect.objectContaining({ id: 'bachata', label: 'Бачата', custom: true })],
       }),
+      ['customActivityOptions', 'hiddenActivityIds'],
     );
 
     await movementCard.get('[aria-label="Убрать Бачата из ежедневной записи"]').trigger('click');
@@ -541,6 +565,7 @@ describe('settings scenarios', () => {
       expect.objectContaining({
         customActivityOptions: [expect.objectContaining({ id: 'bachata', archived: true })],
       }),
+      ['customActivityOptions', 'hiddenActivityIds'],
     );
 
     await movementCard.get('[aria-label="Вернуть Бачата в ежедневную запись"]').trigger('click');
@@ -549,12 +574,13 @@ describe('settings scenarios', () => {
       expect.objectContaining({
         customActivityOptions: [expect.objectContaining({ id: 'bachata', archived: false })],
       }),
+      ['customActivityOptions', 'hiddenActivityIds'],
     );
   });
 
   it('validates an exact period before preparing external analysis', async () => {
     const { pinia } = createStore();
-    const wrapper = mount(SettingsView, { global: { plugins: [pinia] } });
+    const wrapper = mountSettings(pinia);
     const start = wrapper.get('[aria-label="Начало периода анализа"]');
     const end = wrapper.get('[aria-label="Конец периода анализа"]');
 
@@ -578,7 +604,7 @@ describe('settings scenarios', () => {
           finishCopy = resolve;
         }),
     );
-    const wrapper = mount(SettingsView, { global: { plugins: [pinia] } });
+    const wrapper = mountSettings(pinia);
     const copyButton = wrapper
       .get('#analysis-settings')
       .findAll('button')
@@ -602,7 +628,7 @@ describe('settings scenarios', () => {
     const clipboardError = new Error('clipboard denied');
     vi.mocked(copyText).mockRejectedValueOnce(clipboardError);
     vi.mocked(notifyUnknownError).mockClear();
-    const wrapper = mount(SettingsView, { global: { plugins: [pinia] } });
+    const wrapper = mountSettings(pinia);
     const copyButton = wrapper
       .get('#analysis-settings')
       .findAll('button')
@@ -617,8 +643,8 @@ describe('settings scenarios', () => {
 
   it('saves a free-form experiment and completes it into history', async () => {
     const { pinia, store } = createStore();
-    const saveSettings = vi.spyOn(store, 'saveSettings').mockResolvedValue(undefined);
-    const wrapper = mount(SettingsView, { global: { plugins: [pinia] } });
+    const saveSettings = trackSettingsSave(store);
+    const wrapper = mountSettings(pinia);
     const card = wrapper.get('.settings-card--experiment');
     const experimentTitle =
       'В течение недели после 22:00 оставлять телефон заряжаться в другой комнате и вместо новостей читать бумажную книгу не меньше десяти минут.';
@@ -655,6 +681,7 @@ describe('settings scenarios', () => {
           endDate: '2026-07-21',
         }),
       }),
+      ['experiment', 'experimentHistory'],
     );
 
     await card.get('#experiment-conclusion').setValue('Вечером было спокойнее');
@@ -668,6 +695,7 @@ describe('settings scenarios', () => {
         experiment: expect.objectContaining({ active: false, title: '' }),
         experimentHistory: [expect.objectContaining({ title: experimentTitle, conclusion: 'Вечером было спокойнее' })],
       }),
+      ['experiment', 'experimentHistory'],
     );
   });
 
@@ -690,10 +718,8 @@ describe('settings scenarios', () => {
         experimentNote: 'Было проще заснуть',
       };
       store.dailyEntries = [entry];
-      const saveSettings = vi.spyOn(store, 'saveSettings').mockImplementation(async (nextSettings) => {
-        store.settings = structuredClone(nextSettings);
-      });
-      const wrapper = mount(SettingsView, { global: { plugins: [pinia] } });
+      const saveSettings = trackSettingsSave(store);
+      const wrapper = mountSettings(pinia);
       const card = wrapper.get('.settings-card--experiment');
       const completeButton = card.findAll('button').find((button) => button.text().includes('Завершить эксперимент'));
 
@@ -717,6 +743,7 @@ describe('settings scenarios', () => {
         }),
       ]);
       expect(store.dailyEntries).toEqual([entry]);
+      expect(card.get('a').attributes('href')).toBe('/trends#experiments');
       expect(card.find('#experiment-conclusion').exists()).toBe(false);
     },
   );
@@ -730,7 +757,7 @@ describe('settings scenarios', () => {
       startDate: '2026-07-22',
       endDate: '2026-08-15',
     };
-    const wrapper = mount(SettingsView, { global: { plugins: [pinia] } });
+    const wrapper = mountSettings(pinia);
     const card = wrapper.get('.settings-card--experiment');
 
     expect(card.text()).not.toContain('Завершить эксперимент');
@@ -757,10 +784,8 @@ describe('settings scenarios', () => {
         experimentCompleted: true,
       },
     ];
-    const saveSettings = vi.spyOn(store, 'saveSettings').mockImplementation(async (nextSettings) => {
-      store.settings = structuredClone(nextSettings);
-    });
-    const wrapper = mount(SettingsView, { global: { plugins: [pinia] } });
+    const saveSettings = trackSettingsSave(store);
+    const wrapper = mountSettings(pinia);
     const card = wrapper.get('.settings-card--experiment');
     const dates = card.findAll('input[type="date"]');
 
@@ -782,6 +807,7 @@ describe('settings scenarios', () => {
 
     expect(saveSettings).toHaveBeenCalledWith(
       expect.objectContaining({ experiment: expect.objectContaining({ id: 'started-experiment', endDate: '2026-07-28' }) }),
+      ['experiment', 'experimentHistory'],
     );
     expect(notifySaved).toHaveBeenCalledWith('Эксперимент продлён');
   });

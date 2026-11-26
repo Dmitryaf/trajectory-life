@@ -65,7 +65,7 @@ test('keeps the critical path keyboard-visible and traps focus in dialogs', asyn
   }
 
   await page.goto('/today');
-  const reviewLink = page.getByRole('navigation', { name: 'Основная навигация' }).getByRole('link', { name: 'Обзор' });
+  const reviewLink = page.getByRole('navigation', { name: 'Основная навигация' }).getByRole('link', { name: 'Обзоры' });
   await reachWithTab(reviewLink);
   await expect(reviewLink).toBeFocused();
   expect(await reviewLink.evaluate((element) => getComputedStyle(element).outlineStyle)).not.toBe('none');

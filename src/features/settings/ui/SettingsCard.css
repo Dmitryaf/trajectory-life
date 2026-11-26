@@ -16,6 +16,11 @@
     border-radius: 18px;
   }
 }
+.settings-card-status {
+  margin: 10px 0 0;
+  color: var(--muted);
+  font-size: 0.875rem;
+}
 .settings-card::before {
   content: '';
   position: absolute;
