@@ -18,14 +18,24 @@ const courseChange = defineModel<string>('courseChange', { required: true });
     :open="open"
     @toggle="$emit('toggle', $event)"
   >
-    <FormFieldLabel>Что чаще всего повторялось?</FormFieldLabel>
-    <AutoGrowTextarea v-model="mainPattern" :rows="2" placeholder="Например: часто гулял по вечерам и легче засыпал" />
-    <FormFieldLabel>Что помогало?</FormFieldLabel>
-    <AutoGrowTextarea v-model="support" :rows="2" placeholder="Условия, решения или люди, которые помогали" />
-    <FormFieldLabel>Что мешало сильнее всего?</FormFieldLabel>
-    <AutoGrowTextarea v-model="obstacle" :rows="2" placeholder="Например: частые переработки" />
-    <FormFieldLabel>После какого события вы заметили изменения?</FormFieldLabel>
-    <AutoGrowTextarea v-model="courseChange" :rows="2" placeholder="Например: смена работы, поездка или завершение большого дела" />
+    <FormFieldLabel for="month-mainPattern">Что чаще всего повторялось?</FormFieldLabel>
+    <AutoGrowTextarea
+      id="month-mainPattern"
+      v-model="mainPattern"
+      :rows="2"
+      placeholder="Например: часто гулял по вечерам и легче засыпал"
+    />
+    <FormFieldLabel for="month-support">Что помогало?</FormFieldLabel>
+    <AutoGrowTextarea id="month-support" v-model="support" :rows="2" placeholder="Условия, решения или люди, которые помогали" />
+    <FormFieldLabel for="month-obstacle">Что мешало сильнее всего?</FormFieldLabel>
+    <AutoGrowTextarea id="month-obstacle" v-model="obstacle" :rows="2" placeholder="Например: частые переработки" />
+    <FormFieldLabel for="month-courseChange">После какого события вы заметили изменения?</FormFieldLabel>
+    <AutoGrowTextarea
+      id="month-courseChange"
+      v-model="courseChange"
+      :rows="2"
+      placeholder="Например: смена работы, поездка или завершение большого дела"
+    />
   </PeriodDetails>
 </template>
 

@@ -117,12 +117,14 @@ export function factorSummaries(entries: DailyEntry[], factorOptions: Option<Con
     .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label));
 }
 
-export function factorComparisonText(factor: FactorSummary): string {
+export function factorComparisonText(factor: FactorSummary, compact = false): string {
   const parts: string[] = [];
   if (factor.sleepSamples >= 4 && factor.sleepSamplesWithout >= 4 && factor.averageSleep !== null && factor.averageSleepWithout !== null) {
     const difference = Math.round(factor.averageSleep - factor.averageSleepWithout);
     parts.push(
-      `Сон с отметкой: ${formatMinutes(Math.round(factor.averageSleep))} (измерений: ${factor.sleepSamples}), без отметки: ${formatMinutes(Math.round(factor.averageSleepWithout))} (измерений: ${factor.sleepSamplesWithout}); разница ${signedMinutes(difference)}`,
+      compact
+        ? `сон ${signedMinutes(difference)}`
+        : `Сон с отметкой: ${formatMinutes(Math.round(factor.averageSleep))} (измерений: ${factor.sleepSamples}), без отметки: ${formatMinutes(Math.round(factor.averageSleepWithout))} (измерений: ${factor.sleepSamplesWithout}); разница ${signedMinutes(difference)}`,
     );
   }
   if (
@@ -133,10 +135,17 @@ export function factorComparisonText(factor: FactorSummary): string {
   ) {
     const difference = factor.averageEnergy - factor.averageEnergyWithout;
     parts.push(
-      `энергия с отметкой: ${formatNumber(factor.averageEnergy)} (измерений: ${factor.energySamples}), без отметки: ${formatNumber(factor.averageEnergyWithout)} (измерений: ${factor.energySamplesWithout}); разница ${signedNumber(difference)}`,
+      compact
+        ? `энергия ${signedNumber(difference)} по шкале 1–5`
+        : `энергия с отметкой: ${formatNumber(factor.averageEnergy)} (измерений: ${factor.energySamples}), без отметки: ${formatNumber(factor.averageEnergyWithout)} (измерений: ${factor.energySamplesWithout}); разница ${signedNumber(difference)}`,
     );
   }
-  return parts.length ? `${parts.join('; ')}. Разница не доказывает, что причина именно в этом условии.` : '';
+  if (!parts.length) {
+    return '';
+  }
+  return compact
+    ? `В дни с отметкой «${factor.label}» по сравнению с днями без неё: ${parts.join(', ')}.`
+    : `${parts.join('; ')}. Разница не доказывает, что причина именно в этом условии.`;
 }
 
 function average(values: Array<number | null>): number | null {

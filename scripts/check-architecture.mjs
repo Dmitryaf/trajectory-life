@@ -12,11 +12,11 @@ const reportThresholds = new Map([
   ['.css', 500],
 ]);
 const hotspotContentBudgets = new Map([
-  // The Today route places the review invitation component under its date heading.
-  ['src/views/TodayView.vue', 23787],
+  // The Today route delegates its layout, review invitations and dated follow-ups to feature components.
+  ['src/views/TodayView.vue', 23808],
   ['src/views/SettingsView.vue', 13378],
-  ['src/views/WeekView.vue', 17128],
-  ['src/views/MonthView.vue', 19598],
+  ['src/views/WeekView.vue', 16976],
+  ['src/views/MonthView.vue', 19587],
   // Separate entry defaults from historical catalogs; the settings responsibilities remain unchanged.
   ['src/features/settings/useSettingsForm.ts', 11803],
 ]);

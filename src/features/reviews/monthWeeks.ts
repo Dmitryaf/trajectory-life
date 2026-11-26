@@ -1,6 +1,7 @@
 import { addDays, dateRange, endOfMonth, startOfWeek } from '@/services/dates';
 import type { DailyEntry, LifeEventRecord, ResultRecord, WeeklyReview } from '@/types';
 import { summarize } from '@/features/analytics/periodSummary';
+import { weeklyDecisionText } from './decisionText';
 
 export function monthWeekSummariesForPeriod(
   entries: DailyEntry[],
@@ -38,7 +39,7 @@ export function monthWeekReviews(reviews: WeeklyReview[], start: string, end: st
     })
     .map((review) => {
       const fields = [
-        { label: 'Ваше решение', text: review.nextLever },
+        { label: weeklyDecisionText(review) ? 'Ваше решение' : 'После обзора', text: review.nextLever },
         { label: 'Проверка прежнего решения', text: review.previousPlanOutcome },
         { label: 'Что помогало', text: review.support },
         { label: 'Что мешало', text: review.obstacle },
@@ -48,7 +49,8 @@ export function monthWeekReviews(reviews: WeeklyReview[], start: string, end: st
         ...review.results.map((text) => ({ label: 'Итог', text })),
       ].filter((field) => field.text.trim());
       const weekEnd = addDays(review.weekStart, 6);
-      return { review, fields, weekEnd, crossesMonth: review.weekStart < start || weekEnd > endOfMonth(start) };
+      const anchor = review.weekStart < start ? start : review.weekStart;
+      return { review, fields, weekEnd, anchor, crossesMonth: review.weekStart < start || weekEnd > endOfMonth(start) };
     })
     .filter((week) => week.fields.length > 0)
     .sort((a, b) => a.review.weekStart.localeCompare(b.review.weekStart));

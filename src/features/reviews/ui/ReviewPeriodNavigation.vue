@@ -1,14 +1,15 @@
 <script setup lang="ts">
 import { RouterLink } from 'vue-router';
 import RangeTabs from '@/shared/ui/navigation/RangeTabs.vue';
+import { reviewPath, type ReviewPeriod } from '../periods';
 
-defineProps<{ period: 'week' | 'month' }>();
+defineProps<{ period: ReviewPeriod; anchor: string }>();
 </script>
 
 <template>
   <RangeTabs as="nav" class="review-period-navigation" aria-label="Период обзора">
     <RouterLink
-      to="/week"
+      :to="reviewPath('week', anchor)"
       :class="{ active: period === 'week' }"
       :aria-current="period === 'week' ? 'page' : undefined"
       aria-label="Неделя"
@@ -16,7 +17,7 @@ defineProps<{ period: 'week' | 'month' }>();
       <span>Неделя</span>
     </RouterLink>
     <RouterLink
-      to="/month"
+      :to="reviewPath('month', anchor)"
       :class="{ active: period === 'month' }"
       :aria-current="period === 'month' ? 'page' : undefined"
       aria-label="Месяц"

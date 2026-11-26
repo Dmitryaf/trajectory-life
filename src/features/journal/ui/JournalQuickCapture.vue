@@ -1,14 +1,19 @@
 <script setup lang="ts">
 import { RouterLink } from 'vue-router';
 import UiIcon from '@/shared/ui/icons/UiIcon.vue';
+const props = defineProps<{ selectedDate: string }>();
+
+function createLocation(path: string) {
+  return { path, query: { create: '1', date: props.selectedDate } };
+}
 </script>
 
 <template>
   <nav class="quick-capture" aria-label="Быстрые записи">
-    <RouterLink to="/results?create=1"
+    <RouterLink :to="createLocation('/results')"
       ><span><UiIcon name="result" /></span><strong>Записать итог</strong></RouterLink
     >
-    <RouterLink to="/events?create=1" aria-label="Записать мысль или событие"
+    <RouterLink :to="createLocation('/events')" aria-label="Записать мысль или событие"
       ><span><UiIcon name="event" /></span><strong>Мысль или событие</strong></RouterLink
     >
   </nav>

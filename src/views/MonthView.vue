@@ -57,11 +57,7 @@ import {
 
 const store = useAppStore();
 const { initialMonth = '' } = defineProps<{ initialMonth?: string }>();
-const anchor = ref(validDate(initialMonth) || todayKey());
-watch(
-  () => initialMonth,
-  (value) => (anchor.value = validDate(value) || todayKey()),
-);
+const anchor = computed(() => validDate(initialMonth) || todayKey());
 const start = computed(() => startOfMonth(anchor.value));
 const end = computed(() => endOfMonth(anchor.value));
 const archiveEnd = computed(() => (end.value > todayKey() ? todayKey() : end.value));
@@ -331,7 +327,6 @@ const {
   period: 'month',
   anchor,
   start,
-  end,
   emptyReview: emptyMonthlyReview,
   findReview: (monthStart) => store.reviewByMonth(monthStart),
   persistReview: (draft, expected, key) => store.saveMonthlyReview(draft, expected, key),
@@ -357,7 +352,8 @@ function minutesToHours(value: number | null): number | null {
   <PageShell class="page--review page--month">
     <ReviewHeading
       title="Месяц"
-      summary="Сравните недели, вспомните важные события и сделанные дела. При желании запишите планы."
+      :anchor="anchor"
+      :saved="hasSavedReview"
       :href="reviewAvailable ? '#month-review' : undefined"
       period="month"
     />
@@ -365,6 +361,7 @@ function minutesToHours(value: number | null): number | null {
       :title="formatDate(start, { month: 'long', year: 'numeric' })"
       :subtitle="start === startOfMonth(todayKey()) ? 'Текущий месяц' : ''"
       :hint="reviewHint"
+      :return-label="start !== startOfMonth(todayKey()) ? 'К текущему месяцу' : undefined"
       v-on="navigation"
     />
     <MonthSectionLinks :daily-notes="hasDailyNotes" :week-reviews="Boolean(savedWeeks.length)" />
@@ -421,8 +418,13 @@ function minutesToHours(value: number | null): number | null {
           @toggle="updateReviewContextOpen"
         />
         <SelfReminderReview :key="start" />
-        <FormFieldLabel>Чему хотите уделить внимание в следующем месяце?</FormFieldLabel
-        ><AutoGrowTextarea v-model="review.nextFocus" :rows="2" placeholder="Что стоит продолжить, изменить или проверить" />
+        <FormFieldLabel for="month-focus">Чему хотите уделить внимание в следующем месяце?</FormFieldLabel
+        ><AutoGrowTextarea
+          id="month-focus"
+          v-model="review.nextFocus"
+          :rows="2"
+          placeholder="Что стоит продолжить, изменить или проверить"
+        />
         <PeriodReviewActions :actions="actions" label="Сохранить обзор месяца" />
       </SurfaceCard>
       <ReviewNotice v-else id="month-review" tag="section">

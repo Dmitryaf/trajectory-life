@@ -1,6 +1,7 @@
 import { computed, onBeforeUnmount, reactive, ref, watch, type Ref } from 'vue';
+import { useRouter } from 'vue-router';
 import { buildPeriodPackage, copyAiPrompt, downloadAiPackage } from '../export/browser';
-import { addDays, addMonths, formatDate, startOfMonth, startOfWeek, todayKey } from '@/services/dates';
+import { addDays, addMonths, formatDate, todayKey } from '@/services/dates';
 import { notifyInfo, notifySaved, notifyUnknownError } from '@/services/notifications';
 import { plainCopy } from '@/services/plain';
 import { useAppStore } from '@/stores/app';
@@ -10,15 +11,15 @@ import { setSyncEditorDirty } from '../sync/editing';
 import { ReviewChangedError } from './version';
 import { useEditorDraft } from '../editor-drafts/useEditorDraft';
 import { editorDraftKey } from '@/model/editorDraft';
+import { reviewOpensOn, reviewPath, type ReviewPeriod } from './periods';
+import { useReviewReminders } from './useReviewReminders';
 
-type Period = 'week' | 'month';
 type PeriodReview = WeeklyReview | MonthlyReview;
 
 type PeriodReviewOptions<T extends PeriodReview> = {
-  period: Period;
-  anchor: Ref<string>;
+  period: ReviewPeriod;
+  anchor: Readonly<Ref<string>>;
   start: Readonly<Ref<string>>;
-  end: Readonly<Ref<string>>;
   emptyReview: (start: string) => T;
   findReview: (start: string) => T | undefined;
   persistReview: (review: T, expected: T | null, draftKey: string) => Promise<void>;
@@ -50,6 +51,8 @@ function draftSignature(review: PeriodReview) {
 
 export function usePeriodReview<T extends PeriodReview>(options: PeriodReviewOptions<T>) {
   const store = useAppStore();
+  const router = useRouter();
+  const calendar = useReviewReminders();
   const labels = periodLabels[options.period];
   const review = reactive(options.emptyReview(options.start.value)) as T;
   const reviewSaving = ref(false);
@@ -64,16 +67,9 @@ export function usePeriodReview<T extends PeriodReview>(options: PeriodReviewOpt
   const savedReview = computed(() => options.findReview(options.start.value));
   const hasSavedReview = computed(() => Boolean(savedReview.value));
   const reviewHasContext = computed(() => options.hasContext(review));
-  const currentPeriodStart = () => (options.period === 'week' ? startOfWeek(todayKey()) : startOfMonth(todayKey()));
-  const availabilityLeadDays = options.period === 'week' ? 1 : 2;
-  const reviewOpensOn = computed(() => addDays(options.end.value, -availabilityLeadDays));
-  const reviewAvailable = computed(
-    () =>
-      hasSavedReview.value ||
-      options.end.value < todayKey() ||
-      (options.start.value === currentPeriodStart() && todayKey() >= reviewOpensOn.value),
-  );
-  const reviewHint = computed(() => (reviewAvailable.value ? undefined : `Обзор можно заполнить с ${formatDate(reviewOpensOn.value)}`));
+  const opensOn = computed(() => reviewOpensOn(options.period, options.start.value));
+  const reviewAvailable = computed(() => hasSavedReview.value || (calendar?.today.value ?? todayKey()) >= opensOn.value);
+  const reviewHint = computed(() => (reviewAvailable.value ? undefined : `Обзор можно заполнить с ${formatDate(opensOn.value)}`));
 
   const drafts = useEditorDraft({
     reset: loadReview,
@@ -133,11 +129,8 @@ export function usePeriodReview<T extends PeriodReview>(options: PeriodReviewOpt
     },
     { deep: true, flush: 'sync' },
   );
-  async function changePeriod(anchor: string) {
-    const nextStart = options.period === 'week' ? startOfWeek(anchor) : startOfMonth(anchor);
-    if (nextStart === options.start.value || (await drafts.beforeLeave())) {
-      options.anchor.value = anchor;
-    }
+  function changePeriod(anchor: string) {
+    return router.push(reviewPath(options.period, anchor));
   }
   function shiftPeriod(offset: number) {
     void changePeriod(options.period === 'week' ? addDays(options.anchor.value, offset * 7) : addMonths(options.start.value, offset));

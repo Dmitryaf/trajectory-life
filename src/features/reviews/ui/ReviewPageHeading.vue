@@ -1,34 +1,32 @@
 <script setup lang="ts">
-import { computed } from 'vue';
 import PageHeading from '@/shared/ui/layout/PageHeading.vue';
 import UiIcon from '@/shared/ui/icons/UiIcon.vue';
 import EyebrowText from '@/shared/ui/typography/EyebrowText.vue';
 import ReviewPeriodNavigation from './ReviewPeriodNavigation.vue';
 
-const props = defineProps<{
+defineProps<{
   label?: string;
   title: string;
-  summary: string;
+  summary?: string;
   href?: string;
+  saved?: boolean;
   period?: 'week' | 'month';
+  anchor?: string;
 }>();
-
-const periodLabels = { week: 'Недельная сводка', month: 'Месячная сводка' } as const;
-const headingLabel = computed(() => props.label ?? (props.period ? periodLabels[props.period] : ''));
 </script>
 
 <template>
   <PageHeading>
     <div>
-      <EyebrowText>{{ headingLabel }}</EyebrowText>
+      <EyebrowText v-if="label">{{ label }}</EyebrowText>
       <h1>{{ title }}</h1>
-      <p>{{ summary }}</p>
+      <p v-if="summary">{{ summary }}</p>
     </div>
     <a v-if="href" class="review-jump" :href="href"
-      >К обзору <span><UiIcon name="arrow-down" /></span
+      >{{ saved ? 'Открыть мой обзор' : 'Записать вывод' }} <span><UiIcon name="arrow-down" /></span
     ></a>
   </PageHeading>
-  <ReviewPeriodNavigation v-if="period" :period="period" />
+  <ReviewPeriodNavigation v-if="period && anchor" :period="period" :anchor="anchor" />
 </template>
 
 <style scoped>

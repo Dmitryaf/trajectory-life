@@ -11,15 +11,18 @@ import { formatDate } from '@/services/dates';
 import { experimentDecisionLabel } from '../model';
 import type { WeeklyExperimentCard } from '../weeklyReview';
 
-const props = defineProps<{ experiments: WeeklyExperimentCard[] }>();
+const props = defineProps<{ experiments: WeeklyExperimentCard[]; initialHash?: string }>();
 const openExperimentId = ref('');
 const openExperimentNotesId = ref('');
 const experimentNotePages = reactive<Record<string, number>>({});
 
 watch(
-  () => props.experiments.map((experiment) => experiment.id).join('|'),
+  [() => props.experiments.map((experiment) => experiment.id).join('|'), () => props.initialHash],
   () => {
-    if (!props.experiments.some((experiment) => experiment.id === openExperimentId.value)) {
+    const target = props.experiments.find((item) => props.initialHash === `#experiment-${item.id}`);
+    if (target) {
+      openExperimentId.value = target.id;
+    } else if (!props.experiments.some((experiment) => experiment.id === openExperimentId.value)) {
       openExperimentId.value = props.experiments.find((experiment) => experiment.active)?.id ?? props.experiments[0]?.id ?? '';
     }
     if (!props.experiments.some((experiment) => experiment.id === openExperimentNotesId.value)) {
@@ -77,6 +80,7 @@ function experimentNoteStatus(experiment: WeeklyExperimentCard): string {
     <div class="weekly-experiments__content">
       <details
         v-for="(experiment, index) in experiments"
+        :id="`experiment-${experiment.id}`"
         :key="experiment.id"
         class="experiment-period-card"
         :open="openExperimentId === experiment.id"

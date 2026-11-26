@@ -12,7 +12,11 @@ defineProps<{ cues: ReviewCue[] }>();
   <div v-else class="review-cue-grid review-cue-grid--primary">
     <article v-for="cue in cues" :key="cue.id" class="review-cue" :class="`review-cue--${cue.tone}`">
       <strong>{{ cue.title }}</strong>
-      <p>{{ cue.text }}</p>
+      <p>{{ cue.shortText || cue.text }}</p>
+      <details v-if="cue.shortText" class="review-cue__details">
+        <summary>Как посчитано</summary>
+        <p>{{ cue.text }}</p>
+      </details>
     </article>
   </div>
 </template>
@@ -22,6 +26,15 @@ defineProps<{ cues: ReviewCue[] }>();
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
   gap: 10px;
+}
+.review-cue__details {
+  margin-top: 8px;
+}
+.review-cue__details summary {
+  cursor: pointer;
+  color: var(--brand-strong);
+  text-decoration: underline;
+  text-underline-offset: 0.16em;
 }
 .review-cue-empty {
   margin: 0;
