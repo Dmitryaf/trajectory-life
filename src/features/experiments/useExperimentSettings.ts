@@ -13,7 +13,7 @@ import {
   validateExperimentTextLengths,
 } from './model';
 
-type SaveSettings = (message?: string, action?: string, nextSettings?: AppSettings) => Promise<boolean>;
+type SaveSettings = (message: string, action: 'experiment', nextSettings: AppSettings) => Promise<boolean>;
 
 function startsExperiment(next: AppSettings['experiment'], previous: AppSettings['experiment']) {
   return next.active && (!previous.active || next.id !== previous.id);
@@ -86,7 +86,6 @@ export function useExperimentSettings(settings: AppSettings, isSaving: (action: 
     const starting = startsExperiment(experiment, store.settings.experiment);
     const recordStart = captureProductEvent('experiment_started', {});
     if (await save(extending ? 'Эксперимент продлён' : 'Эксперимент сохранён', 'experiment', nextSettings)) {
-      Object.assign(settings, nextSettings);
       if (starting) {
         recordStart();
       }
@@ -139,9 +138,7 @@ export function useExperimentSettings(settings: AppSettings, isSaving: (action: 
     }
     nextSettings.experimentHistory.unshift(createExperimentRecord(experiment));
     nextSettings.experiment = emptyExperiment();
-    if (await save('Эксперимент добавлен в историю', 'experiment', nextSettings)) {
-      Object.assign(settings, nextSettings);
-    }
+    await save('Эксперимент добавлен в историю', 'experiment', nextSettings);
   }
 
   return {

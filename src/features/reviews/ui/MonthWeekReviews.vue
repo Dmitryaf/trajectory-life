@@ -35,7 +35,7 @@ const cards = computed(() =>
     <div class="month-week-reviews__list">
       <article v-for="week in cards" :key="week.review.weekStart" class="month-week-reviews__week">
         <h3>
-          <RouterLink :to="`/week?week=${week.review.weekStart}#week-review`">
+          <RouterLink :to="`/week?week=${week.anchor}#week-review`">
             {{ formatDate(week.review.weekStart, { day: 'numeric', month: 'short' }) }}–{{
               formatDate(week.weekEnd, { day: 'numeric', month: 'short' })
             }}

@@ -313,12 +313,8 @@
   --settings-card-shadow: rgba(16, 45, 44, 0.065);
 
   /* Secondary screens */
-  --more-view-primary-border: #cedfd7;
-  --more-view-secondary: #477567;
-  --more-view-journal-glow: #ffd98a;
   --more-view-journal-text: #176d53;
   --more-view-event-text: #8b5b13;
-  --more-view-muted: #6d7d77;
   --settings-view-heading-border: #d6e6df;
   --settings-view-heading-gradient: #e3f4ed;
   --settings-view-text: #4d586e;
@@ -340,14 +336,10 @@
   --password-reset-surface: rgba(255, 255, 255, 0.97);
   --results-card-border: #dfe9e4;
   --results-card-gradient: #f7fbf9;
-  --results-card-hover-border: #c8ddd4;
-  --results-card-shadow: rgba(16, 45, 44, 0.07);
   --results-card-icon-surface: #dff5ec;
   --results-card-icon-text: #216d54;
   --events-card-border: #eee2ca;
   --events-card-gradient: #fffbf2;
-  --events-card-hover-border: #e4d1aa;
-  --events-card-shadow: rgba(92, 66, 20, 0.07);
 
   /* Application shell */
   --app-header-control-surface: rgba(255, 255, 255, 0.84);
@@ -375,7 +367,6 @@
   --bottom-nav-surface: rgba(16, 45, 44, 0.94);
   --bottom-nav-shadow: rgba(16, 45, 44, 0.28);
   --bottom-nav-text: #adbbb6;
-  --review-reminder-dot: #c9a04e;
   --bottom-nav-active-shadow: rgba(0, 0, 0, 0.14);
 
   /* Month review */
@@ -431,10 +422,6 @@
   --quick-capture-border: rgba(209, 222, 215, 0.9);
   --quick-capture-surface: rgba(255, 255, 255, 0.96);
   --today-summary-surface: rgba(255, 255, 255, 0.82);
-  --first-entry-border: #bfe2d4;
-  --first-entry-surface: #effbf6;
-  --first-entry-text: #60706a;
-  --today-pulse-text: #45665a;
   --entry-change-border: #f0dec4;
   --entry-change-surface: #fff8ef;
   --entry-change-title: #70502b;

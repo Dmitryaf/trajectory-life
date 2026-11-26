@@ -9,6 +9,7 @@ export type ReviewCue = {
   id: string;
   title: string;
   text: string;
+  shortText?: string;
   tone: 'good' | 'warning' | 'neutral';
   detailOnly?: boolean;
 };
@@ -65,6 +66,7 @@ export function buildReviewCues(
       id: 'factor',
       title: 'Повторяющееся условие',
       text: `Отметка «${leadingFactor.label}» встречалась ${leadingFactor.count} ${plural(leadingFactor.count, 'раз', 'раза', 'раз')}.${comparison ? ` ${comparison}` : ' Для сравнения пока мало записей.'}`,
+      shortText: factorComparisonText(leadingFactor, true),
       tone: 'neutral',
       detailOnly: !comparison,
     });
@@ -206,6 +208,7 @@ export function buildRangeReviewCues(
       id: 'factor',
       title: 'Повторяющееся условие',
       text: `Отметка «${factor.label}» встречалась ${factor.count} ${plural(factor.count, 'раз', 'раза', 'раз')}.${comparison ? ` ${comparison}` : ' Для сравнения пока мало записей.'}`,
+      shortText: factorComparisonText(factor, true),
       tone: 'neutral',
       detailOnly: !comparison,
     });

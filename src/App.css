@@ -101,6 +101,12 @@
   max-width: 1168px;
 }
 
+@media (min-width: 1280px) {
+  .app-main:has(.today-principles) {
+    max-width: 1400px;
+  }
+}
+
 :global([data-sonner-toaster][data-theme='light']) {
   --success-text: var(--toast-success-text);
 }
@@ -328,14 +334,6 @@
   font-size: 16px;
   font-weight: 800;
   line-height: 18px;
-}
-
-.bottom-nav__item .review-reminder-dot {
-  box-shadow: 0 0 0 2px var(--bottom-nav-surface);
-}
-
-.bottom-nav__item.router-link-active .review-reminder-dot {
-  box-shadow: 0 0 0 2px var(--mint);
 }
 
 .bottom-nav__item small {

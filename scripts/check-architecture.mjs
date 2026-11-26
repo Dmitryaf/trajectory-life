@@ -12,12 +12,14 @@ const reportThresholds = new Map([
   ['.css', 500],
 ]);
 const hotspotContentBudgets = new Map([
-  ['src/views/TodayView.vue', 23680],
-  ['src/views/SettingsView.vue', 13378],
-  ['src/views/WeekView.vue', 17128],
-  ['src/views/MonthView.vue', 19785],
+  // The Today route delegates its layout, review invitations and dated follow-ups to feature components.
+  ['src/views/TodayView.vue', 23808],
+  // Unsaved state is displayed on the settings card that owns the change.
+  ['src/views/SettingsView.vue', 13525],
+  ['src/views/WeekView.vue', 16976],
+  ['src/views/MonthView.vue', 19587],
   // Separate entry defaults from historical catalogs; the settings responsibilities remain unchanged.
-  ['src/features/settings/useSettingsForm.ts', 11803],
+  ['src/features/settings/useSettingsForm.ts', 11079],
 ]);
 const allowedDbOwners = new Set(['src/stores/app.ts', 'src/features/sync/base.ts']);
 const allowedServiceFeatureEdges = new Set();

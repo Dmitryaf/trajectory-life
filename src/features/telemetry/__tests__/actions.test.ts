@@ -41,7 +41,9 @@ describe('explicit content-free action semantics', () => {
     captureReviewSave(next, review)();
     captureReviewSave(next, next)();
     expect(events.filter((event) => event.name === 'decision_saved')).toEqual([{ name: 'decision_saved', props: { period_type: 'week' } }]);
-    captureReviewSave({ ...emptyMonthlyReview('2026-09-01'), courseChange: 'PRIVATE MONTH DECISION' })();
+    captureReviewSave({ ...emptyMonthlyReview('2026-09-01'), courseChange: 'PRIVATE MONTH OBSERVATION' })();
+    expect(events.at(-1)?.name).toBe('month_review_saved');
+    captureReviewSave({ ...emptyMonthlyReview('2026-09-01'), nextFocus: 'PRIVATE MONTH DECISION' })();
     expect(events.at(-1)).toEqual({ name: 'decision_saved', props: { period_type: 'month' } });
     expect(JSON.stringify(events)).not.toContain('PRIVATE');
   });

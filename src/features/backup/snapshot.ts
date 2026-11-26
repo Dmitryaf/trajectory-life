@@ -14,6 +14,7 @@ import {
   type WeeklyReview,
 } from '@/types';
 import { BACKUP_VERSION, MIN_SUPPORTED_BACKUP_VERSION } from '@/model/dataVersions';
+import { normalizeSelfReminder, type SelfReminder } from '@/model/selfReminder';
 import { experimentEntryLinkError, experimentIntegrityError, linkLegacyExperimentEntries } from '../experiments/model';
 import { startOfMonth, startOfWeek } from '@/services/dates';
 
@@ -23,6 +24,7 @@ export type ExportPayload = {
   dailyEntries: DailyEntry[];
   results: ResultRecord[];
   lifeEvents?: LifeEventRecord[];
+  selfReminders?: SelfReminder[];
   weeklyReviews: WeeklyReview[];
   monthlyReviews?: MonthlyReview[];
   settings: AppSettings;
@@ -54,6 +56,9 @@ export function normalizeSnapshot(input: unknown): ExportPayload {
   );
   const results = requireArray(source.results, 'results').map((value, index) => normalizeSnapshotResult(value, index));
   const lifeEvents = optionalArray(source.lifeEvents, 'lifeEvents').map((value, index) => normalizeSnapshotLifeEvent(value, index));
+  const selfReminders = optionalArray(source.selfReminders, 'selfReminders')
+    .map(normalizeSelfReminder)
+    .sort((left, right) => left.id.localeCompare(right.id));
   const weeklyReviews = optionalArray(source.weeklyReviews, 'weeklyReviews').map((value, index) => {
     const review = requireRecord(value, `weeklyReviews[${index}]`);
     return normalizeWeeklyReview({ ...review, weekStart: requireDate(review.weekStart, `weeklyReviews[${index}].weekStart`) });
@@ -74,6 +79,7 @@ export function normalizeSnapshot(input: unknown): ExportPayload {
     'lifeEvents.id',
   );
   requireUniqueKeys(weeklyReviews, (review) => review.weekStart, 'weeklyReviews.weekStart');
+  requireUniqueKeys(selfReminders, (reminder) => reminder.id, 'selfReminders.id');
   requireUniqueKeys(monthlyReviews, (review) => review.monthStart, 'monthlyReviews.monthStart');
   weeklyReviews.forEach((review, index) => {
     if (startOfWeek(review.weekStart) !== review.weekStart) {
@@ -95,6 +101,7 @@ export function normalizeSnapshot(input: unknown): ExportPayload {
     dailyEntries,
     results,
     lifeEvents,
+    selfReminders,
     weeklyReviews,
     monthlyReviews,
     settings,
@@ -126,7 +133,7 @@ function normalizeSnapshotResult(value: unknown, index: number): ResultRecord {
   return normalizeResult({
     ...(typeof id === 'number' ? { id } : {}),
     date: requireDate(result.date, `results[${index}].date`),
-    area: requireString(result.area, `results[${index}].area`) as ResultRecord['area'],
+    ...(result.area === undefined ? {} : { area: requireString(result.area, `results[${index}].area`) }),
     title: requireString(result.title, `results[${index}].title`),
     note: typeof result.note === 'string' ? result.note : '',
     createdAt: typeof result.createdAt === 'string' ? result.createdAt : '',

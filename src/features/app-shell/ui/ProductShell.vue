@@ -23,7 +23,6 @@ import { useAppStore } from '@/stores/app';
 import { initializeEditorDraftTab } from '@/model/editorDraft';
 import { useAuthStore } from '@/stores/auth';
 import { provideReviewReminders } from '@/features/reviews/useReviewReminders';
-import ReviewReminderDot from '@/features/reviews/ui/ReviewReminderDot.vue';
 
 const store = useAppStore();
 const auth = useAuthStore();
@@ -39,7 +38,7 @@ const loadedOwner = ref('');
 const appDataLoadError = ref('');
 const appDataLoadingText = ref('Загружаю записи…');
 const effectiveLoadError = computed(() => store.loadError || appDataLoadError.value);
-const reviewReminder = provideReviewReminders(
+provideReviewReminders(
   store,
   computed(() => auth.session?.user.id ?? (auth.requiresAuth ? '' : 'local')),
   computed(
@@ -296,9 +295,9 @@ type PrimaryNavigationItem = { to: string; label: string; icon: UiIconName; acti
 
 const navItems: PrimaryNavigationItem[] = [
   { to: '/today', label: 'Сегодня', icon: 'today', activePaths: ['/today'] },
-  { to: '/week', label: 'Обзор', icon: 'week', activePaths: ['/week', '/month'] },
-  { to: '/trends', label: 'История', icon: 'history', activePaths: ['/trends'] },
-  { to: '/more', label: 'Журнал', icon: 'journal', activePaths: ['/more', '/results', '/events'] },
+  { to: '/week', label: 'Обзоры', icon: 'week', activePaths: ['/week', '/month'] },
+  { to: '/trends', label: 'Динамика', icon: 'history', activePaths: ['/trends'] },
+  { to: '/more', label: 'Журнал', icon: 'journal', activePaths: ['/more', '/results', '/events', '/self-reminders'] },
 ];
 
 function isPrimaryNavigationItemActive(item: PrimaryNavigationItem, path: string): boolean {
@@ -380,19 +379,13 @@ function isPrimaryNavigationItemActive(item: PrimaryNavigationItem, path: string
       <RouterLink
         v-for="item in navItems"
         :key="item.to"
-        :to="item.to === '/week' ? reviewReminder.destination.value : item.to"
+        :to="item.to"
         class="bottom-nav__item"
         :aria-label="item.label"
-        :aria-describedby="item.to === '/week' && reviewReminder.reminders.value.length ? 'primary-review-reminder' : undefined"
         :class="{ 'router-link-active': isPrimaryNavigationItemActive(item, $route.path) }"
         :aria-current="isPrimaryNavigationItemActive(item, $route.path) ? 'page' : undefined"
       >
-        <span
-          ><UiIcon :name="item.icon" /><ReviewReminderDot
-            v-if="item.to === '/week' && reviewReminder.reminders.value.length"
-            id="primary-review-reminder"
-            :label="reviewReminder.label.value"
-        /></span>
+        <span><UiIcon :name="item.icon" /></span>
         <small>{{ item.label }}</small>
       </RouterLink>
     </nav>

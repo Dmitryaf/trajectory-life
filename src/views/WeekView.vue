@@ -3,7 +3,7 @@ import PeriodReviewActions from '@/features/reviews/ui/PeriodReviewActions.vue';
 import ActionButton from '@/shared/ui/actions/ActionButton.vue';
 import SurfaceCard from '@/shared/ui/layout/SurfaceCard.vue';
 import SectionHeading from '@/shared/ui/layout/SectionHeading.vue';
-import { computed, ref, watch } from 'vue';
+import { computed } from 'vue';
 import { RouterLink as Link } from 'vue-router';
 import WeeklyExperimentCards from '../features/experiments/ui/WeeklyExperimentCards.vue';
 import { buildWeeklyExperimentCards } from '../features/experiments/weeklyReview';
@@ -15,10 +15,12 @@ import ReviewHeading from '../features/reviews/ui/ReviewPageHeading.vue';
 import ReviewNotice from '../features/reviews/ui/ReviewNotice.vue';
 import WeeklyReviewJournalLinks from '../features/reviews/ui/WeeklyReviewJournalLinks.vue';
 import Insight from '@/features/reviews/ui/WeeklyInsightCard.vue';
+import WeeklyReviewContext from '../features/reviews/ui/WeeklyReviewContext.vue';
 import WeeklyReviewOverview from '../features/reviews/ui/WeeklyReviewOverview.vue';
 import WeeklyRhythmCard from '../features/reviews/ui/WeeklyRhythmCard.vue';
 import DecisionFollowUp from '../features/reviews/ui/DecisionFollowUp.vue';
 import { buildDecisionFollowUp } from '../features/reviews/decisionFollowUp';
+import { weeklyDecisionText } from '../features/reviews/decisionText';
 import { usePeriodReview } from '../features/reviews/usePeriodReview';
 import AutoGrowTextarea from '../shared/ui/forms/AutoGrowTextarea.vue';
 import FormFieldLabel from '../shared/ui/forms/FormFieldLabel.vue';
@@ -39,7 +41,8 @@ import {
   summarize,
   weekSummaryText,
 } from '../features/analytics';
-import { addDays, endOfWeek, formatDate, fromDateKey, startOfWeek, todayKey, toDateKey } from '../services/dates';
+import { addDays, addMonths, endOfWeek, formatDate, startOfWeek, todayKey } from '../services/dates';
+import { validDate } from '@/model/normalization';
 import { useAppStore } from '../stores/app';
 import {
   contextFactorOptions,
@@ -51,21 +54,10 @@ import {
   type WeeklyReview,
 } from '../types';
 
-const props = defineProps<{ initialWeek?: string }>();
+const props = defineProps<{ initialWeek?: string; initialHash?: string }>();
 const store = useAppStore();
 
-function validAnchor(value: string | undefined) {
-  if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
-    return todayKey();
-  }
-  return toDateKey(fromDateKey(value)) === value ? value : todayKey();
-}
-
-function initialAnchor(value: string | undefined) {
-  return value ? validAnchor(value) : todayKey();
-}
-
-const anchor = ref(initialAnchor(props.initialWeek));
+const anchor = computed(() => validDate(props.initialWeek) || todayKey());
 const start = computed(() => startOfWeek(anchor.value));
 const end = computed(() => endOfWeek(anchor.value));
 const days = computed(() => Array.from({ length: 7 }, (_, index) => addDays(start.value, index)));
@@ -144,7 +136,6 @@ const {
   period: 'week',
   anchor,
   start,
-  end,
   emptyReview: emptyWeeklyReview,
   findReview: (weekStart) => store.reviewByWeek(weekStart),
   persistReview: (draft, expected, key) => store.saveReview(draft, expected, key),
@@ -162,6 +153,9 @@ const {
   },
 });
 const previousReview = computed(() => store.reviewByWeek(addDays(start.value, -7)));
+const previousDecision = computed(() => weeklyDecisionText(previousReview.value));
+const focusSource = computed(() => addMonths(addDays(end.value, 1), -1));
+const monthlyFocus = computed(() => store.reviewByMonth(focusSource.value)?.nextFocus.trim());
 const decisionFollowUp = computed(() =>
   buildDecisionFollowUp(previousReview.value, savedReview.value, entries.value, results.value, lifeEvents.value),
 );
@@ -182,7 +176,8 @@ const isRecoveredReview = computed(
     store.settings.firstUse.overviewSeen &&
     (store.settings.firstUse.status === 'in_progress' || store.settings.firstUse.status === 'completed'),
 );
-const showRecoveredOverview = computed(() => isRecoveredReview.value && window.location.hash === '#first-use-overview');
+const activeHash = computed(() => props.initialHash ?? window.location.hash);
+const showRecoveredOverview = computed(() => isRecoveredReview.value && activeHash.value === '#first-use-overview');
 const navigatorSubtitle = computed(() => {
   if (showRecoveredOverview.value) {
     return 'Ваш первый обзор недели';
@@ -211,19 +206,14 @@ const actionNotes = computed(() =>
 );
 const specialDays = computed(() => entries.value.filter((entry) => entry.specialDay !== null).sort((a, b) => a.date.localeCompare(b.date)));
 const rhythmDays = computed(() => days.value.map((day) => ({ day, entry: entriesByDate.value.get(day) })));
-watch(
-  () => props.initialWeek,
-  (value) => {
-    anchor.value = initialAnchor(value);
-  },
-);
 </script>
 
 <template>
   <PageShell class="page--review page--week">
     <ReviewHeading
       title="Неделя"
-      summary="Вспомните события недели и посмотрите свои записи."
+      :anchor="anchor"
+      :saved="hasSavedReview"
       :href="reviewAvailable ? '#week-review' : undefined"
       period="week"
     />
@@ -231,6 +221,7 @@ watch(
       :title="`${formatDate(start, { day: 'numeric', month: 'short' })} — ${formatDate(end, { day: 'numeric', month: 'short' })}`"
       :subtitle="navigatorSubtitle"
       :hint="reviewHint"
+      :return-label="start !== startOfWeek(todayKey()) ? 'К текущей неделе' : undefined"
       v-on="navigation"
     />
 
@@ -330,11 +321,11 @@ watch(
         v-if="hasDailyData || hasJournalData || experimentCards.length"
         class="week-data-details"
         :title="hasDailyData ? 'Показать записи по дням' : 'Записи недели'"
-        :open="!hasDailyData"
+        :open="!hasDailyData || activeHash.startsWith('#experiment-')"
       >
         <WeeklyRhythmCard v-if="hasDailyData" :days="rhythmDays" />
 
-        <WeeklyExperimentCards v-if="experimentCards.length" :experiments="experimentCards" />
+        <WeeklyExperimentCards v-if="experimentCards.length" :experiments="experimentCards" :initial-hash="activeHash" />
 
         <SurfaceCard v-if="hasDailyData && actionNotes.length" kind="dashboard">
           <SectionHeading>
@@ -432,51 +423,45 @@ watch(
           </div>
           <Pill>До {{ formatDate(end, { day: 'numeric', month: 'long', year: 'numeric' }) }}</Pill>
         </SectionHeading>
-        <template v-if="previousReview?.nextLever || previousReview?.ifThenPlan">
+        <template v-if="previousDecision || previousReview?.ifThenPlan">
           <div class="previous-plan">
             <EyebrowText>Решение из прошлого обзора</EyebrowText>
-            <p v-if="previousReview.nextLever"><strong>Вы решили:</strong> {{ previousReview.nextLever }}</p>
-            <p v-if="previousReview.ifThenPlan"><strong>План:</strong> {{ previousReview.ifThenPlan }}</p>
+            <p v-if="previousDecision"><strong>Вы решили:</strong> {{ previousDecision }}</p>
+            <p v-if="previousReview?.ifThenPlan"><strong>План:</strong> {{ previousReview.ifThenPlan }}</p>
           </div>
-          <FormFieldLabel>Что получилось с этим решением?</FormFieldLabel
+          <FormFieldLabel for="week-outcome">Что получилось с этим решением?</FormFieldLabel
           ><AutoGrowTextarea
+            id="week-outcome"
             v-model="review.previousPlanOutcome"
             :rows="2"
             placeholder="Сработало, не сработало или данных пока недостаточно — и почему"
           />
         </template>
-        <PeriodDetails
-          class="review-context-details"
-          :title="reviewHasContext ? 'Дела и события' : 'Добавить дела и события'"
+        <WeeklyReviewContext
+          v-model:results="review.results"
+          v-model:highlights="review.highlights"
+          v-model:state-context="review.stateContext"
+          v-model:support="review.support"
+          v-model:obstacle="review.obstacle"
           :open="reviewContextOpen"
+          :has-context="reviewHasContext"
           @toggle="updateReviewContextOpen"
-        >
-          <FormFieldLabel>До трёх итогов или сделанных дел</FormFieldLabel>
-          <input
-            v-for="(_, index) in review.results"
-            :key="index"
-            v-model="review.results[index]"
-            type="text"
-            :placeholder="`${index + 1}. Сделанное дело или результат`"
-          />
-          <FormFieldLabel>До трёх событий, решений или мыслей</FormFieldLabel>
-          <input
-            v-for="(_, index) in review.highlights"
-            :key="`highlight-${index}`"
-            v-model="review.highlights[index]"
-            type="text"
-            :placeholder="`${index + 1}. Что важно запомнить`"
-          />
-          <FormFieldLabel>Обстоятельства недели</FormFieldLabel>
-          <AutoGrowTextarea v-model="review.stateContext" :rows="2" placeholder="Что повлияло на эту неделю" />
-          <FormFieldLabel>Что помогало?</FormFieldLabel
-          ><AutoGrowTextarea v-model="review.support" :rows="2" placeholder="Например: режим или помощь близких" />
-          <FormFieldLabel>Что мешало?</FormFieldLabel><AutoGrowTextarea v-model="review.obstacle" :rows="2" placeholder="Например: шум" />
-        </PeriodDetails>
-        <FormFieldLabel>Что продолжить или изменить на следующей неделе?</FormFieldLabel
-        ><AutoGrowTextarea v-model="review.nextLever" :rows="2" placeholder="Можно продолжить как есть или пока ничего не решать" />
-        <FormFieldLabel>План на похожую ситуацию</FormFieldLabel
+        />
+        <div v-if="monthlyFocus" class="previous-plan">
+          <strong>Фокус месяца</strong>
+          <p>{{ monthlyFocus }}</p>
+          <Link :to="`/month?month=${focusSource}#month-review`">Из обзора за {{ formatDate(focusSource, { month: 'long' }) }}</Link>
+        </div>
+        <FormFieldLabel for="week-decision">Что продолжить или изменить на следующей неделе?</FormFieldLabel
         ><AutoGrowTextarea
+          id="week-decision"
+          v-model="review.nextLever"
+          :rows="2"
+          placeholder="Можно продолжить как есть или пока ничего не решать"
+        />
+        <FormFieldLabel for="week-plan">План на похожую ситуацию</FormFieldLabel
+        ><AutoGrowTextarea
+          id="week-plan"
           v-model="review.ifThenPlan"
           class="review-plan-field"
           :rows="2"

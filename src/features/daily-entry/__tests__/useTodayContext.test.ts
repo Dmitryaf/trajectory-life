@@ -44,6 +44,10 @@ describe('weekly plan period and optional reflection', () => {
     expect(context.currentWeeklyPlan.value.plan).toBe('');
     store.weeklyReviews.push(emptyWeeklyReview('2026-07-13'));
     expect(context.currentWeeklyPlan.value.plan).toBe('');
+    store.weeklyReviews[1]!.nextLever = 'Пока без решения';
+    expect(context.currentWeeklyPlan.value.decision).toBe('');
+    store.weeklyReviews[1]!.nextLever = 'Решение на неделю';
+    expect(context.currentWeeklyPlan.value.decision).toBe('Решение на неделю');
     store.weeklyReviews[1]!.ifThenPlan = '  План из поздно заполненного обзора  ';
     expect(context.currentWeeklyPlan.value.plan).toBe('План из поздно заполненного обзора');
   });

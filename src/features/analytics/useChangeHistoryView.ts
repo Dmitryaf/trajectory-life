@@ -1,46 +1,30 @@
-import { computed, ref, watch } from 'vue';
+import { computed, ref, watch, type Ref } from 'vue';
+import { monthlyTimeline, weeklyTimeline, type TimelineItem, type TimelineTone } from './reviewTimeline';
 import type { EChartsCoreOption } from 'echarts/core';
 import { buildEventComparison, type EventComparisonMetric } from './eventComparison';
 import { entriesForPeriod, resultsForPeriod, summarize } from './periodSummary';
 import { buildRangeReviewCues, selectPrimaryReviewCues } from './reviewCues';
-import {
-  addMonths,
-  endOfMonth,
-  endOfWeek,
-  formatDate,
-  formatMinutes,
-  monthsBetween,
-  startOfMonth,
-  toDateKey,
-  todayKey,
-} from '@/services/dates';
+import { addMonths, endOfMonth, startOfWeek, formatDate, formatMinutes, monthsBetween, startOfMonth, todayKey } from '@/services/dates';
 import { buildRangePackage, copyAiPrompt as copyPackagePrompt, downloadAiPackage } from '../export/browser';
 import { buildExperimentSummary } from './experimentComparison';
 import { experimentDecisionLabel } from '../experiments/model';
 import { notifyInfo, notifySaved, notifyUnknownError } from '@/services/notifications';
 import { pageCount, pageItems } from '@/services/pagination';
 import { useAppStore } from '@/stores/app';
-import { contextFactorOptions, externalCareerIdsForOptions, type ExperimentRecord } from '@/types';
+import { contextFactorOptions, externalCareerIdsForOptions, lifeEventTypeOptions, type ExperimentRecord } from '@/types';
 import { chartColors, chartStyles } from '@/shared/theme/colors';
 
 export type RangeMonths = 3 | 6 | 12;
 type TrendMetricId = 'sleep' | 'energy' | 'weight';
-export type TimelineTone = 'event' | 'result' | 'decision' | 'outcome' | 'experiment';
-type DecisionTimelineItem = {
-  key: string;
-  date: string;
-  type: string;
-  tone: TimelineTone;
-  title: string;
-  detail: string;
-};
-
 const timelinePageSize = 10;
 
-export function useChangeHistoryView() {
+export function useChangeHistoryView(archiveHash: Ref<string>) {
   const store = useAppStore();
   const range = ref<RangeMonths>(3);
+  const copying = ref(false);
   const timelinePage = ref(1);
+  const allExperiments = computed(() => archiveHash.value === '#experiments' || archiveHash.value.startsWith('#experiment-'));
+  const hasArchivedExperiments = computed(() => store.settings.experimentHistory.length > 0);
   const selectedEventKey = ref('');
   const selectedTrendMetric = ref<TrendMetricId>('sleep');
   const rangeOptions: Array<{ value: RangeMonths; label: string }> = [
@@ -234,14 +218,7 @@ export function useChangeHistoryView() {
     ),
   );
 
-  function savedDate(updatedAt: string, fallback: string): string {
-    if (!updatedAt) {
-      return fallback;
-    }
-    const date = new Date(updatedAt);
-    return Number.isNaN(date.getTime()) ? fallback : toDateKey(date);
-  }
-  function experimentTimelineContent(record: ExperimentRecord): Pick<DecisionTimelineItem, 'detail'> {
+  function experimentTimelineContent(record: ExperimentRecord): Pick<TimelineItem, 'detail'> {
     const experimentSummary = buildExperimentSummary(store.dailyEntries, record);
     const parts = [`Вывод: ${record.conclusion}`];
     const decision = experimentDecisionLabel(record.decision);
@@ -257,73 +234,63 @@ export function useChangeHistoryView() {
     return { detail: parts.join('. ') };
   }
 
-  const decisionTimeline = computed<DecisionTimelineItem[]>(() =>
+  const decisionTimeline = computed<TimelineItem[]>(() =>
     (
       [
-        ...lifeEvents.value.map((event) => ({
-          key: `event:${event.createdAt}`,
+        ...lifeEvents.value.map<TimelineItem>((event) => ({
+          key: `event:${event.id ?? event.createdAt}`,
           date: event.date,
-          type: 'Событие',
+          to: event.id !== undefined ? `/events?entry=${event.id}` : `/events?from=${event.date}&to=${event.date}`,
+          type: lifeEventTypeOptions.find((option) => option.id === event.type)?.label ?? 'Событие',
           tone: 'event',
-          title: event.title,
+          title: event.title.trim() || 'Открыть запись',
           detail: event.note,
         })),
-        ...results.value.map((result) => ({
-          key: `result:${result.createdAt}`,
+        ...results.value.map<TimelineItem>((result) => ({
+          key: `result:${result.id ?? result.createdAt}`,
           date: result.date,
+          to: result.id !== undefined ? `/results?entry=${result.id}` : `/results?from=${result.date}&to=${result.date}`,
           type: 'Итог',
           tone: 'result',
-          title: result.title,
+          title: result.title.trim() || 'Открыть итог',
           detail: result.note,
         })),
-        ...store.weeklyReviews.flatMap((review) => {
-          const date = savedDate(review.updatedAt, endOfWeek(review.weekStart));
-          const items = [];
-          if (review.nextLever || review.ifThenPlan) {
-            items.push({
-              key: `week:${review.weekStart}:decision`,
-              date,
-              type: 'Решение недели',
-              tone: 'decision',
-              title: review.nextLever || 'План недели',
-              detail: review.ifThenPlan,
-            });
-          }
-          if (review.previousPlanOutcome) {
-            items.push({
-              key: `week:${review.weekStart}:outcome`,
-              date,
-              type: 'Проверка решения',
-              tone: 'outcome',
-              title: review.previousPlanOutcome,
-              detail: '',
-            });
-          }
-          return items;
-        }),
-        ...store.monthlyReviews.map((review) => ({
-          key: `month:${review.monthStart}:decision`,
-          date: savedDate(review.updatedAt, endOfMonth(review.monthStart)),
-          type: 'Решение месяца',
-          tone: 'decision',
-          title: review.nextFocus || review.courseChange || review.mainPattern || 'Обзор месяца',
-          detail: review.ifThenPlan,
-        })),
-        ...store.settings.experimentHistory.map((record) => ({
+        ...store.weeklyReviews.flatMap((review) => weeklyTimeline(review, end.value)),
+        ...store.monthlyReviews.flatMap((review) => monthlyTimeline(review, end.value)),
+        ...store.settings.experimentHistory.map<TimelineItem>((record) => ({
           key: `experiment:${record.id}`,
           date: record.endDate,
+          to: `/week?week=${startOfWeek(record.endDate)}#experiment-${encodeURIComponent(record.id)}`,
           type: 'Эксперимент',
           tone: 'experiment',
           title: record.title,
           ...experimentTimelineContent(record),
         })),
-      ] as DecisionTimelineItem[]
+      ] satisfies TimelineItem[]
     )
-      .filter((item) => item.date >= start.value && item.date <= end.value)
+      .filter((item) => (allExperiments.value ? item.tone === 'experiment' : item.date >= start.value && item.date <= end.value))
       .sort((a, b) => b.date.localeCompare(a.date)),
   );
   const timelinePageCount = computed(() => pageCount(decisionTimeline.value.length, timelinePageSize));
   const displayedDecisionTimeline = computed(() => pageItems(decisionTimeline.value, timelinePage.value, timelinePageSize));
+  watch(
+    [archiveHash, decisionTimeline],
+    ([hash, timeline]) => {
+      if (!hash.startsWith('#experiment-')) {
+        return;
+      }
+      const position = timeline.findIndex((item) => `#experiment-${item.key.slice('experiment:'.length)}` === hash);
+      if (position >= 0) {
+        timelinePage.value = Math.floor(position / timelinePageSize) + 1;
+      }
+    },
+    { immediate: true },
+  );
+  watch(allExperiments, () => {
+    if (!archiveHash.value.startsWith('#experiment-')) {
+      timelinePage.value = 1;
+    }
+  });
   watch(timelinePageCount, (count) => {
     timelinePage.value = Math.min(timelinePage.value, count);
   });
@@ -332,6 +299,11 @@ export function useChangeHistoryView() {
       { tone: 'event' as const, label: 'События', count: decisionTimeline.value.filter((item) => item.tone === 'event').length },
       { tone: 'result' as const, label: 'Итоги', count: decisionTimeline.value.filter((item) => item.tone === 'result').length },
       { tone: 'decision' as const, label: 'Решения', count: decisionTimeline.value.filter((item) => item.tone === 'decision').length },
+      {
+        tone: 'observation' as const,
+        label: 'Наблюдения',
+        count: decisionTimeline.value.filter((item) => item.tone === 'observation').length,
+      },
       { tone: 'outcome' as const, label: 'Проверки', count: decisionTimeline.value.filter((item) => item.tone === 'outcome').length },
       {
         tone: 'experiment' as const,
@@ -392,11 +364,17 @@ export function useChangeHistoryView() {
     });
   }
   async function copyPrompt() {
+    if (copying.value) {
+      return;
+    }
+    copying.value = true;
     try {
       await copyPackagePrompt(createPackage(), store.settings);
       notifySaved(`Текст за ${range.value} мес. скопирован`);
     } catch (error) {
       notifyUnknownError(error, 'Не удалось подготовить текст для нейросети');
+    } finally {
+      copying.value = false;
     }
   }
   function downloadJson() {
@@ -450,6 +428,9 @@ export function useChangeHistoryView() {
 
   return {
     range,
+    copying,
+    allExperiments,
+    hasArchivedExperiments,
     timelinePage,
     timelinePageCount,
     selectedEventKey,

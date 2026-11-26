@@ -14,6 +14,7 @@ describe('explicit experiment activation', () => {
     settings.experiment = { ...settings.experiment, active: true, title: 'PRIVATE', startDate: '2026-09-01', endDate: '2026-09-07' };
     const save = vi.fn(async (_message?: string, _action?: string, next?: AppSettings) => {
       store.settings = next!;
+      settings.experiment = structuredClone(next!.experiment);
       return true;
     });
     save.mockResolvedValueOnce(false);

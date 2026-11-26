@@ -10,7 +10,7 @@ defineEmits<{ 'update:modelValue': [value: RangeMonths] }>();
 </script>
 
 <template>
-  <RangeTabs class="history-range-tabs" role="group" aria-label="Период истории">
+  <RangeTabs class="history-range-tabs" role="group" aria-label="Период динамики">
     <button
       v-for="option in options"
       :key="option.value"
