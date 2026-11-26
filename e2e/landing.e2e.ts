@@ -15,14 +15,7 @@ test('keeps the public landing independent from authentication and product stora
   await expect(page.getByRole('link', { name: 'Посмотреть примеры' })).toHaveAttribute('href', '#product');
   await page.getByRole('link', { name: 'Все возможности', exact: false }).click();
   await expect(page.locator('#features')).toBeInViewport();
-  for (const name of [
-    'Записи дня',
-    'Неделя и месяц',
-    'История изменений',
-    'Цель и личный эксперимент',
-    'Журнал',
-    'Копии и внешний анализ',
-  ]) {
+  for (const name of ['Записи дня', 'Неделя и месяц', 'Динамика', 'Цель и личный эксперимент', 'Журнал', 'Копии и внешний анализ']) {
     await expect(page.locator('#features').getByRole('heading', { name, exact: true })).toBeVisible();
   }
   await expect(page.getByRole('link', { name: 'Политика конфиденциальности', exact: true })).toHaveAttribute('href', '/data-policy');
@@ -160,7 +153,7 @@ test('keeps the landing readable and accessible across supported widths', async 
 test('lets visitors browse every example with the keyboard without registering', async ({ page }) => {
   await page.goto('/');
   await page.getByRole('tab', { name: 'Сегодня', exact: true }).focus();
-  for (const title of ['Неделя', 'Месяц', 'История', 'Журнал', 'Настройки', 'Сегодня']) {
+  for (const title of ['Неделя', 'Месяц', 'Динамика', 'Журнал', 'Настройки', 'Сегодня']) {
     await page.keyboard.press('ArrowRight');
     const tab = page.getByRole('tab', { name: title, exact: true });
     await expect(tab).toBeFocused();
@@ -177,7 +170,7 @@ test('lets visitors browse every example with the keyboard without registering',
   await expect(page.getByRole('tab', { name: 'Сегодня', exact: true })).toHaveAttribute('aria-selected', 'true');
   for (const width of [390, 1440]) {
     await page.setViewportSize({ width, height: 900 });
-    for (const title of ['Сегодня', 'Неделя', 'Месяц', 'История', 'Журнал', 'Настройки']) {
+    for (const title of ['Сегодня', 'Неделя', 'Месяц', 'Динамика', 'Журнал', 'Настройки']) {
       await page.getByRole('tab', { name: title, exact: true }).click();
       const image = page.getByRole('tabpanel').getByRole('img');
       await expect(image).toHaveJSProperty('complete', true);

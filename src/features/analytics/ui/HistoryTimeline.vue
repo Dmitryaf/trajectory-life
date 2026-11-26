@@ -2,16 +2,22 @@
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import SurfaceCard from '@/shared/ui/layout/SurfaceCard.vue';
 import SectionHeading from '@/shared/ui/layout/SectionHeading.vue';
-import EyebrowText from '@/shared/ui/typography/EyebrowText.vue';
+import { RouterLink } from 'vue-router';
 import ArchivePagination from '@/features/journal/ui/ArchivePagination.vue';
 import CountBadge from '@/shared/ui/data-display/CountBadge.vue';
 import { formatDate } from '@/services/dates';
-import type { TimelineTone } from '@/features/analytics/useChangeHistoryView';
+import type { TimelineTone, TimelineItem } from '@/features/analytics/reviewTimeline';
 
-type TimelineItem = { key: string; date: string; type: string; tone: TimelineTone; title: string; detail: string };
 type TimelineSummary = { tone: TimelineTone; label: string; count: number };
 
-const props = defineProps<{ items: TimelineItem[]; summary: TimelineSummary[]; total: number; page: number; pageCount: number }>();
+const props = defineProps<{
+  items: TimelineItem[];
+  summary: TimelineSummary[];
+  total: number;
+  page: number;
+  pageCount: number;
+  allExperiments: boolean;
+}>();
 defineEmits<{ 'update:page': [value: number] }>();
 
 const list = ref<HTMLElement>();
@@ -58,30 +64,39 @@ onBeforeUnmount(() => {
   <SurfaceCard kind="dashboard" class="history-timeline history-timeline--featured">
     <SectionHeading>
       <div>
-        <EyebrowText>Основа истории</EyebrowText>
-        <h2>События, решения и итоги</h2>
+        <h2>{{ allExperiments ? 'Завершённые эксперименты' : 'События и выводы' }}</h2>
       </div>
       <CountBadge>{{ total }}</CountBadge>
     </SectionHeading>
-    <div class="history-timeline__summary" aria-label="Состав истории">
+    <div class="history-timeline__summary" aria-label="Типы записей за период">
       <span v-for="item in summary" :key="item.tone" :class="`history-timeline__summary-item--${item.tone}`">
         <i></i>{{ item.label }} <strong>{{ item.count }}</strong>
       </span>
     </div>
     <div ref="list" class="history-timeline__list" :style="{ minHeight: reservedHeight ? `${reservedHeight}px` : undefined }">
-      <article v-for="item in items" :key="item.key" class="decision-timeline__item" :class="`history-timeline__item--${item.tone}`">
-        <time>{{ formatDate(item.date, { day: 'numeric', month: 'short', year: 'numeric' }) }}</time>
+      <article
+        v-for="item in items"
+        :id="item.tone === 'experiment' ? `experiment-${item.key.slice('experiment:'.length)}` : undefined"
+        :key="item.key"
+        class="decision-timeline__item"
+        :class="`history-timeline__item--${item.tone}`"
+      >
+        <span v-if="item.period" class="history-period">{{ item.period }}</span>
+        <time v-else :datetime="item.date">{{ formatDate(item.date, { day: 'numeric', month: 'short', year: 'numeric' }) }}</time>
         <span>{{ item.type }}</span>
         <div>
-          <strong>{{ item.title }}</strong>
+          <RouterLink :to="item.to" class="history-source">{{ item.title }}</RouterLink>
           <p v-if="item.detail">{{ item.detail }}</p>
+          <small v-if="item.updatedDate" class="history-updated"
+            >Обновлено {{ formatDate(item.updatedDate, { day: 'numeric', month: 'short', year: 'numeric' }) }}</small
+          >
         </div>
       </article>
     </div>
     <ArchivePagination
       :page="page"
       :page-count="pageCount"
-      context-label="истории изменений"
+      context-label="ленты изменений"
       preserve-control-position
       @update:page="$emit('update:page', $event)"
     />
@@ -159,6 +174,23 @@ onBeforeUnmount(() => {
 .history-timeline__item--outcome {
   --history-timeline-tone: var(--amber);
 }
+.history-timeline__summary-item--observation,
+.history-timeline__item--observation {
+  --history-timeline-tone: var(--purple);
+}
+.history-source {
+  color: var(--review-cue-title);
+  font-weight: 700;
+  text-underline-offset: 0.16em;
+}
+.history-source:hover {
+  color: var(--brand-strong);
+}
+.history-updated {
+  display: block;
+  margin-top: 5px;
+  color: var(--muted);
+}
 .history-timeline__summary-item--experiment,
 .history-timeline__item--experiment {
   --history-timeline-tone: var(--orange);
@@ -166,7 +198,7 @@ onBeforeUnmount(() => {
 .history-timeline__list > article {
   position: relative;
   display: grid;
-  grid-template-columns: 105px 120px 1fr;
+  grid-template-columns: 105px 120px minmax(0, 1fr);
   gap: 14px;
   align-items: start;
   margin-left: 5px;
@@ -175,6 +207,9 @@ onBeforeUnmount(() => {
   border-left: 2px solid var(--history-timeline-line);
   border-radius: 0 14px 14px 0;
   background: var(--surface);
+}
+.history-timeline__list article > div {
+  overflow-wrap: anywhere;
 }
 .history-timeline__list > article::before {
   content: '';
@@ -188,12 +223,13 @@ onBeforeUnmount(() => {
   background: var(--history-timeline-tone);
   box-shadow: 0 0 0 1px var(--history-timeline-marker-ring);
 }
-.history-timeline__list time {
+.history-timeline__list time,
+.history-period {
   color: var(--history-timeline-meta);
   font-size: 11px;
   font-weight: 750;
 }
-.history-timeline__list article > span {
+.history-timeline__list article > span:not(.history-period) {
   color: var(--history-timeline-text);
   font-size: 11px;
   font-weight: 800;

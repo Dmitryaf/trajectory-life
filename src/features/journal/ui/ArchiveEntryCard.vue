@@ -21,7 +21,7 @@ const legacyContentClass = props.tone === 'results' ? 'result-item__content' : u
       <small>{{ metadata }}</small>
       <slot></slot>
     </div>
-    <ArchiveItemActions>
+    <ArchiveItemActions :title="title">
       <slot name="actions"></slot>
     </ArchiveItemActions>
   </article>
@@ -30,34 +30,19 @@ const legacyContentClass = props.tone === 'results' ? 'result-item__content' : u
 <style scoped>
 .archive-entry {
   display: grid;
-  grid-template-columns: 42px 1fr auto;
-  gap: 13px;
+  grid-template-columns: 42px minmax(0, 1fr);
+  gap: 6px 13px;
   align-items: start;
   padding: 15px 16px;
   border: 1px solid var(--events-card-border);
   border-radius: 17px;
   background: linear-gradient(135deg, var(--events-card-gradient), var(--surface));
-  transition:
-    border-color 0.15s,
-    transform 0.15s,
-    box-shadow 0.15s;
 }
 
 .archive-entry--results {
   align-items: center;
   border-color: var(--results-card-border);
   background: linear-gradient(135deg, var(--results-card-gradient), var(--surface));
-}
-
-.archive-entry:hover {
-  transform: translateY(-1px);
-  border-color: var(--events-card-hover-border);
-  box-shadow: 0 8px 20px var(--events-card-shadow);
-}
-
-.archive-entry--results:hover {
-  border-color: var(--results-card-hover-border);
-  box-shadow: 0 8px 20px var(--results-card-shadow);
 }
 
 .archive-entry__icon {

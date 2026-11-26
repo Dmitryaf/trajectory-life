@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia';
 import type { Table } from 'dexie';
 import { editorDraftKey, logicalEditorDraftKey, type EditorDraft } from '../model/editorDraft';
+import { normalizeSelfReminder, type SelfReminder, type SelfReminderText } from '../model/selfReminder';
 import { assertJournalVersion } from '../features/journal/version';
 import { DailyEntryChangedError } from '../features/daily-entry/model';
 import { db } from '../db';
@@ -150,6 +151,7 @@ export const useAppStore = defineStore('app', {
     editorDraftGeneration: 0,
     results: [] as ResultRecord[],
     lifeEvents: [] as LifeEventRecord[],
+    selfReminders: [] as SelfReminder[],
     weeklyReviews: [] as WeeklyReview[],
     monthlyReviews: [] as MonthlyReview[],
     settings: structuredClone(defaultSettings) as AppSettings,
@@ -181,9 +183,10 @@ export const useAppStore = defineStore('app', {
     async loadLocalData(scope: CloudOperationScope) {
       this.loadError = '';
       try {
-        const [results, lifeEvents, weeklyReviews, monthlyReviews] = await Promise.all([
+        const [results, lifeEvents, selfReminders, weeklyReviews, monthlyReviews] = await Promise.all([
           db.results.toArray(),
           db.lifeEvents.toArray(),
+          db.selfReminders.toArray(),
           db.weeklyReviews.toArray(),
           db.monthlyReviews.toArray(),
         ]);
@@ -235,6 +238,7 @@ export const useAppStore = defineStore('app', {
         this.editorDrafts = editorDrafts;
         this.results = results.map((result) => normalizeResult(result)).sort((a, b) => b.date.localeCompare(a.date));
         this.lifeEvents = lifeEvents.map((event) => normalizeLifeEvent(event)).sort((a, b) => b.date.localeCompare(a.date));
+        this.selfReminders = selfReminders;
         this.weeklyReviews = weeklyReviews.map((review) => normalizeWeeklyReview(review));
         this.monthlyReviews = monthlyReviews.map((review) => normalizeMonthlyReview(review));
         this.settings = activeSettings;
@@ -486,6 +490,43 @@ export const useAppStore = defineStore('app', {
         void this.syncCloudSnapshot();
       });
     },
+    async saveSelfReminder(input: SelfReminderText, expected: SelfReminder | null, draftKey?: string): Promise<SelfReminder> {
+      const scope = this.createCloudOperationScope();
+      return serializeLocalData(this, scope.assertCurrent, async () => {
+        const reminder = normalizeSelfReminder({
+          id: expected?.id ?? crypto.randomUUID(),
+          createdAt: expected?.createdAt ?? new Date().toISOString(),
+          ...input,
+        });
+        await writeWithDraft(
+          scope,
+          db.selfReminders,
+          async () => {
+            assertJournalVersion(await db.selfReminders.get(reminder.id), expected);
+            await db.selfReminders.put(reminder);
+          },
+          draftKey,
+        );
+        scope.assertCurrent();
+        this.forgetEditorDraft(draftKey);
+        this.selfReminders = [...this.selfReminders.filter((item) => item.id !== reminder.id), reminder];
+        void this.requestLocalStoragePersistence();
+        void this.syncCloudSnapshot();
+        return reminder;
+      });
+    },
+    async removeSelfReminder(expected: SelfReminder): Promise<void> {
+      const scope = this.createCloudOperationScope();
+      return serializeLocalData(this, scope.assertCurrent, async () => {
+        await writeWithDraft(scope, db.selfReminders, async () => {
+          assertJournalVersion(await db.selfReminders.get(expected.id), expected);
+          await db.selfReminders.delete(expected.id);
+        });
+        scope.assertCurrent();
+        this.selfReminders = this.selfReminders.filter((item) => item.id !== expected.id);
+        void this.syncCloudSnapshot();
+      });
+    },
     async saveReview(review: WeeklyReview, expected?: WeeklyReview | null, draftKey?: string): Promise<void> {
       const scope = this.createCloudOperationScope();
       return serializeLocalData(this, scope.assertCurrent, async () => {
@@ -552,14 +593,15 @@ export const useAppStore = defineStore('app', {
         void this.syncCloudSnapshot();
       });
     },
-    async saveSettings(settings: AppSettings): Promise<void> {
+    async saveSettings(settings: AppSettings, fields?: readonly (keyof AppSettings)[]): Promise<void> {
       const scope = this.createCloudOperationScope();
       return serializeLocalData(this, scope.assertCurrent, async () => {
-        const integrityError = experimentIntegrityError(settings);
+        const next = fields ? { ...this.settings, ...Object.fromEntries(fields.map((field) => [field, settings[field]])) } : settings;
+        const integrityError = experimentIntegrityError(next);
         if (integrityError) {
           throw new Error(integrityError);
         }
-        const normalized = plainCopy(normalizeSettings(settings));
+        const normalized = plainCopy(normalizeSettings(next));
         const entryLinkError = experimentEntryLinkError(this.dailyEntries, normalized);
         if (entryLinkError) {
           throw new Error(entryLinkError);
@@ -578,6 +620,7 @@ export const useAppStore = defineStore('app', {
         dailyEntries: this.dailyEntries,
         results: this.results,
         lifeEvents: this.lifeEvents,
+        selfReminders: this.selfReminders,
         weeklyReviews: this.weeklyReviews,
         monthlyReviews: this.monthlyReviews,
         settings: this.settings,
@@ -618,6 +661,7 @@ export const useAppStore = defineStore('app', {
             db.editorDrafts,
             db.results,
             db.lifeEvents,
+            db.selfReminders,
             db.weeklyReviews,
             db.monthlyReviews,
             db.settings,
@@ -629,6 +673,7 @@ export const useAppStore = defineStore('app', {
               options.preserveDailyDrafts ? Promise.resolve() : db.editorDrafts.clear(),
               db.results.clear(),
               db.lifeEvents.clear(),
+              db.selfReminders.clear(),
               db.weeklyReviews.clear(),
               db.monthlyReviews.clear(),
               db.settings.clear(),
@@ -636,6 +681,7 @@ export const useAppStore = defineStore('app', {
             await db.dailyEntries.bulkPut(prepared.dailyEntries);
             await db.results.bulkPut(prepared.results);
             await db.lifeEvents.bulkPut(prepared.lifeEvents ?? []);
+            await db.selfReminders.bulkPut(prepared.selfReminders ?? []);
             await db.weeklyReviews.bulkPut(prepared.weeklyReviews);
             await db.monthlyReviews.bulkPut(prepared.monthlyReviews ?? []);
             await db.settings.put(plainCopy(prepared.settings));
@@ -665,6 +711,7 @@ export const useAppStore = defineStore('app', {
               db.editorDrafts,
               db.results,
               db.lifeEvents,
+              db.selfReminders,
               db.weeklyReviews,
               db.monthlyReviews,
               db.settings,
@@ -677,6 +724,7 @@ export const useAppStore = defineStore('app', {
                 db.editorDrafts.clear(),
                 db.results.clear(),
                 db.lifeEvents.clear(),
+                db.selfReminders.clear(),
                 db.weeklyReviews.clear(),
                 db.monthlyReviews.clear(),
                 db.settings.clear(),
@@ -695,6 +743,7 @@ export const useAppStore = defineStore('app', {
         this.results = [];
         scope.assertCurrent();
         this.lifeEvents = [];
+        this.selfReminders = [];
         this.weeklyReviews = [];
         this.monthlyReviews = [];
         scope.assertCurrent();
@@ -872,6 +921,7 @@ export const useAppStore = defineStore('app', {
       this.editorDrafts = [];
       this.results = [];
       this.lifeEvents = [];
+      this.selfReminders = [];
       this.weeklyReviews = [];
       this.monthlyReviews = [];
       this.settings = structuredClone(defaultSettings);

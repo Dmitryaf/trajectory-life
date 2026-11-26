@@ -110,7 +110,10 @@ export const lifeAreaOptions: Option<BaseLifeAreaId>[] = [
 
 export const legacyLifeAreaOptions: Option<BaseLifeAreaId>[] = [{ id: 'english', label: 'Английский', icon: 'A' }];
 
+export const unassignedResultArea = 'unassigned';
+
 export const resultAreaOptions: Option<ResultRecord['area']>[] = [
+  { id: unassignedResultArea, label: 'Без области', icon: '·' },
   { id: 'career', label: 'Работа', icon: '↗' },
   { id: 'sport', label: 'Спорт', icon: '△' },
   { id: 'nutrition', label: 'Питание', icon: '◐' },

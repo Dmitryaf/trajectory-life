@@ -28,6 +28,14 @@ export function mergeCloudSnapshots(baseInput: unknown, localInput: unknown, rem
     dailyEntries: mergeKeyed(base.dailyEntries, local.dailyEntries, remote.dailyEntries, (entry) => entry.date, 'dailyEntries', conflicts),
     results: mergeJournalRecords(base.results, local.results, remote.results, 'results', conflicts),
     lifeEvents: mergeJournalRecords(base.lifeEvents ?? [], local.lifeEvents ?? [], remote.lifeEvents ?? [], 'lifeEvents', conflicts),
+    selfReminders: mergeKeyed(
+      base.selfReminders ?? [],
+      local.selfReminders ?? [],
+      remote.selfReminders ?? [],
+      (reminder) => reminder.id,
+      'selfReminders',
+      conflicts,
+    ),
     weeklyReviews: mergeKeyed(
       base.weeklyReviews,
       local.weeklyReviews,

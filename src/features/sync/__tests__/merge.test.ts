@@ -18,6 +18,32 @@ function emptyPayload(): ExportPayload {
 }
 
 describe('cloud snapshot merge', () => {
+  it('merges independent self-reminders from two devices', () => {
+    const base = { ...emptyPayload(), version: 11 };
+    const started = { category: 'lesson', text: 'Один вывод', createdAt: '2026-08-20T10:00:00.000Z' };
+    const local = { ...emptyPayload(), selfReminders: [{ ...started, id: 'left' }] };
+    const remote = { ...emptyPayload(), selfReminders: [{ ...started, id: 'right', text: 'Другой вывод' }] };
+    expect(mergeCloudSnapshots(base, local, remote).selfReminders).toEqual([...local.selfReminders, ...remote.selfReminders]);
+  });
+
+  it('merges a self-reminder title added independently of a body edit', () => {
+    const item = { id: 'one', category: 'principle', text: 'Запись', createdAt: '2026-08-20T10:00:00.000Z' };
+    const base = { ...emptyPayload(), version: 12, selfReminders: [item] };
+    const local = { ...emptyPayload(), selfReminders: [{ ...item, title: 'Заголовок' }] };
+    const remote = { ...emptyPayload(), selfReminders: [{ ...item, text: 'Изменённый текст' }] };
+    expect(mergeCloudSnapshots(base, local, remote).selfReminders).toEqual([{ ...item, title: 'Заголовок', text: 'Изменённый текст' }]);
+  });
+
+  it('protects a self-reminder edited on one device and removed on another', () => {
+    const item = { id: 'one', category: 'principle', text: 'Исходный текст', createdAt: '2026-08-20T10:00:00.000Z' };
+    const base = { ...emptyPayload(), selfReminders: [item] };
+    const local = { ...base, selfReminders: [{ ...item, text: 'Новая редакция' }] };
+    const remote = { ...base, selfReminders: [] };
+    expect(() => mergeCloudSnapshots(base, local, remote)).toThrowError(
+      expect.objectContaining({ conflicts: [{ path: 'selfReminders[one]', kind: 'edit_delete' }] }),
+    );
+  });
+
   it('keeps independent field edits made on two devices', () => {
     const entry = { ...emptyDailyEntry('2026-08-20'), energy: 3, importantFact: '' };
     const base = { ...emptyPayload(), dailyEntries: [entry] };

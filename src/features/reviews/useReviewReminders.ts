@@ -1,30 +1,28 @@
 import { computed, inject, onBeforeUnmount, onMounted, provide, ref, watch, type InjectionKey, type Ref } from 'vue';
 import { todayKey } from '@/services/dates';
 import type { useAppStore } from '@/stores/app';
-import { readViewedReviews, reviewReminders, writeViewedReviews, type ReviewPeriod, type ViewedReviews } from './reminders';
+import { readDismissedReviews, reviewReminders, writeDismissedReviews, type DismissedReviews, type ReviewReminder } from './reminders';
 
 const reminderKey: InjectionKey<ReturnType<typeof provideReviewReminders>> = Symbol('review-reminders');
 
 export function provideReviewReminders(store: ReturnType<typeof useAppStore>, owner: Readonly<Ref<string>>, ready: Readonly<Ref<boolean>>) {
   const today = ref(todayKey());
-  const viewed = ref<ViewedReviews>({});
+  const dismissed = ref<DismissedReviews>({});
   watch(
     owner,
     (value) => {
-      viewed.value = value ? readViewedReviews(value) : {};
+      dismissed.value = value ? readDismissedReviews(value) : {};
     },
     { immediate: true, flush: 'sync' },
   );
-  const reminders = computed(() => (ready.value && owner.value ? reviewReminders(store, today.value, viewed.value) : []));
-  const destination = computed(() => reminders.value[0]?.to ?? '/week');
-  const label = computed(() => reminders.value.map((reminder) => reminder.label).join('. '));
+  const reminders = computed(() => (ready.value && owner.value ? reviewReminders(store, today.value, dismissed.value) : []));
 
-  function markViewed(period: ReviewPeriod, start: string) {
+  function dismiss({ period, start }: ReviewReminder) {
     if (!reminders.value.some((reminder) => reminder.period === period && reminder.start === start)) {
       return;
     }
-    viewed.value = { ...viewed.value, [period]: start };
-    writeViewedReviews(owner.value, viewed.value);
+    dismissed.value = { ...dismissed.value, [period]: start };
+    writeDismissedReviews(owner.value, dismissed.value);
   }
   function refreshDate() {
     today.value = todayKey();
@@ -40,28 +38,11 @@ export function provideReviewReminders(store: ReturnType<typeof useAppStore>, ow
     window.removeEventListener('focus', refreshDate);
     document.removeEventListener('visibilitychange', refreshDate);
   });
-  const context = { reminders, destination, label, markViewed };
+  const context = { today, reminders, dismiss };
   provide(reminderKey, context);
   return context;
 }
 
 export function useReviewReminders() {
   return inject(reminderKey, null);
-}
-
-export function useViewedReview(period: ReviewPeriod, start: Readonly<Ref<string>>) {
-  const context = useReviewReminders();
-  const mounted = ref(false);
-  onMounted(() => {
-    mounted.value = true;
-  });
-  watch(
-    () => [mounted.value, start.value, context?.reminders.value] as const,
-    () => {
-      if (mounted.value) {
-        context?.markViewed(period, start.value);
-      }
-    },
-    { flush: 'post' },
-  );
 }

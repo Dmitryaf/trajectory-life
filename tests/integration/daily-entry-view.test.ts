@@ -95,8 +95,9 @@ describe('daily entry scenario', () => {
       global: { plugins: [pinia], stubs: { RouterLink: routerLinkStub } },
     });
 
-    expect(wrapper.text()).toContain('Отметьте несколько деталей сегодняшнего дня');
-    expect(wrapper.text()).toContain('Разделы на главной можно добавить или убрать в настройках');
+    const note = wrapper.get('.form-card--daily-summary');
+    expect(note.text()).toContain('Что сегодня произошло или что вы заметили');
+    expect(note.get('a').attributes('href')).toBe('/settings#daily-blocks');
     expect(wrapper.text()).toContain('Настроить блоки');
     expect(wrapper.text()).not.toContain('Зачем это заполнять?');
     expect(wrapper.text()).not.toContain('Вчера без записи');
@@ -210,7 +211,7 @@ describe('daily entry scenario', () => {
     expect(wrapper.find('.checkin-grid').exists()).toBe(true);
   });
 
-  it('shows one optional cue and falls back after first-use is postponed', async () => {
+  it('keeps a personal plan visible while the optional first-use cue can be postponed', async () => {
     const { pinia, store } = createStore();
     store.settings.firstUse = {
       status: 'available',
@@ -232,7 +233,7 @@ describe('daily entry scenario', () => {
     });
 
     expect(wrapper.find('.first-use-card--available').exists()).toBe(true);
-    expect(wrapper.find('[aria-label="Текущий план недели"]').exists()).toBe(false);
+    expect(wrapper.get('[aria-label="Текущий план недели"]').text()).toContain('Если устану, сокращу необязательную задачу');
     expect(wrapper.find('.ai-analysis-nudge').exists()).toBe(false);
 
     await wrapper
@@ -245,7 +246,7 @@ describe('daily entry scenario', () => {
     expect(wrapper.find('.ai-analysis-nudge').exists()).toBe(false);
   });
 
-  it('keeps the weekly plan collapsed after the note without requiring daily tracking', () => {
+  it('shows the weekly plan directly after the note without requiring daily tracking', () => {
     const { pinia, store } = createStore();
     store.dailyEntries = [{ ...emptyDailyEntry('2026-07-20'), importantFact: 'Обычная запись' }];
     store.weeklyReviews = [{ ...emptyWeeklyReview('2026-07-13'), ifThenPlan: 'Если застряну, выйду на короткую прогулку' }];
@@ -258,7 +259,8 @@ describe('daily entry scenario', () => {
     expect(wrapper.find('.recovery-nudge').exists()).toBe(false);
     const children = Array.from(wrapper.get('.checkin-grid').element.children);
     const plan = wrapper.get('[aria-label="Текущий план недели"]');
-    expect(plan.get('details').attributes('open')).toBeUndefined();
+    expect(plan.get('p').text()).toBe('Если застряну, выйду на короткую прогулку');
+    expect(plan.get('a').attributes('href')).toBe('/week?week=2026-07-13#week-review');
     expect(children.indexOf(plan.element)).toBe(children.indexOf(wrapper.get('.form-card--daily-summary').element) + 1);
   });
 

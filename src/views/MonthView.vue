@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import PeriodReviewActions from '@/features/reviews/ui/PeriodReviewActions.vue';
 import MonthDailyNotes from '@/features/reviews/ui/MonthDailyNotes.vue';
+import MonthReviewContext from '@/features/reviews/ui/MonthReviewContext.vue';
+import SelfReminderReview from '@/features/self-reminders/ui/SelfReminderReview.vue';
 import MonthSectionLinks from '@/features/reviews/ui/MonthSectionLinks.vue';
 import MonthWeekReviews from '@/features/reviews/ui/MonthWeekReviews.vue';
 import MonthWeekComparison from '@/features/reviews/ui/MonthWeekComparison.vue';
@@ -18,6 +20,7 @@ import ReviewHeading from '@/features/reviews/ui/ReviewPageHeading.vue';
 import ReviewNotice from '@/features/reviews/ui/ReviewNotice.vue';
 import MetricSwitcher from '@/features/reviews/ui/MetricSwitcher.vue';
 import { usePeriodReview } from '@/features/reviews/usePeriodReview';
+import { validDate } from '@/model/normalization';
 import EChartPanel from '@/shared/ui/charts/EChartPanel.vue';
 import AutoGrowTextarea from '@/shared/ui/forms/AutoGrowTextarea.vue';
 import FormFieldLabel from '@/shared/ui/forms/FormFieldLabel.vue';
@@ -53,7 +56,8 @@ import {
 } from '@/types';
 
 const store = useAppStore();
-const anchor = ref(todayKey());
+const { initialMonth = '' } = defineProps<{ initialMonth?: string }>();
+const anchor = computed(() => validDate(initialMonth) || todayKey());
 const start = computed(() => startOfMonth(anchor.value));
 const end = computed(() => endOfMonth(anchor.value));
 const archiveEnd = computed(() => (end.value > todayKey() ? todayKey() : end.value));
@@ -323,7 +327,6 @@ const {
   period: 'month',
   anchor,
   start,
-  end,
   emptyReview: emptyMonthlyReview,
   findReview: (monthStart) => store.reviewByMonth(monthStart),
   persistReview: (draft, expected, key) => store.saveMonthlyReview(draft, expected, key),
@@ -349,7 +352,8 @@ function minutesToHours(value: number | null): number | null {
   <PageShell class="page--review page--month">
     <ReviewHeading
       title="Месяц"
-      summary="Сравните недели, вспомните важные события и сделанные дела. При желании запишите планы."
+      :anchor="anchor"
+      :saved="hasSavedReview"
       :href="reviewAvailable ? '#month-review' : undefined"
       period="month"
     />
@@ -357,6 +361,7 @@ function minutesToHours(value: number | null): number | null {
       :title="formatDate(start, { month: 'long', year: 'numeric' })"
       :subtitle="start === startOfMonth(todayKey()) ? 'Текущий месяц' : ''"
       :hint="reviewHint"
+      :return-label="start !== startOfMonth(todayKey()) ? 'К текущему месяцу' : undefined"
       v-on="navigation"
     />
     <MonthSectionLinks :daily-notes="hasDailyNotes" :week-reviews="Boolean(savedWeeks.length)" />
@@ -403,27 +408,23 @@ function minutesToHours(value: number | null): number | null {
           </div>
           <small>{{ formatDate(end, { day: 'numeric', month: 'long' }) }}</small>
         </SectionHeading>
-        <PeriodDetails
-          class="month-review-context"
-          :title="reviewHasContext ? 'Разбор месяца' : 'Добавить разбор месяца'"
+        <MonthReviewContext
+          v-model:main-pattern="review.mainPattern"
+          v-model:support="review.support"
+          v-model:obstacle="review.obstacle"
+          v-model:course-change="review.courseChange"
+          :has-context="reviewHasContext"
           :open="reviewContextOpen"
           @toggle="updateReviewContextOpen"
-        >
-          <FormFieldLabel>Что чаще всего повторялось?</FormFieldLabel
-          ><AutoGrowTextarea v-model="review.mainPattern" :rows="2" placeholder="Например: часто гулял по вечерам и легче засыпал" />
-          <FormFieldLabel>Что помогало?</FormFieldLabel
-          ><AutoGrowTextarea v-model="review.support" :rows="2" placeholder="Условия, решения или люди, которые помогали" />
-          <FormFieldLabel>Что мешало сильнее всего?</FormFieldLabel
-          ><AutoGrowTextarea v-model="review.obstacle" :rows="2" placeholder="Например: частые переработки" />
-          <FormFieldLabel>После какого события вы заметили изменения?</FormFieldLabel
-          ><AutoGrowTextarea
-            v-model="review.courseChange"
-            :rows="2"
-            placeholder="Например: смена работы, поездка или завершение большого дела"
-          />
-        </PeriodDetails>
-        <FormFieldLabel>Чему хотите уделить внимание в следующем месяце?</FormFieldLabel
-        ><AutoGrowTextarea v-model="review.nextFocus" :rows="2" placeholder="Что стоит продолжить, изменить или проверить" />
+        />
+        <SelfReminderReview :key="start" />
+        <FormFieldLabel for="month-focus">Чему хотите уделить внимание в следующем месяце?</FormFieldLabel
+        ><AutoGrowTextarea
+          id="month-focus"
+          v-model="review.nextFocus"
+          :rows="2"
+          placeholder="Что стоит продолжить, изменить или проверить"
+        />
         <PeriodReviewActions :actions="actions" label="Сохранить обзор месяца" />
       </SurfaceCard>
       <ReviewNotice v-else id="month-review" tag="section">

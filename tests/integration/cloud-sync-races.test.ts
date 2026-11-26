@@ -50,6 +50,16 @@ afterAll(async () => {
 });
 
 describe('cloud synchronization races', () => {
+  it('keeps both independent card saves when their drafts share an old baseline', async () => {
+    const store = useAppStore();
+    vi.spyOn(store, 'syncCloudSnapshot').mockResolvedValue({ status: 'pending', error: 'offline' });
+    const first = { ...plainCopy(store.settings), nutritionGoalCriterion: 'first', activeFocusTitle: 'unsaved' };
+    const second = { ...plainCopy(store.settings), activeLifeAreas: ['friends'] };
+    await Promise.all([store.saveSettings(first, ['nutritionGoalCriterion']), store.saveSettings(second, ['activeLifeAreas'])]);
+    const saved = { nutritionGoalCriterion: 'first', activeLifeAreas: ['friends'], activeFocusTitle: '' };
+    expect(store.settings).toMatchObject(saved);
+    expect(await db.settings.get('main')).toMatchObject(saved);
+  });
   it('does not apply a stale download over a save that was already queued locally', async () => {
     const store = useAppStore();
     vi.spyOn(store, 'syncCloudSnapshot').mockResolvedValue({ status: 'pending', error: 'offline' });

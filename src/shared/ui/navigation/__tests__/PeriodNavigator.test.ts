@@ -7,11 +7,11 @@ import PeriodNavigator from '../PeriodNavigator.vue';
 describe('PeriodNavigator', () => {
   it('exposes previous, current and next actions with accessible labels', async () => {
     const wrapper = mount(PeriodNavigator, {
-      props: { title: 'Июль 2026', subtitle: '20 записей' },
+      props: { title: 'Июль 2026', returnLabel: 'К текущему месяцу' },
     });
 
     expect(wrapper.text()).toContain('Июль 2026');
-    expect(wrapper.text()).toContain('20 записей');
+    expect(wrapper.text()).toContain('К текущему месяцу');
     expect(wrapper.findAll('.icon-button svg[aria-hidden="true"]')).toHaveLength(2);
 
     await wrapper.get('[aria-label="Предыдущий период"]').trigger('click');

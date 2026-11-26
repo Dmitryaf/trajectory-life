@@ -1,6 +1,12 @@
 import { createPinia, setActivePinia } from 'pinia';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { hasLocalUserData, prepareLocalCacheOwner, reconcileCloudSnapshotAfterResume, reconcileCloudSnapshotOnStartup } from '../startup';
+import {
+  hasLocalUserData,
+  prepareLocalCacheOwner,
+  reconcileCloudSnapshotAfterResume,
+  reconcileCloudSnapshotOnStartup,
+  samePayloadData,
+} from '../startup';
 import type { CloudSnapshot, CloudSyncMeta } from '@/services/cloudSync';
 import { useAppStore } from '@/stores/app';
 import { useAuthStore } from '@/stores/auth';
@@ -48,6 +54,19 @@ function createServices(
 beforeEach(() => vi.clearAllMocks());
 
 describe('startup cloud reconciliation', () => {
+  it('compares supported cloud formats by data and detects newly saved self-reminders', () => {
+    const current = createStore().exportData();
+    const old = { ...current, version: 11, selfReminders: undefined };
+    expect(samePayloadData(current, old)).toBe(true);
+    expect(
+      samePayloadData(
+        { ...current, selfReminders: [{ id: 'one', category: 'principle', text: 'Сохранённая запись', createdAt: current.exportedAt }] },
+        old,
+      ),
+    ).toBe(false);
+    expect(samePayloadData(current, { ...current, version: current.version + 1 })).toBe(false);
+  });
+
   it.each([reconcileCloudSnapshotOnStartup, reconcileCloudSnapshotAfterResume])('discards a previous owner response', async (reconcile) => {
     const store = createStore();
     let finish!: (snapshot: CloudSnapshot) => void;

@@ -19,6 +19,45 @@ test.beforeEach(async ({ page }) => {
   await expect(page.locator('input[type="file"]')).toHaveValue('');
 });
 
+test('keeps the selected historical day for quick capture and finds the saved source through the journal', async ({ page }) => {
+  // Exercises two independent saves, search, Back navigation and a fresh app load.
+  test.slow();
+  const day = '2026-01-12';
+  for (const [path, label, saved] of [
+    ['results', 'Дата итога', 'Добавить итог'],
+    ['events', 'Дата события', 'Добавить запись'],
+  ] as const) {
+    await page.goto(`/today?date=${day}`);
+    await page.locator(`.quick-capture a[href^="/${path}?"]`).click();
+    await expect(page.getByLabel(label)).toHaveValue(day);
+    await page.locator('.archive-composer textarea').fill(`Контрольная запись журнала ${path}`);
+    await page.getByRole('button', { name: saved, exact: true }).click();
+    await expect(page.locator('.archive-composer textarea')).toHaveValue('');
+  }
+  await page.goto('/more');
+  const search = page.getByRole('searchbox', { name: 'Поиск по всем записям' });
+  await search.fill('Контрольная запись журнала');
+  await expect(page.locator('.journal-entry-link')).toHaveCount(2);
+  await page.getByLabel('Тип записи').selectOption('result');
+  const result = page.locator('.journal-entry-link');
+  await expect(result).toHaveCount(1);
+  await result.click();
+  await expect(page).toHaveURL(/\/results\?entry=\d+$/);
+  await expect(page.locator('.archive-entry')).toHaveCount(1);
+  await expect(page.locator('.archive-entry')).toContainText('Без области');
+  await expect(page.locator('.archive-entry')).toContainText('12 янв. 2026');
+  await page.goBack();
+  await expect(search).toHaveValue('Контрольная запись журнала');
+  await expect(page.getByLabel('Тип записи')).toHaveValue('result');
+  await result.click();
+  await page.reload();
+  await expect(page.locator('.archive-entry')).toContainText('Контрольная запись журнала results');
+  await page.getByRole('link', { name: 'Все итоги' }).click();
+  await expect(page.getByRole('searchbox', { name: 'Поиск по итогам' })).toBeVisible();
+  await page.goto('/events?entry=999999999');
+  await expect(page.getByRole('heading', { name: 'Запись не найдена' })).toBeVisible();
+});
+
 test('adds both journal entry types through their direct section links', async ({ page }) => {
   await page.goto('/more');
   await expect(page.getByRole('button', { name: 'Добавить запись' })).toHaveCount(0);
@@ -57,6 +96,8 @@ test('adds both journal entry types through their direct section links', async (
 });
 
 test('places both composer actions below focused notes with the same spacing', async ({ page }) => {
+  // Both archive forms are loaded from scratch at each of four viewport widths.
+  test.slow();
   for (const width of [390, 720, 721, 1440]) {
     await page.setViewportSize({ width, height: 844 });
     const layouts = [];
@@ -117,6 +158,7 @@ test('keeps cancellation for the remaining archive edit scenarios', async ({ pag
   await page.goto('/results');
   await openComposer(page);
   const resultTitle = page.getByPlaceholder('Что вы сделали или какой результат получили');
+  await page.locator('.result-item .archive-item-actions > summary').first().click();
   await page.getByRole('button', { name: 'Редактировать итог' }).first().click();
   await resultTitle.fill('Изменение, которое не нужно сохранять');
   await page.getByRole('button', { name: 'Отменить редактирование' }).click();
@@ -126,6 +168,7 @@ test('keeps cancellation for the remaining archive edit scenarios', async ({ pag
   await page.goto('/events');
   await openComposer(page);
   const eventTitle = page.getByPlaceholder('Короткое название');
+  await page.locator('.timeline-item .archive-item-actions > summary').first().click();
   await page.getByRole('button', { name: 'Редактировать событие' }).first().click();
   await eventTitle.fill('Другое несохранённое изменение');
   await page.getByRole('button', { name: 'Отменить редактирование' }).click();
@@ -143,6 +186,7 @@ test('opens edits with Enter without saving on key release and returns focus aft
     await page.goto(scenario.route);
     const card = page.locator(scenario.card).first();
     const originalTitle = await card.locator('strong').first().innerText();
+    await card.locator('.archive-item-actions > summary').press('Enter');
     const edit = card.getByRole('button', { name: scenario.edit });
     await edit.focus();
     await page.keyboard.press('Enter');

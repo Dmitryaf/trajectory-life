@@ -246,7 +246,7 @@ export async function smokePublic(origin) {
       await page.setViewportSize({ width, height: 900 });
       await page.goto(origin);
       await page.locator('h1').waitFor();
-      for (const title of ['Сегодня', 'Неделя', 'Месяц', 'История', 'Журнал', 'Настройки']) {
+      for (const title of ['Сегодня', 'Неделя', 'Месяц', 'Динамика', 'Журнал', 'Настройки']) {
         await page.getByRole('tab', { name: title, exact: true }).click();
         const image = page.getByRole('tabpanel').getByRole('img');
         await image.scrollIntoViewIfNeeded();

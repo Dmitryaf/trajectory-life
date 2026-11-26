@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import UiIcon from '@/shared/ui/icons/UiIcon.vue';
 
-defineProps<{ title: string; subtitle?: string; hint?: string }>();
+defineProps<{ title: string; subtitle?: string; hint?: string; returnLabel?: string }>();
 defineEmits<{ previous: []; next: []; current: [] }>();
 </script>
 
@@ -10,10 +10,14 @@ defineEmits<{ previous: []; next: []; current: [] }>();
     <button class="icon-button" type="button" aria-label="Предыдущий период" @click="$emit('previous')">
       <UiIcon name="arrow-left" />
     </button>
-    <button class="period-nav__label" type="button" @click="$emit('current')">
+    <button v-if="returnLabel" class="period-nav__label" type="button" @click="$emit('current')">
+      <strong>{{ title }}</strong>
+      <span>{{ returnLabel }}</span>
+    </button>
+    <div v-else class="period-nav__label">
       <strong>{{ title }}</strong>
       <span v-if="subtitle">{{ subtitle }}</span>
-    </button>
+    </div>
     <button class="icon-button" type="button" aria-label="Следующий период" @click="$emit('next')">
       <UiIcon name="arrow-right" />
     </button>
@@ -54,14 +58,22 @@ defineEmits<{ previous: []; next: []; current: [] }>();
   color: var(--text-inverse);
 }
 .period-nav__label {
+  display: grid;
+  align-content: center;
   min-width: 0;
   min-height: 46px;
   border: 0;
   border-radius: 14px;
   background: transparent;
   color: var(--text-inverse);
-  cursor: pointer;
   text-align: center;
+}
+button.period-nav__label {
+  cursor: pointer;
+}
+button.period-nav__label span {
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
 .period-nav__label strong,
 .period-nav__label span {

@@ -87,7 +87,7 @@ for (const [route, other, table, saved] of [
   test(`protects a text-only ${route} draft across navigation and reload, then clears it atomically`, async ({ page }) => {
     await seed(page, [{ date: '2026-11-12', importantFact: 'Предыдущая дневная запись' }]);
     await page.goto('/today');
-    await page.locator(`.quick-capture a[href="/${route}?create=1"]`).click();
+    await page.locator(`.quick-capture a[href^="/${route}?create=1&date="]`).click();
     await expect(page.locator('.archive-add')).toHaveAttribute('open', '');
     const note = page.locator('.archive-composer textarea');
     await note.fill('Текст без отдельного названия. '.repeat(12));
@@ -132,7 +132,7 @@ for (const [route, other, table, saved] of [
     await expect(page.getByText(/Восстановлен черновик/)).toHaveCount(0);
     // The quick action must open an editor even after the archive has records.
     await page.goto('/today');
-    await page.locator(`.quick-capture a[href="/${route}?create=1"]`).click();
+    await page.locator(`.quick-capture a[href^="/${route}?create=1&date="]`).click();
     await expect(note).toBeVisible();
   });
 }
@@ -148,8 +148,10 @@ test('keeps separate edit drafts and requires an explicit choice before replacin
   }
   const first = page.locator('.result-item').filter({ hasText: 'Первая запись' });
   const second = page.locator('.result-item').filter({ hasText: 'Вторая запись' });
+  await first.locator('.archive-item-actions > summary').click();
   await first.getByLabel('Редактировать итог').click();
   await note.fill('Черновик первой записи');
+  await second.locator('.archive-item-actions > summary').click();
   await second.getByLabel('Редактировать итог').click();
   await note.fill('Черновик второй записи');
   await page.locator('.journal-drafts > summary').click();
@@ -205,7 +207,6 @@ for (const period of ['week', 'month'] as const) {
     await page.getByLabel('Предыдущий период').click();
     await expect(field).toHaveValue(`Вспомнил ${period} без ежедневных отметок`);
     await page.reload();
-    await page.getByLabel('Предыдущий период').click();
     await expect(field).toHaveValue(`Вспомнил ${period} без ежедневных отметок`);
     await page.getByRole('button', { name: period === 'week' ? 'Сохранить обзор' : 'Сохранить обзор месяца', exact: true }).click();
     await expect(page.getByText(period === 'week' ? 'Обзор недели сохранён' : 'Итог месяца сохранён', { exact: true })).toBeVisible();

@@ -2,6 +2,7 @@ import Dexie, { type EntityTable } from 'dexie';
 import type { AppSettings, DailyEntry, DailyEntryDraft, LifeEventRecord, MonthlyReview, ResultRecord, WeeklyReview } from './types';
 import { INDEXED_DB_VERSION } from './model/dataVersions';
 import type { EditorDraft } from './model/editorDraft';
+import type { SelfReminder } from './model/selfReminder';
 
 export type CloudSyncBase = {
   userId: string;
@@ -15,6 +16,7 @@ class TrajectoryDatabase extends Dexie {
   editorDrafts!: EntityTable<EditorDraft, 'key'>;
   results!: EntityTable<ResultRecord, 'id'>;
   lifeEvents!: EntityTable<LifeEventRecord, 'id'>;
+  selfReminders!: EntityTable<SelfReminder, 'id'>;
   weeklyReviews!: EntityTable<WeeklyReview, 'weekStart'>;
   monthlyReviews!: EntityTable<MonthlyReview, 'monthStart'>;
   settings!: EntityTable<AppSettings, 'id'>;
@@ -53,7 +55,8 @@ class TrajectoryDatabase extends Dexie {
       settings: '&id',
       cloudSyncBases: '&userId',
     });
-    this.version(INDEXED_DB_VERSION).stores({ editorDrafts: '&key, updatedAt' });
+    this.version(6).stores({ editorDrafts: '&key, updatedAt' });
+    this.version(INDEXED_DB_VERSION).stores({ selfReminders: '&id' });
   }
 }
 

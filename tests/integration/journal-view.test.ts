@@ -5,6 +5,8 @@ import { describe, expect, it, vi } from 'vitest';
 import { notifyError, notifyInfo, notifyUnknownError } from '@/services/notifications';
 import EventsView from '@/views/EventsView.vue';
 import ResultsView from '@/views/ResultsView.vue';
+import MoreView from '@/views/MoreView.vue';
+import { emptyDailyEntry } from '@/types';
 import { createStore, routerLinkStub } from '../helpers/viewScenario';
 
 vi.mock('@/services/notifications', () => ({
@@ -15,6 +17,29 @@ vi.mock('@/services/notifications', () => ({
 }));
 
 describe('journal scenarios', () => {
+  it('finds all four entry types by their text and links to the original records', async () => {
+    const { pinia, store } = createStore();
+    const date = '2026-07-19';
+    const createdAt = '2026-07-19T09:00:00Z';
+    store.dailyEntries = [{ ...emptyDailyEntry(date), importantFact: 'Заметка про созвон' }, emptyDailyEntry('2026-07-20')];
+    store.results = [{ id: 5, date, area: 'career', title: 'Итог', note: 'Созвон с командой', createdAt }];
+    store.lifeEvents = [{ id: 8, date, type: 'event', title: 'Встреча', note: 'Организовал созвон', createdAt }];
+    store.selfReminders = [{ id: 'note/1', category: 'principle', title: 'Правило', text: 'Подготовка к созвону', createdAt }];
+    const wrapper = mount(MoreView, { global: { plugins: [pinia], stubs: { RouterLink: routerLinkStub } } });
+    await wrapper.get('input[type="search"]').setValue('Созвон');
+    expect(
+      wrapper
+        .findAll('.journal-entry-link')
+        .map((link) => link.attributes('href'))
+        .sort(),
+    ).toEqual(['/events?entry=8', '/results?entry=5', '/self-reminders?entry=note%2F1', '/today?date=2026-07-19']);
+    await wrapper.get('select').setValue('reminder');
+    expect(wrapper.get('[role="status"]').text()).toContain('1');
+    expect(wrapper.get('.journal-entry-link').text()).toContain('Подготовка к созвону');
+    await wrapper.get('input[type="search"]').setValue('Отсутствующая запись');
+    expect(wrapper.findAll('.journal-entry-link')).toHaveLength(0);
+  });
+
   it('opens the edit form, focuses its title and returns focus after cancel without changing the record', async () => {
     const { pinia, store } = createStore();
     store.results = [
@@ -146,7 +171,7 @@ describe('journal scenarios', () => {
     expect(addResult).toHaveBeenCalledWith(
       {
         date: '2026-07-21',
-        area: 'career',
+        area: 'unassigned',
         title: 'Закончил курс',
         note: 'Собрал финальный проект и получил обратную связь',
       },

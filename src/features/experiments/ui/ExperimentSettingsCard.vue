@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { RouterLink } from 'vue-router';
 import ActionButton from '@/shared/ui/actions/ActionButton.vue';
 import DataNote from '@/shared/ui/content/DataNote.vue';
 import AutoGrowTextarea from '@/shared/ui/forms/AutoGrowTextarea.vue';
@@ -90,7 +91,7 @@ defineEmits<{
       <ChipGroup v-model="experiment.decision" :options="experimentDecisionOptions" allow-clear />
     </template>
     <FormHint v-else-if="experiment.endDate">
-      После начала здесь можно записать, что вы заметили, и завершить эксперимент. Он сохранится в разделе «История».
+      После начала здесь можно записать, что вы заметили, и завершить эксперимент. Он появится в разделе «Динамика».
     </FormHint>
     <div class="experiment-actions">
       <ActionButton variant="primary" type="button" :disabled="saving" :busy="saving" busy-label="Сохраняю…" @click="$emit('save')">
@@ -100,7 +101,9 @@ defineEmits<{
         Завершить эксперимент
       </ActionButton>
     </div>
-    <DataNote v-if="historyCount">Завершённые эксперименты можно посмотреть в разделе «История»: {{ historyCount }}.</DataNote>
+    <DataNote v-if="historyCount"
+      ><RouterLink to="/trends#experiments">Завершённые эксперименты в Динамике ({{ historyCount }})</RouterLink></DataNote
+    >
   </SettingsCard>
 </template>
 

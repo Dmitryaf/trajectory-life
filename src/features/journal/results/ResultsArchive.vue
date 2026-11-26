@@ -1,17 +1,16 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
 import ActionButton from '@/shared/ui/actions/ActionButton.vue';
-import IconActionButton from '@/shared/ui/actions/IconActionButton.vue';
 import ClampedText from '@/shared/ui/content/ClampedText.vue';
 import AutoGrowTextarea from '@/shared/ui/forms/AutoGrowTextarea.vue';
 import ChipGroup from '@/shared/ui/forms/ChipGroup.vue';
 import DateInput from '@/shared/ui/forms/DateInput.vue';
 import FormCardHeading from '@/shared/ui/forms/FormCardHeading.vue';
-import { formatDate, todayKey } from '@/services/dates';
+import { formatDate } from '@/services/dates';
 import { notifyInfo, notifyUnknownError } from '@/services/notifications';
 import { useAppStore } from '@/stores/app';
-import { resultAreaOptions, type ResultRecord } from '@/types';
-import { archiveRangeFromQuery } from '../archiveQuery';
+import { resultAreaOptions, unassignedResultArea, type ResultRecord } from '@/types';
+import { archiveRangeFromQuery, newJournalDate, useArchiveEntryId } from '../archiveQuery';
 import { useArchiveList } from '../useArchiveList';
 import ArchiveDateRange from '../ui/ArchiveDateRange.vue';
 import ArchiveEntryCard from '../ui/ArchiveEntryCard.vue';
@@ -23,7 +22,7 @@ import { useJournalEditor } from '../useJournalEditor';
 const store = useAppStore();
 const editor = useJournalEditor<ResultRecord>({
   kind: 'result',
-  empty: () => ({ id: undefined, date: todayKey(), title: '', note: '', area: 'career', createdAt: '' }),
+  empty: () => ({ id: undefined, date: newJournalDate(), title: '', note: '', area: unassignedResultArea, createdAt: '' }),
   records: () => store.results,
   titleLimit: 160,
   persist: (record, expected, key) =>
@@ -48,12 +47,17 @@ const {
   currentPage,
   filteredItems: filteredResults,
   pageCount,
-  visibleItems: visibleResults,
+  visibleItems: pagedResults,
 } = useArchiveList(recentResults, {
   getSearchText: (result) => `${result.title} ${result.note}`,
   getCategory: (result) => result.area,
   ...archiveRange,
 });
+
+const requestedEntry = useArchiveEntryId();
+const visibleResults = computed(() =>
+  requestedEntry.value === null ? pagedResults.value : recentResults.value.filter((item) => String(item.id) === requestedEntry.value),
+);
 
 async function remove(id?: number) {
   if (id === undefined || removingIds.value.includes(id) || !window.confirm('Удалить этот итог?')) {
@@ -97,6 +101,7 @@ function resultKey(result: ResultRecord) {
     :count="filteredResults.length"
     :active-filters="Number(filterArea !== 'all') + Number(Boolean(dateFrom || dateTo))"
     :has-items="visibleResults.length > 0"
+    :selected-entry="requestedEntry !== null"
     empty-icon="result"
     :empty-title="recentResults.length ? 'Ничего не найдено' : 'Итогов пока нет'"
     :empty-description="
@@ -122,22 +127,6 @@ function resultKey(result: ResultRecord) {
         @open="editor.openDraft"
       />
       <fieldset :disabled="saving" class="journal-fields">
-        <ChipGroup v-model="area" :options="resultEntryOptions" />
-
-        <details :open="titleExpanded" class="journal-title" @toggle="titleExpanded = ($event.currentTarget as HTMLDetailsElement).open">
-          <summary>Название (необязательно)</summary>
-          <div class="result-composer__fields">
-            <input
-              v-model="title"
-              :disabled="saving"
-              type="text"
-              maxlength="160"
-              placeholder="Что вы сделали или какой результат получили"
-              @keydown.enter.prevent="saveResult()"
-            />
-          </div>
-        </details>
-        <DateInput v-model="date" class="journal-date" required aria-label="Дата итога" :disabled="saving" />
         <label class="journal-note-label" for="result-note">Что получилось</label>
         <AutoGrowTextarea
           id="result-note"
@@ -160,7 +149,27 @@ function resultKey(result: ResultRecord) {
         <ActionButton v-if="editingId !== null || dirty" variant="secondary" class="composer-cancel" type="button" @click="resetForm">
           {{ editingId === null ? 'Удалить черновик' : 'Отменить редактирование' }}
         </ActionButton>
+        <DateInput v-model="date" class="journal-date" required aria-label="Дата итога" :disabled="saving" />
       </div>
+      <fieldset :disabled="saving" class="journal-fields">
+        <details :open="titleExpanded" class="journal-title" @toggle="titleExpanded = ($event.currentTarget as HTMLDetailsElement).open">
+          <summary>Название и область</summary>
+          <div class="result-composer__fields">
+            <label for="result-title">Название (необязательно)</label>
+            <input
+              id="result-title"
+              v-model="title"
+              :disabled="saving"
+              type="text"
+              maxlength="160"
+              placeholder="Что вы сделали или какой результат получили"
+              @keydown.enter.prevent="saveResult()"
+            />
+          </div>
+          <p class="journal-note-label">Область (необязательно)</p>
+          <ChipGroup v-model="area" :options="resultEntryOptions" />
+        </details>
+      </fieldset>
     </template>
     <template #search>
       <label class="archive-filter-field">
@@ -178,7 +187,12 @@ function resultKey(result: ResultRecord) {
       </label>
       <ArchiveDateRange v-model:date-from="dateFrom" v-model:date-to="dateTo" context-label="итогов" />
     </template>
-    <ArchiveEntryList v-model:page="currentPage" tone="results" :page-count="pageCount" context-label="итогов">
+    <ArchiveEntryList
+      v-model:page="currentPage"
+      tone="results"
+      :page-count="requestedEntry === null ? pageCount : 1"
+      context-label="итогов"
+    >
       <ArchiveEntryCard
         v-for="result in visibleResults"
         :key="result.id ?? result.createdAt"
@@ -188,21 +202,21 @@ function resultKey(result: ResultRecord) {
         :metadata="`${areaMeta(result.area).label} · ${formatDate(result.date, { day: 'numeric', month: 'short', year: 'numeric' })}`"
       >
         <ClampedText
-          v-if="result.note"
+          v-if="result.note && result.note !== result.title"
           :text="result.note"
           :content-id="`result-note-${resultKey(result)}`"
           text-class="result-item__note"
           tone="result"
         />
         <template #actions>
-          <IconActionButton icon="edit" label="Редактировать итог" @click="edit(result)" />
-          <IconActionButton
-            icon="delete"
-            danger
-            label="Удалить итог"
+          <ActionButton variant="secondary" aria-label="Редактировать итог" @click="edit(result)">Редактировать</ActionButton>
+          <ActionButton
+            variant="danger"
+            aria-label="Удалить итог"
             :disabled="result.id !== undefined && removingIds.includes(result.id)"
             @click="remove(result.id)"
-          />
+            >Удалить</ActionButton
+          >
         </template>
       </ArchiveEntryCard>
     </ArchiveEntryList>

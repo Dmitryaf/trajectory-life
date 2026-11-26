@@ -11,16 +11,16 @@ const RouterLink = {
 
 describe('ReviewPeriodNavigation', () => {
   it.each([
-    ['week', '/week'],
-    ['month', '/month'],
+    ['week', '/week?week=2026-11-01'],
+    ['month', '/month?month=2026-11-01'],
   ] as const)('links both review periods and marks %s as current', (period, currentHref) => {
     const wrapper = mount(ReviewPeriodNavigation, {
-      props: { period },
+      props: { period, anchor: '2026-11-01' },
       global: { stubs: { RouterLink } },
     });
     const links = wrapper.findAll('a');
 
-    expect(links.map((link) => link.attributes('href'))).toEqual(['/week', '/month']);
+    expect(links.map((link) => link.attributes('href'))).toEqual(['/week?week=2026-11-01', '/month?month=2026-11-01']);
     expect(wrapper.get(`a[href="${currentHref}"]`).attributes('aria-current')).toBe('page');
     expect(wrapper.findAll('a[aria-current="page"]')).toHaveLength(1);
   });

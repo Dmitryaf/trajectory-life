@@ -18,6 +18,50 @@ afterAll(async () => {
 });
 
 describe('backup import', () => {
+  it('preserves saved result areas and leaves uncategorized results unassigned after restore', async () => {
+    const store = useAppStore();
+    const record = { date: '2026-08-12', title: 'Синтетическая запись' };
+    await store.importData({
+      ...validBackup(),
+      version: 11,
+      results: [record, { ...record, area: 'career' }, { ...record, area: 'custom:life:existing' }],
+    });
+    const areas = () => store.results.map((result) => result.area).sort();
+    expect(areas()).toEqual(['career', 'custom:life:existing', 'unassigned']);
+    await store.importData(store.exportData());
+    expect(areas()).toEqual(['career', 'custom:life:existing', 'unassigned']);
+    await expect(store.importData({ ...validBackup(), results: [{ ...record, area: 17 }] })).rejects.toThrow('area');
+  });
+
+  it('keeps saved self-reminders through local reload and backup restore, rejects stale deletes, and reads old backups', async () => {
+    const store = useAppStore();
+    const first = await store.saveSelfReminder({ category: 'principle', text: '  Проверять предположения  ' }, null);
+    const edited = await store.saveSelfReminder(
+      { category: 'question', title: '  Вопрос месяца  ', text: 'Что можно проверить сегодня?' },
+      first,
+    );
+    expect(edited.title).toBe('Вопрос месяца');
+    await expect(store.removeSelfReminder(first)).rejects.toMatchObject({ name: 'JournalChangedError' });
+    expect(store.selfReminders).toEqual([edited]);
+    expect(first.text).toBe('Проверять предположения');
+
+    const backup = store.exportData();
+    store.unload();
+    await store.load();
+    expect(store.selfReminders).toEqual([edited]);
+    await store.clearAll({ syncCloud: false });
+    expect(await db.selfReminders.count()).toBe(0);
+    await store.importData(backup);
+    expect(store.selfReminders).toEqual([edited]);
+    await expect(store.importData({ ...backup, selfReminders: [edited, edited] })).rejects.toThrow('Повторяющееся поле');
+    expect(store.selfReminders).toEqual([edited]);
+
+    await store.importData({ ...backup, version: 12, selfReminders: [first] });
+    expect(store.selfReminders).toEqual([first]);
+    await store.importData({ ...validBackup(), version: 11 });
+    expect(store.selfReminders).toEqual([]);
+  });
+
   it('keeps a newer day and its draft when an editor saves against a stale version', async () => {
     const store = useAppStore();
     const initial = await store.saveEntry({ ...emptyDailyEntry('2026-07-21'), importantFact: 'Исходный текст' });

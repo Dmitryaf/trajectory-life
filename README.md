@@ -2,18 +2,24 @@
 
 A personal journal connecting daily notes with weekly and monthly reflection. The interface is in Russian. [Open the app](https://trajectory-life.ru) · [Data policy](https://trajectory-life.ru/data-policy).
 
-## Current workflows
+## Using Trajectory
 
-- Daily notes with optional sleep, energy, activities, context and nutrition fields.
-- Weekly and monthly reviews, a current goal, concrete next steps and personal experiments.
-- Separate archives of results and life events, search and charts over time.
-- Compatible JSON backup/restore and a separately prepared export for external analysis.
-- Local IndexedDB storage, optional account sync and PWA installation.
+| Section | What you can do |
+| --- | --- |
+| **Today** | Write a daily note and optionally track sleep, energy, activities, context and nutrition. Revisit the weekly decision, see when a review is due, and follow up on goals and experiments. Saved principles stay in view on wide screens and are one tap away on mobile. |
+| **Reviews** | Review a week or month, read the entries from that period and choose a next step. Navigation preserves the selected date. A monthly review links to saved weekly reviews and daily notes and lets you open your recurring questions by topic. |
+| **Dynamics** | Explore charts and comparisons, trace observations and decisions back to their source reviews, and revisit completed experiments. |
+| **Journal** | Search daily notes, results, events and thoughts, and personal reminders together. Open a result to go to the original entry. In **Notes to Self**, save principles, questions to revisit and lessons from past experience. |
+
+Settings cover daily fields, experiments, optional account sync, and JSON backup and restore. Reviews and Dynamics offer separate exports for external analysis. The app can be installed as a PWA.
+
+Local drafts can be recovered for daily notes, journal entries and reviews. Saving an edit checks whether the stored record changed while the editor was open.
 
 There is no score for a person or a day. Missing fields stay missing; you choose what to record. The app does not automatically send journal entries to an AI service.
 
 ![Today with generated example data](src/features/landing/assets/today-desktop.webp)
 ![Week with generated example data](src/features/landing/assets/week-desktop.webp)
+![Journal with generated example data](src/features/landing/assets/journal-desktop.webp)
 
 ## Local development
 
@@ -37,6 +43,6 @@ Built with Vue 3, TypeScript, Pinia, Vue Router, Dexie, Supabase, ECharts and Vi
 
 ## Data boundary
 
-The account snapshot uses Auth and row-level security. Administrators retain technical access; client-side encryption is not implemented. Product telemetry is opt-in and excludes journal text and recorded values. Local backup, cloud sync and analysis export are different operations.
+Product telemetry is opt-in and excludes journal text and recorded values. Local backup, cloud sync and analysis export are different operations. Unsaved editor drafts stay on the device, outside cloud sync and JSON backups.
 
 [MIT License](LICENSE)
