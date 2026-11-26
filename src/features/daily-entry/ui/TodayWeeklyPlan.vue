@@ -1,18 +1,14 @@
 <script setup lang="ts">
 import { RouterLink } from 'vue-router';
-import EyebrowText from '@/shared/ui/typography/EyebrowText.vue';
-import UiIcon from '@/shared/ui/icons/UiIcon.vue';
-defineProps<{ plan: string; period: string; source: string }>();
+defineProps<{ decision: string; plan: string; period: string; source: string }>();
 </script>
 
 <template>
   <section class="today-weekly-plan" aria-label="Текущий план недели">
-    <details>
-      <summary><span>Мой план на неделю</span><UiIcon name="arrow-down" /></summary>
-      <EyebrowText>План на {{ period }}</EyebrowText>
-      <p>{{ plan }}</p>
-      <RouterLink :to="source">Из обзора прошлой недели</RouterLink>
-    </details>
+    <h2>{{ decision ? 'Моё решение' : 'Мой план' }} на {{ period }}</h2>
+    <p>{{ decision || plan }}</p>
+    <p v-if="decision && plan && decision !== plan">{{ plan }}</p>
+    <RouterLink :to="source">Из обзора прошлой недели</RouterLink>
   </section>
 </template>
 
@@ -20,39 +16,24 @@ defineProps<{ plan: string; period: string; source: string }>();
 .today-weekly-plan {
   grid-column: 1 / -1;
   min-width: 0;
-  padding: 0 4px;
-}
-summary {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
-  min-height: 44px;
-  color: var(--muted);
-  cursor: pointer;
-  list-style: none;
-  font-size: 13px;
-}
-summary::-webkit-details-marker {
-  display: none;
-}
-details[open] summary {
-  margin-bottom: 10px;
-}
-details[open] summary :deep(.ui-icon) {
-  transform: rotate(180deg);
-}
-.eyebrow {
-  margin-bottom: 5px;
-}
-p {
-  margin: 0 0 8px;
-  color: var(--today-pulse-text);
-  font-size: 13px;
+  padding: 12px 16px;
+  border-inline-start: 3px solid var(--accent-dark);
+  background: var(--surface-soft);
   overflow-wrap: anywhere;
 }
-a {
+.today-weekly-plan h2 {
+  margin: 0;
+  color: var(--navy);
+  font-size: 1rem;
+}
+.today-weekly-plan p {
+  margin: 6px 0;
+  white-space: pre-wrap;
+}
+.today-weekly-plan a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
   color: var(--brand-strong);
-  font-size: 13px;
 }
 </style>

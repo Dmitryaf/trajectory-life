@@ -295,8 +295,8 @@ type PrimaryNavigationItem = { to: string; label: string; icon: UiIconName; acti
 
 const navItems: PrimaryNavigationItem[] = [
   { to: '/today', label: 'Сегодня', icon: 'today', activePaths: ['/today'] },
-  { to: '/week', label: 'Обзор', icon: 'week', activePaths: ['/week', '/month'] },
-  { to: '/trends', label: 'История', icon: 'history', activePaths: ['/trends'] },
+  { to: '/week', label: 'Обзоры', icon: 'week', activePaths: ['/week', '/month'] },
+  { to: '/trends', label: 'Динамика', icon: 'history', activePaths: ['/trends'] },
   { to: '/more', label: 'Журнал', icon: 'journal', activePaths: ['/more', '/results', '/events', '/self-reminders'] },
 ];
 

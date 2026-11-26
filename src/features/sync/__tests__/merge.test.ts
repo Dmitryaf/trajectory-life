@@ -26,6 +26,14 @@ describe('cloud snapshot merge', () => {
     expect(mergeCloudSnapshots(base, local, remote).selfReminders).toEqual([...local.selfReminders, ...remote.selfReminders]);
   });
 
+  it('merges a self-reminder title added independently of a body edit', () => {
+    const item = { id: 'one', category: 'principle', text: 'Запись', createdAt: '2026-08-20T10:00:00.000Z' };
+    const base = { ...emptyPayload(), version: 12, selfReminders: [item] };
+    const local = { ...emptyPayload(), selfReminders: [{ ...item, title: 'Заголовок' }] };
+    const remote = { ...emptyPayload(), selfReminders: [{ ...item, text: 'Изменённый текст' }] };
+    expect(mergeCloudSnapshots(base, local, remote).selfReminders).toEqual([{ ...item, title: 'Заголовок', text: 'Изменённый текст' }]);
+  });
+
   it('protects a self-reminder edited on one device and removed on another', () => {
     const item = { id: 'one', category: 'principle', text: 'Исходный текст', createdAt: '2026-08-20T10:00:00.000Z' };
     const base = { ...emptyPayload(), selfReminders: [item] };

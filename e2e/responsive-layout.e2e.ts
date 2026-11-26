@@ -112,6 +112,7 @@ test('keeps every primary screen inside the minimum viewport width', async ({ pa
 });
 
 test('groups weekly and monthly reviews under one primary navigation item', async ({ page }) => {
+  await page.clock.setFixedTime(new Date('2026-08-26T12:00:00Z'));
   for (const viewport of [
     { width: 390, height: 844 },
     { width: 1280, height: 720 },
@@ -120,7 +121,7 @@ test('groups weekly and monthly reviews under one primary navigation item', asyn
     await page.goto('/today');
 
     const primaryNavigation = page.getByRole('navigation', { name: 'Основная навигация' });
-    const overviewLink = primaryNavigation.getByRole('link', { name: 'Обзор', exact: true });
+    const overviewLink = primaryNavigation.getByRole('link', { name: 'Обзоры', exact: true });
     await expect(primaryNavigation.getByRole('link')).toHaveCount(4);
     await expect(primaryNavigation.getByRole('link', { name: 'Неделя', exact: true })).toHaveCount(0);
     await expect(primaryNavigation.getByRole('link', { name: 'Месяц', exact: true })).toHaveCount(0);
@@ -136,7 +137,7 @@ test('groups weekly and monthly reviews under one primary navigation item', asyn
     await expect(monthLink).not.toHaveAttribute('aria-current');
 
     await monthLink.click();
-    await expect(page).toHaveURL(/\/month$/);
+    await expect(page).toHaveURL(/\/month\?month=2026-08-26$/);
     await expect(overviewLink).toHaveAttribute('aria-current', 'page');
     await expect(monthLink).toHaveAttribute('aria-current', 'page');
     await expect(weekLink).not.toHaveAttribute('aria-current');
@@ -300,28 +301,16 @@ test('keeps the Journal and archive chrome compact at pilot widths', async ({ pa
     const journalTitleSize = await page
       .locator('.page--journal h1')
       .evaluate((element) => Number.parseFloat(getComputedStyle(element).fontSize));
-    const journalCards = page.locator('.more-card');
-    await expect(journalCards).toHaveCount(2);
-    const cardBoxes = await Promise.all([
-      readLayoutBox(journalCards.nth(0), `first Journal choice at ${width}px`),
-      readLayoutBox(journalCards.nth(1), `second Journal choice at ${width}px`),
-    ]);
-    const settingsBox = await readLayoutBox(page.locator('.journal-settings-card'), `Journal settings at ${width}px`);
-    const remindersBox = await readLayoutBox(page.getByRole('link', { name: /Напоминания себе/ }), `Journal reminders at ${width}px`);
-
+    const collections = page.getByRole('navigation', { name: 'Разделы журнала' });
+    await expect(collections.getByRole('link')).toHaveCount(3);
+    const collectionBox = await readLayoutBox(collections, `Journal collections at ${width}px`);
+    const searchBox = await readLayoutBox(page.getByRole('searchbox', { name: 'Поиск по всем записям' }), `Journal search at ${width}px`);
     expect(journalTitleSize, `Journal title size at ${width}px`).toBeLessThanOrEqual(width <= 720 ? 34 : 44);
-    expect(Math.max(...cardBoxes.map((box) => box.height)), `Journal choice height at ${width}px`).toBeLessThanOrEqual(
-      width <= 760 ? 160 : 176,
-    );
-    expect(settingsBox.height, `Journal settings height at ${width}px`).toBeLessThanOrEqual(100);
-    expectVerticalSeparation(cardBoxes[1], remindersBox, 12, `Journal reminders follow the archives at ${width}px`);
-    expectVerticalSeparation(journalHeading, cardBoxes[0], 0, `Journal heading and choices at ${width}px`);
-    if (width === 390) {
-      expect(cardBoxes[0].y, 'Journal choices should appear in the first mobile viewport').toBeLessThanOrEqual(300);
-      expectVerticalSeparation(cardBoxes[0], cardBoxes[1], 12, 'stacked Journal choices');
-    } else {
-      expect(Math.abs(cardBoxes[0].y - cardBoxes[1].y), `Journal choice alignment at ${width}px`).toBeLessThanOrEqual(1);
-      expect(Math.abs(cardBoxes[0].height - cardBoxes[1].height), `Journal choice height match at ${width}px`).toBeLessThanOrEqual(1);
+    expectVerticalSeparation(journalHeading, collectionBox, 0, `Journal heading and collections at ${width}px`);
+    expectVerticalSeparation(collectionBox, searchBox, 12, `Journal search after collection links at ${width}px`);
+    expect(searchBox.y, 'Search should be reachable in the first viewport').toBeLessThan(500);
+    for (const link of await collections.getByRole('link').all()) {
+      expect((await readLayoutBox(link, 'Collection link')).height).toBeGreaterThanOrEqual(44);
     }
 
     for (const route of ['/results', '/events']) {
@@ -447,10 +436,10 @@ test('separates analysis guidance from insights and centers period arrows', asyn
     await page.setViewportSize(viewport);
     await page.goto('/trends');
 
-    await expect(page.locator('.history-external-analysis')).not.toHaveAttribute('open', '');
-    await page.locator('.history-external-analysis > summary').click();
+    await expect(page.locator('.period-analysis-card__external')).not.toHaveAttribute('open', '');
+    await page.locator('.period-analysis-card__external > summary').click();
     const guidanceBox = await readLayoutBox(
-      page.locator('.history-external-analysis > .ai-analysis-steps'),
+      page.locator('.period-analysis-card__external > .ai-analysis-steps'),
       `analysis guidance at ${viewport.width}px`,
     );
     const insightsBox = await readLayoutBox(page.locator('.history-overview-card > .review-cue-grid'), `insights at ${viewport.width}px`);
@@ -476,9 +465,7 @@ test('separates the custom-period action from adjacent review content', async ({
 
   for (const route of ['/week', '/month', '/trends']) {
     await page.goto(route);
-    if (route !== '/trends') {
-      await page.locator('.period-analysis-card__external > summary').click();
-    }
+    await page.locator('.period-analysis-card__external > summary').click();
     const action = page.locator('.range-custom-action');
     await expect(action).toBeVisible();
     const spacing = await action.evaluate((element) => {

@@ -34,8 +34,8 @@ describe('optional review reminders', () => {
     expect(reviewReminders(diary, '2026-10-31', { week: '2026-10-26' }).map((item) => item.period)).toEqual(['month']);
     expect(reviewReminders(diary, '2026-10-31', { week: '2026-10-19' })).toHaveLength(2);
     expect(reviewReminders(diary, '2026-11-02', {})).toEqual([
-      expect.objectContaining({ period: 'week', start: '2026-10-26', to: '/week?week=2026-10-26' }),
-      expect.objectContaining({ period: 'month', start: '2026-10-01', to: '/month?month=2026-10-01' }),
+      expect.objectContaining({ period: 'week', start: '2026-10-26', to: '/week?week=2026-10-26#week-review' }),
+      expect.objectContaining({ period: 'month', start: '2026-10-01', to: '/month?month=2026-10-01#month-review' }),
     ]);
     expect(reviewReminders(diary, '2026-11-07', {}).map((item) => item.period)).toEqual(['month']);
     diary.weeklyReviews = [emptyWeeklyReview('2026-10-26')];
@@ -49,6 +49,25 @@ describe('optional review reminders', () => {
     diary.dailyEntries = [{ ...emptyDailyEntry('2027-02-22'), importantFact: 'Заметка' }];
     expect(reviewReminders(diary, '2027-02-25', {})).toEqual([]);
     expect(reviewReminders(diary, '2027-02-26', {}).map((item) => item.period)).toEqual(['month']);
+  });
+
+  it('includes a meaningful week in its covered month, including across a month boundary', () => {
+    const diary = data();
+    const review = { ...emptyWeeklyReview('2026-09-28'), nextLever: 'Оставить время на прогулки' };
+    diary.weeklyReviews = [review];
+    expect(reviewReminders(diary, '2026-11-10', {}).map((item) => item.to)).toEqual(['/month?month=2026-10-01#month-review']);
+    diary.weeklyReviews = [{ ...review, coveredThrough: '2026-09-30' }, emptyWeeklyReview('2026-10-12')];
+    expect(reviewReminders(diary, '2026-11-10', {})).toEqual([]);
+  });
+
+  it('starts the monthly invitation with the first existing reminder, in the local calendar', () => {
+    const diary = data();
+    diary.selfReminders = [
+      { id: 'one', category: 'question', text: 'Что попробовать?', createdAt: new Date(2026, 10, 1, 0, 1).toISOString() },
+    ];
+    expect(reviewReminders(diary, '2026-11-10', {})).toEqual([]);
+    expect(reviewReminders(diary, '2026-11-28', {}).map((item) => item.start)).toEqual(['2026-11-01']);
+    expect(reviewReminders(diary, '2026-12-10', {}).map((item) => item.start)).toEqual(['2026-11-01']);
   });
 
   it('round-trips only period keys for their owner and tolerates unavailable or malformed storage', () => {

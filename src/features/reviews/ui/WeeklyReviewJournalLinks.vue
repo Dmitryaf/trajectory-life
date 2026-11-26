@@ -4,7 +4,14 @@ import DateInput from '@/shared/ui/forms/DateInput.vue';
 import { computed, reactive, ref, watch } from 'vue';
 import { addDays, formatDate } from '@/services/dates';
 import { useAppStore } from '@/stores/app';
-import { lifeEventTypeOptions, resultAreaOptions, type LifeEventType, type ResultRecord, type WeeklyReview } from '@/types';
+import {
+  lifeEventTypeOptions,
+  resultAreaOptions,
+  unassignedResultArea,
+  type LifeEventType,
+  type ResultRecord,
+  type WeeklyReview,
+} from '@/types';
 
 type JournalItem = {
   key: string;
@@ -56,7 +63,7 @@ watch(
             record.date <= weekEnd.value &&
             normalizedTitle(record.title) === normalizedTitle(item.title),
         );
-        drafts[item.key] = existing ? { date: existing.date, category: existing.area } : { date: '', category: '' };
+        drafts[item.key] = existing ? { date: existing.date, category: existing.area } : { date: '', category: unassignedResultArea };
       } else {
         const existing = store.lifeEvents.find(
           (record) =>
@@ -149,7 +156,7 @@ async function saveToJournal(item: JournalItem) {
             <label>
               <span>{{ item.kind === 'result' ? 'Область' : 'Тип записи' }}</span>
               <select v-model="drafts[item.key]!.category" :aria-label="`${item.kind === 'result' ? 'Область' : 'Тип'}: ${item.title}`">
-                <option value="" disabled>{{ item.kind === 'result' ? 'Выберите область' : 'Выберите тип' }}</option>
+                <option v-if="item.kind === 'event'" value="" disabled>Выберите тип</option>
                 <option v-for="option in item.kind === 'result' ? resultOptions : lifeEventTypeOptions" :key="option.id" :value="option.id">
                   {{ option.label }}
                 </option>

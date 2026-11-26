@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, useTemplateRef } from 'vue';
-import { RouterLink } from 'vue-router';
+import { RouterLink, useRoute, useRouter } from 'vue-router';
 import { selfReminderCategories, type SelfReminder } from '@/model/selfReminder';
 import { useAppStore } from '@/stores/app';
 import EditorDraftNotice from '@/features/editor-drafts/EditorDraftNotice.vue';
@@ -13,6 +13,18 @@ import { useSelfReminderEditor } from '../useSelfReminderEditor';
 import SelfReminderList from './SelfReminderList.vue';
 
 const store = useAppStore();
+const route = useRoute();
+const router = useRouter();
+const entryId = computed(() => (typeof route.query.entry === 'string' ? route.query.entry : undefined));
+const requestedEntry = computed(() => store.selfReminders.find((item) => item.id === entryId.value));
+const activeCategory = computed(
+  () =>
+    requestedEntry.value?.category ??
+    selfReminderCategories.find((item) => '#' + item.value === route.hash)?.value ??
+    selfReminderCategories.find((item) => store.selfReminders.some((entry) => entry.category === item.value))?.value ??
+    'principle',
+);
+const categoryEntries = computed(() => store.selfReminders.filter((item) => item.category === activeCategory.value));
 const editor = useSelfReminderEditor();
 const { open, form, source, busy, conflict, drafts } = editor;
 const { notice, error } = drafts;
@@ -21,8 +33,18 @@ const placeholder = computed(() => selfReminderCategories.find((option) => optio
 
 async function start(reminder: SelfReminder | null) {
   editor.load(reminder);
+  if (!reminder) {
+    form.value.category = activeCategory.value;
+  }
   await nextTick();
   field.value?.focus();
+}
+async function save(replace = false) {
+  const category = form.value.category;
+  await editor.save(replace);
+  if (!open.value) {
+    await router.replace({ path: '/self-reminders', hash: '#' + category });
+  }
 }
 </script>
 
@@ -36,15 +58,20 @@ async function start(reminder: SelfReminder | null) {
       </div>
     </PageHeading>
 
+    <p v-if="entryId && !requestedEntry" role="status">Эта запись больше недоступна.</p>
     <ActionButton v-if="!open" :disabled="busy" @click="start(null)">Добавить запись</ActionButton>
     <SurfaceCard v-else kind="form" class="self-reminders__editor">
       <h2>{{ source ? 'Редактировать запись' : 'Новая запись' }}</h2>
-      <form @submit.prevent="editor.save()">
+      <form @submit.prevent="save()">
         <label>
           Категория
           <select v-model="form.category" :disabled="busy">
             <option v-for="category in selfReminderCategories" :key="category.value" :value="category.value">{{ category.label }}</option>
           </select>
+        </label>
+        <label>
+          Заголовок (необязательно)
+          <input v-model="form.title" type="text" :readonly="busy" />
         </label>
         <label>
           Текст записи
@@ -55,7 +82,7 @@ async function start(reminder: SelfReminder | null) {
           <p>Запись изменилась или была удалена. Ваш текст остался в форме.</p>
           <div class="self-reminders__actions">
             <ActionButton variant="secondary" :disabled="busy" @click="editor.finish(true)">Загрузить сохранённую версию</ActionButton>
-            <ActionButton variant="secondary" :disabled="busy" @click="editor.save(true)">Сохранить мой вариант</ActionButton>
+            <ActionButton variant="secondary" :disabled="busy" @click="save(true)">Сохранить мой вариант</ActionButton>
           </div>
         </div>
         <div class="self-reminders__actions">
@@ -68,20 +95,52 @@ async function start(reminder: SelfReminder | null) {
     </SurfaceCard>
 
     <SurfaceCard v-if="store.selfReminders.length" class="self-reminders__collection">
-      <SelfReminderList :reminders="store.selfReminders">
+      <nav class="self-reminders__categories" aria-label="Категории напоминаний">
+        <RouterLink
+          v-for="category in selfReminderCategories"
+          :key="category.value"
+          :to="{ path: '/self-reminders', hash: '#' + category.value }"
+          :aria-current="activeCategory === category.value ? 'page' : undefined"
+          >{{ category.label }}</RouterLink
+        >
+      </nav>
+      <SelfReminderList v-if="categoryEntries.length" :reminders="categoryEntries" editable :selected-id="entryId">
         <template #actions="{ reminder }">
           <div v-if="!open" class="self-reminders__record-actions">
-            <button type="button" :disabled="busy" @click="start(reminder)">Редактировать</button>
-            <button type="button" :disabled="busy" @click="editor.remove(reminder)">Удалить</button>
+            <ActionButton variant="secondary" :disabled="busy" @click="start(reminder)">Редактировать</ActionButton>
+            <ActionButton variant="danger" class="reminder-remove" :disabled="busy" @click="editor.remove(reminder)">Удалить</ActionButton>
           </div>
         </template>
       </SelfReminderList>
+      <p v-else :id="activeCategory">В этой категории пока нет записей.</p>
     </SurfaceCard>
     <p v-else-if="!open" class="self-reminders__empty">Здесь будут ваши напоминания.</p>
   </PageShell>
 </template>
 
 <style scoped>
+.self-reminders__categories {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  margin-bottom: 12px;
+}
+.self-reminders__categories a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding-inline: 8px;
+  color: var(--brand-strong);
+  text-underline-offset: 0.2em;
+}
+.self-reminders__categories a[aria-current] {
+  background: var(--surface-success);
+  border-radius: 8px;
+  font-weight: 700;
+}
+.self-reminders__record-actions {
+  padding: 4px 6px 10px;
+}
 .self-reminders__back {
   display: inline-flex;
   min-height: 44px;
@@ -135,17 +194,23 @@ async function start(reminder: SelfReminder | null) {
 }
 .self-reminders__record-actions button {
   min-height: 44px;
-  padding: 0 8px;
-  border: 0;
+  padding: 8px 12px;
   border-radius: 8px;
-  background: transparent;
-  color: var(--brand-strong);
   font-size: 0.875rem;
-  text-decoration: underline;
-  text-underline-offset: 0.15em;
 }
-.self-reminders__record-actions button:last-child {
-  color: var(--action-danger-text);
+.self-reminders__record-actions button:active:not(:disabled) {
+  opacity: 0.72;
+}
+.self-reminders__record-actions .reminder-remove {
+  border: 1px solid var(--action-danger-text);
+  background: var(--surface);
+}
+.self-reminders__record-actions .reminder-remove:hover:not(:disabled) {
+  background: var(--action-danger-surface);
+}
+.self-reminders__record-actions .reminder-remove:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 .self-reminders__conflict {
   margin-block: 12px;

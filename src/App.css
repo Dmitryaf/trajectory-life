@@ -101,6 +101,12 @@
   max-width: 1168px;
 }
 
+@media (min-width: 1280px) {
+  .app-main:has(.today-principles) {
+    max-width: 1400px;
+  }
+}
+
 :global([data-sonner-toaster][data-theme='light']) {
   --success-text: var(--toast-success-text);
 }

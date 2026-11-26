@@ -126,7 +126,7 @@ test('refreshes an existing public landing after a real worker update and keeps 
   await expect(page.locator('meta[name="pwa-test-version"]')).toHaveAttribute('content', 'A');
   await activateNextVersion(page);
   await expect(page.locator('meta[name="pwa-test-version"]')).toHaveAttribute('content', 'B', { timeout: 15_000 });
-  for (const title of ['Сегодня', 'Неделя', 'Месяц', 'История', 'Журнал', 'Настройки']) {
+  for (const title of ['Сегодня', 'Неделя', 'Месяц', 'Динамика', 'Журнал', 'Настройки']) {
     await page.getByRole('tab', { name: title, exact: true }).click();
     await expect(page.getByRole('tabpanel').getByRole('img')).toHaveJSProperty('naturalWidth', 390);
   }

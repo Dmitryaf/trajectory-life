@@ -9,19 +9,24 @@ import { JournalChangedError } from '../journal/version';
 import { setSyncEditorDirty } from '../sync/editing';
 
 const editorId = 'self-reminder';
-const emptyForm: SelfReminderText = { category: 'principle', text: '' };
+const emptyForm: Required<SelfReminderText> = { category: 'principle', title: '', text: '' };
 
 export function useSelfReminderEditor() {
   const store = useAppStore();
   const open = ref(false);
-  const form = ref<SelfReminderText>({ ...emptyForm });
+  const form = ref({ ...emptyForm });
   const source = shallowRef<SelfReminder | null>(null);
   const busy = ref(false);
   const conflict = ref(false);
   const key = computed(() => editorDraftKey(editorId));
   const dirty = computed(() => {
+    if (!source.value && !form.value.text && !form.value.title) {
+      return false;
+    }
     const base = source.value ?? emptyForm;
-    return open.value && (form.value.text !== base.text || form.value.category !== base.category);
+    return (
+      open.value && (form.value.text !== base.text || form.value.category !== base.category || form.value.title !== (base.title ?? ''))
+    );
   });
   const drafts = useEditorDraft({
     key,
@@ -31,19 +36,23 @@ export function useSelfReminderEditor() {
     reset: () => load(null, false),
     restore(value, baseline) {
       const restored = JSON.parse(value) as SelfReminderText;
-      if (typeof restored?.text !== 'string' || !selfReminderCategories.some((option) => option.value === restored.category)) {
+      if (
+        typeof restored?.text !== 'string' ||
+        (restored.title !== undefined && typeof restored.title !== 'string') ||
+        !selfReminderCategories.some((option) => option.value === restored.category)
+      ) {
         throw new Error('Некорректный черновик напоминания');
       }
       const original: unknown = JSON.parse(baseline);
       source.value = original === null ? null : normalizeSelfReminder(original);
-      form.value = restored;
+      form.value = { category: restored.category, title: restored.title ?? '', text: restored.text };
       open.value = true;
     },
   });
 
   function load(reminder: SelfReminder | null, show = true) {
     source.value = plainCopy(reminder);
-    form.value = reminder ? { category: reminder.category, text: reminder.text } : { ...emptyForm };
+    form.value = reminder ? { category: reminder.category, title: reminder.title ?? '', text: reminder.text } : { ...emptyForm };
     conflict.value = false;
     open.value = show;
     drafts.saved();

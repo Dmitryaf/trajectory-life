@@ -317,11 +317,13 @@ test('saves a dirty daily entry from the mobile action', async ({ page }) => {
   await page.getByPlaceholder('Например: после прогулки стало легче собраться с мыслями').fill('Проверка мобильного сохранения');
   await expect(floatingSave).toBeVisible();
   await expect(floatingSave).toHaveCSS('position', 'fixed');
-  const saveBox = await floatingSave.boundingBox();
-  const navigationBox = await page.locator('.bottom-nav').boundingBox();
-  expect(saveBox).not.toBeNull();
-  expect(navigationBox).not.toBeNull();
-  expect(saveBox!.y + saveBox!.height).toBeLessThan(navigationBox!.y);
+  await expect(async () => {
+    const saveBox = await floatingSave.boundingBox();
+    const navigationBox = await page.locator('.bottom-nav').boundingBox();
+    expect(saveBox).not.toBeNull();
+    expect(navigationBox).not.toBeNull();
+    expect(saveBox!.y + saveBox!.height).toBeLessThan(navigationBox!.y);
+  }).toPass({ timeout: 3_000 });
 
   await expect(page.getByText('Черновик сохранён на этом устройстве', { exact: false })).toBeVisible();
   await page.reload();
@@ -588,7 +590,10 @@ for (const width of [390, 1440]) {
     await page.reload();
     await page.getByRole('button', { name: 'Эксперимент', exact: true }).click();
     await expect(card.getByRole('checkbox', { name: 'Включить эксперимент' })).not.toBeChecked();
-    await expect(card).toContainText('Завершённые эксперименты можно посмотреть в разделе «История»: 1');
+    await expect(card.getByRole('link', { name: 'Завершённые эксперименты в Динамике (1)' })).toHaveAttribute(
+      'href',
+      '/trends#experiments',
+    );
     await page.getByRole('button', { name: 'Данные и синхронизация' }).click();
     const downloadPromise = page.waitForEvent('download');
     await page.getByRole('button', { name: 'Скачать копию', exact: true }).click();
@@ -615,7 +620,7 @@ for (const width of [390, 1440]) {
       buffer: Buffer.from(JSON.stringify(backup)),
     });
     await expect(page.getByText('Резервная копия восстановлена на этом устройстве', { exact: true })).toBeVisible();
-    await page.getByRole('link', { name: 'История', exact: true }).click();
+    await page.getByRole('link', { name: 'Динамика', exact: true }).click();
     const history = page.locator('.history-timeline__item--experiment');
     await expect(history).toContainText('Эксперимент больше не актуален');
     await expect(history).toContainText('Условие выполнено в 1 из 1 отмеченных дней');

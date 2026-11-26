@@ -1,3 +1,4 @@
+import { weeklyDecisionText } from './decisionText';
 import { addDays } from '@/services/dates';
 import type { DailyEntry, LifeEventRecord, ResultRecord, WeeklyReview } from '@/types';
 
@@ -33,7 +34,7 @@ export function buildDecisionFollowUp(
     return null;
   }
 
-  const decision = previousReview.nextLever.trim();
+  const decision = weeklyDecisionText(previousReview);
   const ifThenPlan = previousReview.ifThenPlan.trim();
   const userOutcome = currentReview.previousPlanOutcome.trim();
   if ((!decision && !ifThenPlan) || !userOutcome) {
@@ -83,7 +84,7 @@ export function buildDecisionFollowUp(
     ifThenPlan,
     facts,
     userOutcome,
-    nextDecision: currentReview.nextLever.trim(),
+    nextDecision: weeklyDecisionText(currentReview),
     nextIfThenPlan: currentReview.ifThenPlan.trim(),
   };
 }

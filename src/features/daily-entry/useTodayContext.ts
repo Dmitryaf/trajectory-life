@@ -1,4 +1,5 @@
 import { computed, type ComputedRef } from 'vue';
+import { weeklyDecisionText } from '@/features/reviews/decisionText';
 import { shouldShowAiAnalysisNudge } from '@/features/analysis/discovery';
 import { addDays, endOfWeek, formatDate, startOfWeek, todayKey } from '@/services/dates';
 import type { useAppStore } from '@/stores/app';
@@ -8,8 +9,10 @@ type AppStore = ReturnType<typeof useAppStore>;
 export function useTodayContext(store: AppStore, isToday: ComputedRef<boolean>) {
   const currentWeeklyPlan = computed(() => {
     const sourceWeek = addDays(startOfWeek(todayKey()), -7);
+    const review = store.reviewByWeek(sourceWeek);
     return {
-      plan: store.reviewByWeek(sourceWeek)?.ifThenPlan.trim() ?? '',
+      decision: weeklyDecisionText(review),
+      plan: review?.ifThenPlan.trim() ?? '',
       period: `${formatDate(startOfWeek(todayKey()), { day: 'numeric', month: 'short' })}–${formatDate(endOfWeek(todayKey()), { day: 'numeric', month: 'short' })}`,
       source: `/week?week=${sourceWeek}#week-review`,
     };

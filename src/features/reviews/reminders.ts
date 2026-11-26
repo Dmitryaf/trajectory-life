@@ -1,19 +1,19 @@
 import { dataCoverageLevel } from '@/features/analytics/coverage';
-import { addDays, endOfMonth, endOfWeek, formatDate, startOfMonth, startOfWeek } from '@/services/dates';
+import { addDays, endOfMonth, endOfWeek, formatDate, startOfMonth, startOfWeek, toDateKey } from '@/services/dates';
 import type { DailyEntry, LifeEventRecord, MonthlyReview, ResultRecord, WeeklyReview } from '@/types';
 import type { SelfReminder } from '@/model/selfReminder';
-
-export type ReviewPeriod = 'week' | 'month';
+import { monthWeekReviews } from './monthWeeks';
+import { reviewOpensOn, reviewPath, type ReviewPeriod } from './periods';
+export type { ReviewPeriod } from './periods';
 export type DismissedReviews = Partial<Record<ReviewPeriod, string>>;
 export type ReviewReminder = { period: ReviewPeriod; start: string; to: string; label: string; dates: string };
 export const reviewReminderStorageKey = 'trajectory:review-reminders:v2';
 const legacyReminderStorageKey = 'trajectory:review-reminders:v1';
 const periodBounds = {
-  week: { start: startOfWeek, end: endOfWeek, lead: 1, label: 'Вспомнить неделю', format: formatWeek },
+  week: { start: startOfWeek, end: endOfWeek, label: 'Вспомнить неделю', format: formatWeek },
   month: {
     start: startOfMonth,
     end: endOfMonth,
-    lead: 2,
     label: 'Вспомнить месяц',
     format: (date: string) => formatDate(date, { month: 'long', year: 'numeric' }),
   },
@@ -38,7 +38,7 @@ export function reviewReminders(data: ReviewData, today: string, dismissed: Dism
   return (['week', 'month'] as const).flatMap((period) => {
     const bounds = periodBounds[period];
     const current = bounds.start(today);
-    const anchor = today >= addDays(bounds.end(today), -bounds.lead) ? today : addDays(current, -1);
+    const anchor = today >= reviewOpensOn(period, today) ? today : addDays(current, -1);
     const start = bounds.start(anchor);
     const end = bounds.end(anchor);
     if (dismissed[period] === start) {
@@ -48,14 +48,17 @@ export function reviewReminders(data: ReviewData, today: string, dismissed: Dism
       period === 'week'
         ? data.weeklyReviews.some((review) => review.weekStart === start)
         : data.monthlyReviews.some((review) => review.monthStart === start);
-    const inPeriod = (date: string) => date >= start && date <= end && date <= today;
+    const coveredEnd = end < today ? end : today;
+    const inPeriod = (date: string) => date >= start && date <= coveredEnd;
     const hasData =
-      (period === 'month' && Boolean(data.selfReminders?.length)) ||
+      (period === 'month' &&
+        (data.selfReminders?.some((row) => toDateKey(new Date(row.createdAt)) <= coveredEnd) ||
+          monthWeekReviews(data.weeklyReviews, start, coveredEnd).length > 0)) ||
       data.dailyEntries.some((entry) => inPeriod(entry.date) && dataCoverageLevel(entry) > 0) ||
       data.results.some((record) => inPeriod(record.date) && Boolean(record.title.trim() || record.note.trim())) ||
       data.lifeEvents.some((record) => inPeriod(record.date) && Boolean(record.title.trim() || record.note.trim()));
     return !saved && hasData
-      ? [{ period, start, to: `/${period}?${period}=${start}`, label: bounds.label, dates: bounds.format(start, end) }]
+      ? [{ period, start, to: reviewPath(period, start, true), label: bounds.label, dates: bounds.format(start, end) }]
       : [];
   });
 }

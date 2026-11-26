@@ -38,7 +38,7 @@ export function provideReviewReminders(store: ReturnType<typeof useAppStore>, ow
     window.removeEventListener('focus', refreshDate);
     document.removeEventListener('visibilitychange', refreshDate);
   });
-  const context = { reminders, dismiss };
+  const context = { today, reminders, dismiss };
   provide(reminderKey, context);
   return context;
 }

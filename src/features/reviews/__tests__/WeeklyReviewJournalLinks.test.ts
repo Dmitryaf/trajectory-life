@@ -31,7 +31,7 @@ function setup(existingResults: ResultRecord[] = []) {
 describe('weekly review journal links', () => {
   beforeEach(() => window.localStorage.clear());
 
-  it('saves only explicitly dated and classified items', async () => {
+  it('saves dated results without requiring an area and uses the selected event type', async () => {
     const { store, wrapper } = setup();
     expect(wrapper.text()).toContain('только из периода обзора: 27 июля — 2 августа 2026 г.');
     const items = wrapper.findAll('.weekly-review-journal__item');
@@ -40,12 +40,12 @@ describe('weekly review journal links', () => {
 
     expect(result.get('button').attributes('disabled')).toBeDefined();
     await result.get('input[type="date"]').setValue('2026-07-29');
-    await result.get('select').setValue('career');
+    expect((result.get('select').element as HTMLSelectElement).selectedOptions[0]!.textContent).toBe('Без области');
     await result.get('button').trigger('click');
 
     expect(store.addResult).toHaveBeenCalledWith({
       date: '2026-07-29',
-      area: 'career',
+      area: 'unassigned',
       title: 'Закончил черновик',
       note: '',
     });

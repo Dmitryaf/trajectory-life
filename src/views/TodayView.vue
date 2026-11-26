@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import TodayFollowUps from '@/features/daily-entry/ui/TodayFollowUps.vue';
 import TodayWeeklyPlan from '@/features/daily-entry/ui/TodayWeeklyPlan.vue';
 import ReviewInvitations from '@/features/reviews/ui/ReviewInvitations.vue';
 import ActionButton from '@/shared/ui/actions/ActionButton.vue';
@@ -27,7 +28,7 @@ import FormHint from '../shared/ui/forms/FormHint.vue';
 import FormRow from '../shared/ui/forms/FormRow.vue';
 import DateInput from '../shared/ui/forms/DateInput.vue';
 import PageHeading from '../shared/ui/layout/PageHeading.vue';
-import PageShell from '../shared/ui/layout/PageShell.vue';
+import TodayWorkspace from '@/features/self-reminders/ui/TodayWorkspace.vue';
 import EyebrowText from '../shared/ui/typography/EyebrowText.vue';
 import ChipGroup from '../shared/ui/forms/ChipGroup.vue';
 import DurationInput from '../shared/ui/forms/DurationInput.vue';
@@ -190,7 +191,7 @@ const activeContextCue = computed(() =>
     firstUse:
       isToday.value && store.settings.firstUse.status === 'available' && store.dailyEntries.length > 0 && !firstUsePromptHidden.value,
     recovery: yesterdayMissing.value,
-    plan: isToday.value && Boolean(currentWeeklyPlan.value.plan),
+    plan: isToday.value && Boolean(currentWeeklyPlan.value.decision || currentWeeklyPlan.value.plan),
     pwa: isToday.value && pwaNudgeAvailable.value,
     ai: showAiAnalysisNudge.value,
   }),
@@ -280,7 +281,7 @@ function openEntryDatePicker() {
 </script>
 
 <template>
-  <PageShell class="page--today">
+  <TodayWorkspace v-slot="{ hasPrinciples }">
     <PageHeading :class="{ 'page-heading--historical': !isToday }">
       <div>
         <EyebrowText>Ежедневная запись</EyebrowText>
@@ -325,18 +326,8 @@ function openEntryDatePicker() {
       @available-hidden="firstUsePromptHidden = true"
     />
 
-    <section v-if="isFirstEntry && !firstUseTakesPriority" class="first-entry-guide" aria-label="Первая запись">
-      <div>
-        <EyebrowText>С чего начать</EyebrowText>
-        <h2>Отметьте несколько деталей сегодняшнего дня</h2>
-        <p>Не нужно заполнять всё. Разделы на главной можно добавить или убрать в настройках — уже сохранённые записи не пропадут.</p>
-      </div>
-      <div class="first-entry-guide__actions">
-        <ActionButton :as="RouterLink" variant="secondary" class="context-action" to="/settings#daily-blocks">Настроить блоки</ActionButton>
-      </div>
-    </section>
-
-    <JournalQuickCapture v-if="!firstUseTakesPriority && !isFirstEntry" />
+    <JournalQuickCapture v-if="!firstUseTakesPriority && !isFirstEntry" :selected-date="selectedDate" />
+    <RouterLink v-if="hasPrinciples" class="mobile-principles" to="/self-reminders#principle">Мои принципы</RouterLink>
 
     <section v-if="!firstUseTakesPriority && draftConflict" class="entry-change-notice draft-conflict-notice" role="alert">
       <div>
@@ -363,6 +354,7 @@ function openEntryDatePicker() {
             <h2>Заметка дня</h2>
             <p v-if="isFirstEntry">Что сегодня произошло или что вы заметили — даже если день был обычным.</p>
           </div>
+          <RouterLink v-if="isFirstEntry" class="card-settings-link" to="/settings#daily-blocks">Настроить блоки</RouterLink>
         </FormCardHeading>
         <textarea
           v-model="form.importantFact"
@@ -372,7 +364,8 @@ function openEntryDatePicker() {
           placeholder="Например: после прогулки стало легче собраться с мыслями"
         ></textarea>
       </SurfaceCard>
-      <TodayWeeklyPlan v-if="activeContextCue === 'plan'" v-bind="currentWeeklyPlan" />
+      <TodayWeeklyPlan v-if="isToday && (currentWeeklyPlan.decision || currentWeeklyPlan.plan)" v-bind="currentWeeklyPlan" />
+      <TodayFollowUps v-if="isToday" :today="localToday" @review-goal="openCurrentGoalDialog" />
       <div v-if="blockIsActive('sleep') || blockIsActive('context')" class="checkin-group-heading">
         <span>Состояние и условия</span>
       </div>
@@ -696,7 +689,7 @@ function openEntryDatePicker() {
       @remove="removeCurrentGoal"
       @save="saveCurrentGoal"
     />
-  </PageShell>
+  </TodayWorkspace>
 </template>
 
 <style scoped src="./TodayView.css"></style>

@@ -1,3 +1,4 @@
+import { weeklyDecisionText } from './decisionText';
 import type { MonthlyReview, WeeklyReview } from '@/types';
 import { captureProductEvent } from '@/features/telemetry/productTelemetry';
 
@@ -22,8 +23,8 @@ function decision(review: WeeklyReview | MonthlyReview | undefined): string {
   if (!review) {
     return '';
   }
-  const value = 'weekStart' in review ? review.nextLever.trim() : review.courseChange.trim();
-  return value === 'Пока без решения' ? '' : value;
+  const value = 'weekStart' in review ? weeklyDecisionText(review) : review.nextFocus.trim();
+  return value || review.ifThenPlan.trim();
 }
 export function captureDecisionSave(review: WeeklyReview | MonthlyReview, previous?: WeeklyReview | MonthlyReview): () => void {
   if (!decision(review) || decision(review) === decision(previous)) {

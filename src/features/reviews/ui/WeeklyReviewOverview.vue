@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import type { WeeklyReview } from '@/types';
+import { weeklyDecisionText } from '../decisionText';
 
 const props = defineProps<{ review: WeeklyReview }>();
 const results = computed(() => props.review.results.filter((item) => item.trim()));
@@ -34,7 +35,7 @@ const highlights = computed(() => props.review.highlights.filter((item) => item.
       <p>{{ review.obstacle }}</p>
     </div>
     <div v-if="review.nextLever" class="weekly-review-overview__group">
-      <strong>Ваше решение</strong>
+      <strong>{{ weeklyDecisionText(review) ? 'Ваше решение' : 'После обзора' }}</strong>
       <p>{{ review.nextLever }}</p>
     </div>
     <div v-if="review.ifThenPlan" class="weekly-review-overview__group">

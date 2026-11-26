@@ -60,6 +60,7 @@ const {
   dailyBlockOptions,
   store,
   settings,
+  cardDirty,
   importInput,
   newCareerLabel,
   newActivityLabel,
@@ -127,7 +128,7 @@ const {
       :style="settingsGroupStyle"
       aria-label="Настройка ежедневной записи"
     >
-      <SettingsCard id="daily-blocks" class="settings-card--daily-blocks">
+      <SettingsCard id="daily-blocks" class="settings-card--daily-blocks" :unsaved="cardDirty('daily-blocks')">
         <FormCardHeading icon="blocks" tone="blue">
           <div>
             <h2>Разделы ежедневной записи</h2>
@@ -204,7 +205,7 @@ const {
         </div>
       </SettingsCard>
 
-      <SettingsCard id="life-areas" class="settings-card--areas" tone="areas">
+      <SettingsCard id="life-areas" class="settings-card--areas" tone="areas" :unsaved="cardDirty('life-areas')">
         <FormCardHeading icon="event" tone="amber">
           <div>
             <h2>Области жизни</h2>
@@ -372,7 +373,7 @@ const {
         </div>
       </SettingsCard>
 
-      <SettingsCard id="nutrition-settings" class="settings-card--nutrition" tone="success">
+      <SettingsCard id="nutrition-settings" class="settings-card--nutrition" tone="success" :unsaved="cardDirty('nutrition')">
         <FormCardHeading icon="nutrition" tone="green">
           <div>
             <h2>Критерий питания</h2>
@@ -407,6 +408,7 @@ const {
     >
       <ExperimentSettingsCard
         v-model:experiment="settings.experiment"
+        :unsaved="cardDirty('experiment')"
         :can-conclude="experimentCanConclude"
         :history-count="settings.experimentHistory.length"
         :identity-locked="experimentIdentityLocked"

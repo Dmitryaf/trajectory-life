@@ -70,7 +70,10 @@ describe('trends scenarios', () => {
     expect(wrapper.get('.range-custom-action strong').text()).toBe('Данные для анализа за другие даты');
     expect(wrapper.get('.range-custom-action a').text()).toBe('Перейти к экспорту');
     expect(wrapper.get('.range-custom-action a').attributes('href')).toBe('/settings#analysis-settings');
-    expect(wrapper.get('h1').text()).toBe('История изменений');
+    expect(wrapper.get('h1').text()).toBe('Динамика');
+    expect(wrapper.get('.review-cue__details summary').text()).toBe('Как посчитано');
+    expect(wrapper.get('.review-cue__details').attributes('open')).toBeUndefined();
+    expect(wrapper.get('.review-cue__details p').text()).toContain('измерений');
     expect(wrapper.html().indexOf('dashboard-card--insights')).toBeLessThan(wrapper.html().indexOf('history-timeline--featured'));
     expect(wrapper.html().indexOf('history-timeline--featured')).toBeLessThan(wrapper.html().indexOf('trends-metric-details'));
     expect(wrapper.findAll('.review-cue-grid--primary .review-cue strong').map((item) => item.text())).toEqual([
@@ -140,7 +143,7 @@ describe('trends scenarios', () => {
 
     expect(wrapper.findAll('.decision-timeline__item')).toHaveLength(10);
     expect(wrapper.get('.archive-pagination span').text()).toBe('2 из 3');
-    expect(wrapper.findAll('.decision-timeline__item strong').map((item) => item.text())).toEqual(
+    expect(wrapper.findAll('.decision-timeline__item .history-source').map((item) => item.text())).toEqual(
       Array.from({ length: 10 }, (_, index) => `Итог ${index + 11}`),
     );
 
@@ -148,7 +151,8 @@ describe('trends scenarios', () => {
 
     expect(wrapper.findAll('.decision-timeline__item')).toHaveLength(1);
     expect(wrapper.get('.archive-pagination span').text()).toBe('3 из 3');
-    expect(wrapper.get('.decision-timeline__item strong').text()).toBe('Итог 21');
+    expect(wrapper.get('.decision-timeline__item .history-source').text()).toBe('Итог 21');
+    expect(wrapper.get('.decision-timeline__item .history-source').attributes('href')).toBe('/results?entry=21');
   });
 
   it('does not show metric comparisons inside experiment history records', () => {

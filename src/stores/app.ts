@@ -593,14 +593,15 @@ export const useAppStore = defineStore('app', {
         void this.syncCloudSnapshot();
       });
     },
-    async saveSettings(settings: AppSettings): Promise<void> {
+    async saveSettings(settings: AppSettings, fields?: readonly (keyof AppSettings)[]): Promise<void> {
       const scope = this.createCloudOperationScope();
       return serializeLocalData(this, scope.assertCurrent, async () => {
-        const integrityError = experimentIntegrityError(settings);
+        const next = fields ? { ...this.settings, ...Object.fromEntries(fields.map((field) => [field, settings[field]])) } : settings;
+        const integrityError = experimentIntegrityError(next);
         if (integrityError) {
           throw new Error(integrityError);
         }
-        const normalized = plainCopy(normalizeSettings(settings));
+        const normalized = plainCopy(normalizeSettings(next));
         const entryLinkError = experimentEntryLinkError(this.dailyEntries, normalized);
         if (entryLinkError) {
           throw new Error(entryLinkError);
