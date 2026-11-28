@@ -48,9 +48,15 @@ export function useJournalEditor<T extends Record>(options: {
       Object.assign(form, restored);
     },
   });
+  const draftNotice = computed(() => {
+    if (drafts.error.value) {
+      return drafts.notice.value;
+    }
+    return drafts.restored.value ? 'Восстановлен черновик с этого устройства.' : 'Черновик сохраняется на этом устройстве.';
+  });
   const draftOptions = computed(() =>
     store.editorDrafts
-      .filter((item) => item.key.startsWith(`${options.kind}:`))
+      .filter((item) => item.key.startsWith(`${options.kind}:`) && item.key !== key.value)
       .map((item) => {
         try {
           const value = JSON.parse(item.value) as T;
@@ -217,6 +223,7 @@ export function useJournalEditor<T extends Record>(options: {
     conflict,
     dirty,
     drafts: reactive(drafts),
+    draftNotice,
     draftOptions,
     createRequested,
     edit,

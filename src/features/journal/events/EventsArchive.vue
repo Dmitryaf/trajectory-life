@@ -113,17 +113,6 @@ function eventKey(event: LifeEventRecord) {
           <p>Запишите событие или мысль, к которой хочется вернуться.</p>
         </div>
       </FormCardHeading>
-      <JournalDraftStatus
-        :notice="drafts.notice"
-        :error="drafts.error"
-        :conflict="conflict"
-        :saving="saving"
-        :drafts="editor.draftOptions.value"
-        @retry="drafts.flush"
-        @reload="editor.reload"
-        @replace="editor.replace"
-        @open="editor.openDraft"
-      />
       <fieldset :disabled="saving" class="journal-fields">
         <label class="journal-note-label" for="event-note">Событие или мысль</label>
         <AutoGrowTextarea
@@ -144,7 +133,13 @@ function eventKey(event: LifeEventRecord) {
         >
           {{ editingId === null ? 'Добавить запись' : 'Сохранить запись' }}
         </ActionButton>
-        <ActionButton v-if="editingId !== null || dirty" variant="secondary" class="composer-cancel" type="button" @click="resetForm">
+        <ActionButton
+          variant="secondary"
+          class="composer-cancel"
+          type="button"
+          :disabled="saving || (editingId === null && !dirty)"
+          @click="resetForm"
+        >
           {{ editingId === null ? 'Удалить черновик' : 'Отменить редактирование' }}
         </ActionButton>
         <DateInput v-model="date" class="journal-date" required aria-label="Дата события" :disabled="saving" />
@@ -168,6 +163,17 @@ function eventKey(event: LifeEventRecord) {
           <ChipGroup v-model="type" :options="lifeEventTypeOptions" />
         </details>
       </fieldset>
+      <JournalDraftStatus
+        :notice="editor.draftNotice.value"
+        :error="drafts.error"
+        :conflict="conflict"
+        :saving="saving"
+        :drafts="editor.draftOptions.value"
+        @retry="drafts.flush"
+        @reload="editor.reload"
+        @replace="editor.replace"
+        @open="editor.openDraft"
+      />
     </template>
     <template #search>
       <label class="archive-filter-field">

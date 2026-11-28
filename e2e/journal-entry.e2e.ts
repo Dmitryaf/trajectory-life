@@ -127,10 +127,12 @@ test('places both composer actions below focused notes with the same spacing', a
         await expect(page.locator('.bottom-nav')).toHaveCSS('pointer-events', 'none');
       }
       await expectPageFitsViewport(page, `${route} composer at ${width}px`);
-      await expect(page.locator('.editor-draft-notice')).toContainText(/Черновик сохранён|Восстановлен черновик/);
+      await expect(page.locator('.editor-draft-notice')).toContainText(/Черновик сохраняется|Восстановлен черновик/);
       if (width === 390 || width === 1440) {
         await composer.screenshot({ path: `qa/ui-polish-20261012/${route.slice(1)}-${width}.png` });
       }
+      await page.locator('.archive-navigation a[href="/more"]').click();
+      await page.waitForURL('**/more');
     }
     expect(layouts[0]).toBeCloseTo(layouts[1]!, 0);
   }
@@ -158,7 +160,6 @@ test('keeps cancellation for the remaining archive edit scenarios', async ({ pag
   await page.goto('/results');
   await openComposer(page);
   const resultTitle = page.getByPlaceholder('Что вы сделали или какой результат получили');
-  await page.locator('.result-item .archive-item-actions > summary').first().click();
   await page.getByRole('button', { name: 'Редактировать итог' }).first().click();
   await resultTitle.fill('Изменение, которое не нужно сохранять');
   await page.getByRole('button', { name: 'Отменить редактирование' }).click();
@@ -168,7 +169,6 @@ test('keeps cancellation for the remaining archive edit scenarios', async ({ pag
   await page.goto('/events');
   await openComposer(page);
   const eventTitle = page.getByPlaceholder('Короткое название');
-  await page.locator('.timeline-item .archive-item-actions > summary').first().click();
   await page.getByRole('button', { name: 'Редактировать событие' }).first().click();
   await eventTitle.fill('Другое несохранённое изменение');
   await page.getByRole('button', { name: 'Отменить редактирование' }).click();
@@ -186,8 +186,8 @@ test('opens edits with Enter without saving on key release and returns focus aft
     await page.goto(scenario.route);
     const card = page.locator(scenario.card).first();
     const originalTitle = await card.locator('strong').first().innerText();
-    await card.locator('.archive-item-actions > summary').press('Enter');
     const edit = card.getByRole('button', { name: scenario.edit });
+    await expect(edit).toBeVisible();
     await edit.focus();
     await page.keyboard.press('Enter');
     const input = page.locator('.result-composer input[type="text"]');
@@ -203,6 +203,32 @@ test('opens edits with Enter without saving on key release and returns focus aft
     await expect(edit).toBeFocused();
     await expect(edit).toBeInViewport();
     await expect(card.locator('strong').first()).toHaveText(originalTitle);
+  }
+});
+
+test('shows direct delete buttons in both archives and requires confirmation', async ({ page }) => {
+  page.removeAllListeners('dialog');
+  for (const [route, selector, action, confirmation, toast] of [
+    ['/results', '.result-item', 'Удалить итог', 'Удалить этот итог?', 'Итог удалён'],
+    ['/events', '.timeline-item', 'Удалить событие', 'Удалить это событие?', 'Событие удалено'],
+  ] as const) {
+    await page.goto(route);
+    const cards = page.locator(selector);
+    const firstCard = cards.first();
+    const remove = firstCard.getByRole('button', { name: action });
+    await expect(remove).toBeVisible();
+    const title = await firstCard.locator('strong').innerText();
+    const original = cards.filter({ has: page.getByText(title, { exact: true }) });
+    await remove.click();
+    await expect(original).toBeVisible();
+
+    page.once('dialog', async (dialog) => {
+      expect(dialog.message()).toBe(confirmation);
+      await dialog.accept();
+    });
+    await remove.click();
+    await expect(page.getByText(toast, { exact: true })).toBeVisible();
+    await expect(original).toHaveCount(0);
   }
 });
 
