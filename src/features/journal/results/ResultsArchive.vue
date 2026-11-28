@@ -115,17 +115,6 @@ function resultKey(result: ResultRecord) {
           <p>Запишите одним предложением, что вы сделали или какой результат получили.</p>
         </div>
       </FormCardHeading>
-      <JournalDraftStatus
-        :notice="drafts.notice"
-        :error="drafts.error"
-        :conflict="conflict"
-        :saving="saving"
-        :drafts="editor.draftOptions.value"
-        @retry="drafts.flush"
-        @reload="editor.reload"
-        @replace="editor.replace"
-        @open="editor.openDraft"
-      />
       <fieldset :disabled="saving" class="journal-fields">
         <label class="journal-note-label" for="result-note">Что получилось</label>
         <AutoGrowTextarea
@@ -146,7 +135,13 @@ function resultKey(result: ResultRecord) {
         >
           {{ editingId === null ? 'Добавить итог' : 'Сохранить итог' }}
         </ActionButton>
-        <ActionButton v-if="editingId !== null || dirty" variant="secondary" class="composer-cancel" type="button" @click="resetForm">
+        <ActionButton
+          variant="secondary"
+          class="composer-cancel"
+          type="button"
+          :disabled="saving || (editingId === null && !dirty)"
+          @click="resetForm"
+        >
           {{ editingId === null ? 'Удалить черновик' : 'Отменить редактирование' }}
         </ActionButton>
         <DateInput v-model="date" class="journal-date" required aria-label="Дата итога" :disabled="saving" />
@@ -170,6 +165,17 @@ function resultKey(result: ResultRecord) {
           <ChipGroup v-model="area" :options="resultEntryOptions" />
         </details>
       </fieldset>
+      <JournalDraftStatus
+        :notice="editor.draftNotice.value"
+        :error="drafts.error"
+        :conflict="conflict"
+        :saving="saving"
+        :drafts="editor.draftOptions.value"
+        @retry="drafts.flush"
+        @reload="editor.reload"
+        @replace="editor.replace"
+        @open="editor.openDraft"
+      />
     </template>
     <template #search>
       <label class="archive-filter-field">

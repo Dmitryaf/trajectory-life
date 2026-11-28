@@ -192,5 +192,5 @@ export function useEditorDraft(options: Options) {
     window.removeEventListener('beforeunload', beforeUnload);
     document.removeEventListener('visibilitychange', protectOnHide);
   });
-  return { error, notice, suspended, restore, saved, discard, flush, beforeLeave, currentOwner };
+  return { error, notice, restored, suspended, restore, saved, discard, flush, beforeLeave, currentOwner };
 }

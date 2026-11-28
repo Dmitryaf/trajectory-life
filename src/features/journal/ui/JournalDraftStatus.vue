@@ -5,14 +5,6 @@ defineProps<{ notice: string; error: boolean; conflict: boolean; saving: boolean
 defineEmits<{ retry: []; reload: []; replace: []; open: [key: string] }>();
 </script>
 <template>
-  <details v-if="drafts.length" class="journal-drafts">
-    <summary>Черновики на этом устройстве ({{ drafts.length }})</summary>
-    <div class="journal-drafts__actions">
-      <ActionButton v-for="draft in drafts" :key="draft.key" variant="secondary" :disabled="saving" @click="$emit('open', draft.key)">{{
-        draft.label
-      }}</ActionButton>
-    </div>
-  </details>
   <EditorDraftNotice :notice="notice" :error="error" @retry="$emit('retry')" />
   <div v-if="conflict" role="status" class="journal-conflict">
     <p>Сохранённая запись изменилась или была удалена. Ваш текст остался в форме.</p>
@@ -21,6 +13,14 @@ defineEmits<{ retry: []; reload: []; replace: []; open: [key: string] }>();
       <ActionButton variant="secondary" :disabled="saving" @click="$emit('replace')">Сохранить мой вариант</ActionButton>
     </div>
   </div>
+  <details v-if="drafts.length" class="journal-drafts">
+    <summary>Другие черновики ({{ drafts.length }})</summary>
+    <div class="journal-drafts__actions">
+      <ActionButton v-for="draft in drafts" :key="draft.key" variant="secondary" :disabled="saving" @click="$emit('open', draft.key)">{{
+        draft.label
+      }}</ActionButton>
+    </div>
+  </details>
 </template>
 <style scoped>
 .journal-drafts {

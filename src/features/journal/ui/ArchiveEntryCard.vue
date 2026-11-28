@@ -1,6 +1,4 @@
 <script setup lang="ts">
-import ArchiveItemActions from './ArchiveItemActions.vue';
-
 const props = defineProps<{
   tone: 'results' | 'events';
   icon?: string;
@@ -21,9 +19,9 @@ const legacyContentClass = props.tone === 'results' ? 'result-item__content' : u
       <small>{{ metadata }}</small>
       <slot></slot>
     </div>
-    <ArchiveItemActions :title="title">
+    <div class="archive-entry__actions" role="group" :aria-label="`Действия с записью «${title}»`">
       <slot name="actions"></slot>
-    </ArchiveItemActions>
+    </div>
   </article>
 </template>
 
@@ -80,9 +78,20 @@ const legacyContentClass = props.tone === 'results' ? 'result-item__content' : u
   color: var(--muted);
 }
 
-@media (max-width: 520px) {
-  .archive-entry--events > :deep(.archive-item-actions) {
-    grid-column: 2;
+.archive-entry__actions {
+  grid-column: 2 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.archive-entry__actions :deep(button) {
+  padding-inline: 10px;
+}
+
+@media (max-width: 384px) {
+  .archive-entry__actions {
+    grid-column: 1 / -1;
   }
 }
 </style>

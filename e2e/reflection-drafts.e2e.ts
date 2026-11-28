@@ -1,6 +1,6 @@
 import { expect, test, type Page } from './fixtures';
 import { readDemoPayload } from './demo-data';
-import { expectPageFitsViewport } from './layout-assertions';
+import { expectPageFitsViewport, expectSamePosition, readDocumentLayoutBox } from './layout-assertions';
 
 async function seed(page: Page, entries: Array<{ date: string; importantFact?: string }> = []) {
   const payload = { ...readDemoPayload(), dailyEntries: entries, results: [], lifeEvents: [], weeklyReviews: [], monthlyReviews: [] };
@@ -42,10 +42,9 @@ test('keeps an independent new journal draft when another tab saves its own', as
   const firstNote = page.locator('.archive-composer textarea');
   const secondNote = second.locator('.archive-composer textarea');
   await firstNote.fill('Итог из первой вкладки');
-  await expect(page.getByText(/Черновик сохранён на этом устройстве/)).toBeVisible();
+  await expect.poll(() => records(page, 'editorDrafts')).toHaveLength(1);
   await secondNote.fill('Черновик из второй вкладки');
-  await expect(second.getByText(/Черновик сохранён на этом устройстве/)).toBeVisible();
-  expect(await records(page, 'editorDrafts')).toHaveLength(2);
+  await expect.poll(() => records(page, 'editorDrafts')).toHaveLength(2);
 
   await page.getByRole('button', { name: 'Добавить итог', exact: true }).click();
   await expect(page.getByText('Итог добавлен', { exact: true })).toBeVisible();
@@ -84,6 +83,38 @@ for (const [route, other, table, saved] of [
   ['results', 'events', 'results', 'Итог добавлен'],
   ['events', 'results', 'lifeEvents', 'Событие добавлено'],
 ] as const) {
+  test(`keeps the ${route} editor stable while autosaving without listing the active draft`, async ({ page }) => {
+    await seed(page);
+    for (const width of [390, 1280]) {
+      await page.setViewportSize({ width, height: 844 });
+      await page.goto(`/${route}?create=1`);
+      const composer = page.locator('.archive-composer');
+      const note = composer.locator('textarea');
+      const notice = composer.locator('.editor-draft-notice');
+      const controls = [note, composer.locator('.primary-button'), composer.locator('input[type="date"]'), page.locator('.archive-panel')];
+      await expect(note).toHaveValue('');
+      await expect(notice).toHaveText('Черновик сохраняется на этом устройстве.');
+      const message = await notice.innerText();
+      const before = await Promise.all(controls.map((control) => readDocumentLayoutBox(control, `${route} at ${width}px`)));
+      for (const value of ['Новая запись', 'Новая запись с уточнением']) {
+        await note.fill(value);
+        await expect(notice).toHaveText(message);
+        await expect
+          .poll(async () => (await records(page, 'editorDrafts')).map((draft) => JSON.parse(String(draft.value)).note))
+          .toEqual([value]);
+        await expect(notice).toHaveText(message);
+        for (const [index, control] of controls.entries()) {
+          const context = `${route} control ${index + 1} at ${width}px`;
+          expectSamePosition(before[index]!, await readDocumentLayoutBox(control, context), context);
+        }
+        await expect(composer.locator('.journal-drafts')).toHaveCount(0);
+      }
+      await expectPageFitsViewport(page, `${route} composer at ${width}px`);
+      await composer.locator('.primary-button').click();
+      await expect(note).toHaveValue('');
+    }
+  });
+
   test(`protects a text-only ${route} draft across navigation and reload, then clears it atomically`, async ({ page }) => {
     await seed(page, [{ date: '2026-11-12', importantFact: 'Предыдущая дневная запись' }]);
     await page.goto('/today');
@@ -148,15 +179,14 @@ test('keeps separate edit drafts and requires an explicit choice before replacin
   }
   const first = page.locator('.result-item').filter({ hasText: 'Первая запись' });
   const second = page.locator('.result-item').filter({ hasText: 'Вторая запись' });
-  await first.locator('.archive-item-actions > summary').click();
   await first.getByLabel('Редактировать итог').click();
   await note.fill('Черновик первой записи');
-  await second.locator('.archive-item-actions > summary').click();
   await second.getByLabel('Редактировать итог').click();
   await note.fill('Черновик второй записи');
   await page.locator('.journal-drafts > summary').click();
   await page.locator('.journal-drafts').getByRole('button', { name: 'Первая запись', exact: true }).click();
   await expect(note).toHaveValue('Черновик первой записи');
+  await expect(page.locator('.journal-drafts button')).toHaveText(['Вторая запись']);
   const firstRecord = (await records(page, 'results')).find((item) => item.title === 'Первая запись')!;
   await page.evaluate(
     (record) =>
